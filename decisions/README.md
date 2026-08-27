@@ -14,6 +14,7 @@
 | [ADR-0008](0008-run-api-sse-mock-runner.md) | Run API、SSE 事件流与 mock runner | accepted | 后端 run 创建/查询/事件回看/SSE 和前端 Run 交互已验证 |
 | [ADR-0009](0009-workspace-write-edit-tools.md) | Workspace 写入与文本编辑工具 | accepted | `write_file`、`replace_text`、hash 冲突检测和注册表接入已验证 |
 | [ADR-0010](0010-model-boundary-response-parser.md) | 模型适配边界与响应解析器 | accepted | 模型请求/响应边界、JSON 解析、mock 客户端接入和解析失败终止已验证；真实 API 未接入 |
+| [ADR-0011](0011-agent-loop-budget.md) | 多轮 Agent loop 与运行预算 | accepted | 多轮模型/工具循环、轮次上限、工具调用上限和上下文消息窗口已验证；真实 API 未接入 |
 
 ## 规则
 

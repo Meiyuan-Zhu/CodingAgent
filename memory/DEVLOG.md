@@ -128,3 +128,18 @@
 - 增加模型解析器、模型请求、mock 模型客户端和 runner 解析失败测试。
 - 执行 MODEL-001 验证：`cd backend && mvn test` 通过，78 tests, 0 failures, 0 errors。
 - 限制：仍未接入真实模型 API；runner 仍是单轮请求，不包含上下文裁剪、预算、取消或多轮 observe-think-act 循环。
+
+
+## 2026-08-27：子任务 7 - 多轮 Agent loop 与运行预算
+
+- 目标：在接入真实模型前先把核心循环和预算控制做出来，避免真实 provider 行为与 loop bug 混在一起。
+- 新增 `RunBudget`，默认限制为 4 轮、12 次工具调用、30 条上下文消息。
+- 更新 `MockAgentRunner`：
+  - 每轮通过 `ModelClient` 请求模型，并在事件中记录 round、contextMessages 和 toolCallsUsed。
+  - `TOOL_CALLS` 响应先检查工具调用预算，再通过 `ToolRegistry` 执行工具。
+  - 工具结果作为 tool observation message 追加到上下文，进入下一轮模型请求。
+  - `STOP` 正常完成，`LENGTH` 转为 `TOKEN_BUDGET_LIMIT`，超轮次转为 `ROUND_LIMIT`，超工具调用转为 `TOOL_CALL_LIMIT`。
+  - 上下文超过消息窗口时保留 system prompt 和最近消息。
+- 更新 `HeuristicMockModelClient`：收到 tool message 后返回 `STOP`，因此 mock run 现在能演示两轮 observe/tool/finish 流程。
+- 执行 LOOP-001 验证：`cd backend && mvn test` 通过，85 tests, 0 failures, 0 errors；`cd frontend && npm run build` 通过；本地 HTTP run 产生 11 条事件、2 次模型请求、1 次工具完成并以 `COMPLETED` 成功结束。
+- 限制：真实模型 API、取消、超时、审批、命令工具和精确 token 计数仍未实现。

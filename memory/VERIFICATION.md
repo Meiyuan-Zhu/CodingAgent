@@ -306,3 +306,44 @@
 - 关联：ADR-0010。
 - 代码版本/运行 ID：`a58e31b feat: add model response parsing boundary`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+
+## LOOP-001：多轮 Agent loop 与预算验证
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试、Spring 上下文测试、前端构建、本地 HTTP 集成测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/HeuristicMockModelClient.java`、`frontend/src/App.vue`。
+- 方法：实现多轮模型/工具循环、预算限制、上下文消息窗口和 mock 模型 stop 行为后执行以下检查：
+  - `cd backend && mvn test`。
+  - `cd frontend && npm run build`。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 启动后端。
+  - 使用本地 HTTP 请求 `POST /api/runs` 创建 run，并查询 `GET /api/runs/{runId}` 与 `GET /api/runs/{runId}/events`。
+- 结果：通过。
+  - 后端测试：85 tests, 0 failures, 0 errors。
+  - 前端构建：`vue-tsc -b` 与 `vite build` 均成功。
+  - 本地 HTTP run `2bbde4a4-237e-45ab-828a-4568ec636e43` 最终状态 `SUCCEEDED`，stopReason 为 `COMPLETED`。
+  - 事件共 11 条，其中 `MODEL_REQUESTED` 2 条、`TOOL_CALL_FINISHED` 1 条，`RUN_FINISHED` payload 包含 `roundsUsed=2`、`toolCallsUsed=1`。
+- 覆盖：
+  - 多轮成功：第一轮模型请求工具，工具结果回填后第二轮模型返回 `STOP`。
+  - 工具失败以 `TOOL_ERROR` 结束。
+  - 模型解析失败以 `MODEL_PARSE_ERROR` 结束。
+  - 模型 `LENGTH` finish reason 以 `TOKEN_BUDGET_LIMIT` 结束。
+  - 模型持续请求工具时以 `ROUND_LIMIT` 结束。
+  - 工具调用数超过预算时以 `TOOL_CALL_LIMIT` 结束，并在执行前停止。
+  - 上下文窗口保留 system prompt 和最近消息。
+- 观察：首次本地 HTTP 请求在沙箱内因 `Operation not permitted` 被拒绝；按权限规则使用提升权限访问本机 `127.0.0.1:18080` 后验证通过。Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均不影响本次结果。
+- 关联：ADR-0011。
+- 代码版本/运行 ID：`2b06ac8 feat: add bounded agent loop`。
+- 限制：仍未验证真实模型 API、真实 token 计数、取消、超时、审批、命令执行或浏览器交互。
+
+
+## DOC-010：多轮 loop 子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0011 索引、STATUS 对 ADR-0011 和 LOOP-001 的引用、LOOP-001 验证记录、DEVLOG 子任务 7 记录。
+- 结果：通过。检查 23 个 Markdown 文件。
+- 关联：ADR-0011。
+- 代码版本/运行 ID：`2b06ac8 feat: add bounded agent loop`；本条哈希信息由后续文档同步提交补充。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。
