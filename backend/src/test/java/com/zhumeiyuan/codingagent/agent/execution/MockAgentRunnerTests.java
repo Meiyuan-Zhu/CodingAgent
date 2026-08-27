@@ -3,11 +3,15 @@ package com.zhumeiyuan.codingagent.agent.execution;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
 import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
@@ -26,12 +30,19 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolDefinition;
 import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionResult;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class MockAgentRunnerTests {
 
 	private final Clock clock = Clock.fixed(Instant.parse("2026-08-27T09:30:00Z"), ZoneOffset.UTC);
 	private final RunBudget budget = new RunBudget(4, 12, 30);
+	private final ExecutorService toolExecutor = Executors.newSingleThreadExecutor();
+
+	@AfterEach
+	void shutdownToolExecutor() {
+		this.toolExecutor.shutdownNow();
+	}
 
 	@Test
 	void runsMultipleRoundsThroughRegistryAndFinishesSuccessfully() {
@@ -42,7 +53,7 @@ class MockAgentRunnerTests {
 						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
 				new ModelResponse("Done after observing files", ModelFinishReason.STOP, List.of()));
 		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), model,
-				this.budget, this.clock);
+				this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "please inspect workspace");
 
@@ -81,7 +92,7 @@ class MockAgentRunnerTests {
 				request -> new ModelResponse("List files",
 						ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
-				this.budget, this.clock);
+				this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "please inspect workspace");
 
@@ -98,7 +109,7 @@ class MockAgentRunnerTests {
 			throw new ModelParseException("bad response");
 		};
 		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), failingModel,
-				this.budget, this.clock);
+				this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
 
@@ -112,7 +123,7 @@ class MockAgentRunnerTests {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
 		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
-				request -> new ModelResponse("partial", ModelFinishReason.LENGTH, List.of()), this.budget, this.clock);
+				request -> new ModelResponse("partial", ModelFinishReason.LENGTH, List.of()), this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
 
@@ -128,7 +139,7 @@ class MockAgentRunnerTests {
 		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
 				request -> new ModelResponse("again", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-" + request.messages().size(), "list_files", Map.of("path", ".")))),
-				smallBudget, this.clock);
+				smallBudget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
 
@@ -148,7 +159,7 @@ class MockAgentRunnerTests {
 						List.of(
 								new ToolCall("call-1", "list_files", Map.of("path", ".")),
 								new ToolCall("call-2", "read_file", Map.of("path", "README.md")))),
-				smallBudget, this.clock);
+				smallBudget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
 
@@ -171,7 +182,7 @@ class MockAgentRunnerTests {
 						List.of(new ToolCall("call-" + requests.size(), "list_files", Map.of("path", "."))));
 			}
 			return new ModelResponse("done", ModelFinishReason.STOP, List.of());
-		}, smallContext, this.clock);
+		}, smallContext, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
 
@@ -181,6 +192,53 @@ class MockAgentRunnerTests {
 		assertThat(thirdRequest.messages()).hasSize(4);
 		assertThat(thirdRequest.messages().get(0).role().name()).isEqualTo("SYSTEM");
 		assertThat(thirdRequest.messages()).extracting(ModelMessage::content).last().asString().contains("tool_call_id=call-2");
+	}
+
+	@Test
+	void toolTimeoutStopsRunWithTimeLimit() {
+		AgentRunStore store = new AgentRunStore();
+		AgentRun run = store.create(this.clock);
+		RunBudget timeoutBudget = new RunBudget(4, 12, 30, Duration.ofMillis(20));
+		ToolRegistry registry = new ToolRegistry(List.of(new RegisteredTool(
+				new ToolDefinition("slow_tool", "Slow tool", Map.of("type", "object")),
+				arguments -> {
+					try {
+						Thread.sleep(Duration.ofSeconds(5));
+					} catch (InterruptedException ex) {
+						Thread.currentThread().interrupt();
+					}
+					return ToolExecutionResult.of("too late", Map.of());
+				})), this.clock);
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry,
+				request -> new ModelResponse("slow", ModelFinishReason.TOOL_CALLS,
+						List.of(new ToolCall("call-1", "slow_tool", Map.of()))),
+				timeoutBudget, this.toolExecutor, this.clock);
+
+		runner.run(run.id(), "inspect");
+
+		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
+		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.TIME_LIMIT);
+		assertThat(store.listEvents(run.id(), -1)).filteredOn(event -> event.type() == RunEventType.TOOL_CALL_FINISHED)
+				.singleElement()
+				.satisfies(event -> assertThat(event.payload().get("metadata").toString()).contains("TOOL_TIMEOUT"));
+	}
+
+	@Test
+	void cancellingRunBeforeStartSkipsModelAndFinishesCancelled() {
+		AgentRunStore store = new AgentRunStore();
+		AgentRun run = store.create(this.clock);
+		store.transition(run.id(), current -> current.requestCancel(this.clock));
+		AtomicBoolean modelCalled = new AtomicBoolean(false);
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), request -> {
+			modelCalled.set(true);
+			return new ModelResponse("done", ModelFinishReason.STOP, List.of());
+		}, this.budget, this.toolExecutor, this.clock);
+
+		runner.run(run.id(), "inspect");
+
+		assertThat(modelCalled).isFalse();
+		assertThat(store.get(run.id()).status().name()).isEqualTo("CANCELLED");
+		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.USER_CANCELLED);
 	}
 
 	private ToolRegistry registryReturningSuccess() {

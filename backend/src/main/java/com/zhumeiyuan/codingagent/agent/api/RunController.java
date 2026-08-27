@@ -44,6 +44,11 @@ class RunController {
 		return RunResponse.from(this.agentRunService.getRun(RunId.from(runId)));
 	}
 
+	@PostMapping("/{runId}/cancel")
+	RunResponse cancelRun(@PathVariable String runId) {
+		return RunResponse.from(this.agentRunService.cancelRun(RunId.from(runId)));
+	}
+
 	@GetMapping("/{runId}/events")
 	List<RunEvent> listRunEvents(@PathVariable String runId,
 			@RequestParam(name = "after", defaultValue = "-1") long afterSequence) {

@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 import java.util.function.UnaryOperator;
 
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
@@ -19,15 +18,15 @@ public class AgentRunService {
 	private final AgentRunStore store;
 	private final RunEventStream runEventStream;
 	private final MockAgentRunner mockAgentRunner;
-	private final Executor executor;
+	private final RunTaskManager runTaskManager;
 	private final Clock clock;
 
 	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
-			Executor executor, Clock clock) {
+			RunTaskManager runTaskManager, Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
 		this.mockAgentRunner = Objects.requireNonNull(mockAgentRunner, "mockAgentRunner");
-		this.executor = Objects.requireNonNull(executor, "executor");
+		this.runTaskManager = Objects.requireNonNull(runTaskManager, "runTaskManager");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
@@ -36,8 +35,23 @@ public class AgentRunService {
 		AgentRun run = this.store.create(this.clock);
 		emit(run.id(), RunEventType.RUN_CREATED, Map.of("runId", run.id().value()));
 		emit(run.id(), RunEventType.USER_MESSAGE_ACCEPTED, Map.of("prompt", normalizedPrompt));
-		this.executor.execute(() -> this.mockAgentRunner.run(run.id(), normalizedPrompt));
+		this.runTaskManager.start(run.id(), () -> this.mockAgentRunner.run(run.id(), normalizedPrompt));
 		return getRun(run.id());
+	}
+
+	public AgentRun cancelRun(RunId runId) {
+		AgentRun cancelling = this.store.transition(runId, run -> {
+			if (run.status().isTerminal()) {
+				return run;
+			}
+			return run.requestCancel(this.clock);
+		});
+		if (cancelling.status().isTerminal()) {
+			return cancelling;
+		}
+		emit(runId, RunEventType.RUN_CANCELLING, Map.of("reason", "user_requested"));
+		boolean interruptRequested = this.runTaskManager.cancel(runId);
+		return completeCancellation(runId, interruptRequested);
 	}
 
 	public AgentRun getRun(RunId runId) {
@@ -56,6 +70,20 @@ public class AgentRunService {
 		RunEvent event = this.store.appendEvent(runId, type, payload, this.clock);
 		this.runEventStream.publish(event, getRun(runId).status().isTerminal());
 		return event;
+	}
+
+	private AgentRun completeCancellation(RunId runId, boolean interruptRequested) {
+		AgentRun current = getRun(runId);
+		if (current.status().isTerminal()) {
+			return current;
+		}
+		this.store.transition(runId, run -> run.cancel(this.clock));
+		AgentRun cancelled = getRun(runId);
+		emit(runId, RunEventType.RUN_FINISHED, Map.of(
+				"status", cancelled.status().name(),
+				"stopReason", cancelled.stopReason().name(),
+				"interruptRequested", interruptRequested));
+		return getRun(runId);
 	}
 
 	private String validatePrompt(String prompt) {

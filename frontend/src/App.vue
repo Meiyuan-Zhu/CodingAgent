@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchHealth, type HealthResponse } from './api/health'
-import { createRun, fetchRun, type RunEvent, type RunResponse } from './api/runs'
+import { cancelRun, createRun, fetchRun, type RunEvent, type RunResponse } from './api/runs'
 
 const health = ref<HealthResponse | null>(null)
 const loading = ref(true)
@@ -9,6 +9,7 @@ const error = ref<string | null>(null)
 const detailTab = ref<'files' | 'diff' | 'checks'>('files')
 const taskDraft = ref('List files in the demo workspace')
 const submitting = ref(false)
+const cancelling = ref(false)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
@@ -44,8 +45,14 @@ const statusLabel = computed(() => {
   return health.value?.status ?? 'unknown'
 })
 
+const terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED']
+
 const runButtonDisabled = computed(() => {
   return submitting.value || loading.value || !!error.value || taskDraft.value.trim().length === 0
+})
+
+const cancelButtonDisabled = computed(() => {
+  return cancelling.value || !activeRun.value || terminalStatuses.includes(activeRun.value.status)
 })
 
 onMounted(async () => {
@@ -90,6 +97,7 @@ function connectEventStream(runId: string) {
     'run_created',
     'user_message_accepted',
     'run_started',
+    'run_cancelling',
     'model_requested',
     'model_message_received',
     'tool_call_requested',
@@ -111,7 +119,7 @@ function connectEventStream(runId: string) {
 
   source.onerror = () => {
     source.close()
-    if (!activeRun.value?.status || !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(activeRun.value.status)) {
+    if (!activeRun.value?.status || !terminalStatuses.includes(activeRun.value.status)) {
       runError.value = 'Event stream closed before the run reached a terminal state.'
       refreshRun(runId)
     }
@@ -125,6 +133,21 @@ function upsertEvent(event: RunEvent) {
   } else {
     events.value.push(event)
     events.value.sort((a, b) => a.sequence - b.sequence)
+  }
+}
+
+async function cancelActiveRun() {
+  if (cancelButtonDisabled.value || !activeRun.value) return
+  cancelling.value = true
+  runError.value = null
+  try {
+    const run = await cancelRun(activeRun.value.id)
+    activeRun.value = run
+    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to cancel run'
+  } finally {
+    cancelling.value = false
   }
 }
 
@@ -150,6 +173,7 @@ function eventTitle(event: RunEvent) {
     RUN_CREATED: 'Run created',
     USER_MESSAGE_ACCEPTED: 'User message accepted',
     RUN_STARTED: 'Mock runner started',
+    RUN_CANCELLING: 'Run cancelling',
     MODEL_REQUESTED: 'Mock model requested',
     MODEL_MESSAGE_RECEIVED: 'Assistant message',
     TOOL_CALL_REQUESTED: `Tool requested: ${String(event.payload.name ?? '')}`,
@@ -268,9 +292,14 @@ function truncate(value: string, limit: number) {
 
       <form class="composer" aria-label="Task composer" @submit.prevent="submitRun">
         <textarea v-model="taskDraft" aria-label="Task input" placeholder="Ask the agent to change this workspace" rows="2" />
-        <button type="submit" :disabled="runButtonDisabled">
-          {{ submitting ? 'Starting' : 'Run' }}
-        </button>
+        <div class="composer-actions">
+          <button type="submit" :disabled="runButtonDisabled">
+            {{ submitting ? 'Starting' : 'Run' }}
+          </button>
+          <button class="secondary-action" type="button" :disabled="cancelButtonDisabled" @click="cancelActiveRun">
+            {{ cancelling ? 'Cancelling' : 'Cancel' }}
+          </button>
+        </div>
       </form>
     </section>
 

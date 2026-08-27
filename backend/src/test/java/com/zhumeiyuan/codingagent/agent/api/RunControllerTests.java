@@ -67,6 +67,20 @@ class RunControllerTests {
 	}
 
 	@Test
+	void cancelRunEndpointReturnsRunState() throws Exception {
+		MvcResult createResult = this.mvc.perform(post("/api/runs")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"prompt\":\"list workspace files\"}"))
+				.andExpect(status().isAccepted())
+				.andReturn();
+		String runId = this.objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
+
+		this.mvc.perform(post("/api/runs/{runId}/cancel", runId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(runId));
+	}
+
+	@Test
 	void eventStreamEndpointStartsAsyncResponse() throws Exception {
 		MvcResult createResult = this.mvc.perform(post("/api/runs")
 						.contentType(MediaType.APPLICATION_JSON)

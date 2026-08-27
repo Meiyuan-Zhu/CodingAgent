@@ -327,9 +327,19 @@ dd {
   cursor: pointer;
 }
 
+.composer-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .composer button {
   min-width: 76px;
   padding: 0 16px;
+}
+
+.composer .secondary-action {
+  color: #57606a;
+  background: #ffffff;
 }
 
 .composer button:disabled {

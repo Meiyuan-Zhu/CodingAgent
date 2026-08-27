@@ -53,3 +53,16 @@ async function errorMessage(response: Response): Promise<string> {
     return `Backend returned HTTP ${response.status}`
   }
 }
+
+
+export async function cancelRun(runId: string): Promise<RunResponse> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: 'POST',
+  })
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<RunResponse>
+}
