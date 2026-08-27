@@ -38,3 +38,4 @@
 - 更新 `frontend/src/style.css`：使用更克制的工程工具布局，减少展示页感。
 - `Run` 按钮暂时禁用，避免在任务接口和 Agent Core 未实现前制造假能力。
 - 执行 UI-001 验证：`npm run build` 通过。
+- 创建 UI 提交 `8fc625b feat: shape codex-like workbench shell`。
