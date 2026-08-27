@@ -5,5 +5,6 @@ public record TextReplacementResult(
 		int replacements,
 		String previousSha256,
 		String sha256,
-		long sizeBytes) {
+		long sizeBytes,
+		String unifiedDiff) {
 }

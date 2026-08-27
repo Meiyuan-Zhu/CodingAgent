@@ -37,6 +37,7 @@ class WorkspaceWriteToolsTests {
 		assertThat(result.overwritten()).isFalse();
 		assertThat(result.previousSha256()).isNull();
 		assertThat(result.sha256()).hasSize(64);
+		assertThat(result.unifiedDiff()).contains("--- a/src/new.txt", "+++ b/src/new.txt", "+new content");
 		assertThat(Files.readString(this.root.resolve("src/new.txt"))).isEqualTo("new content\n");
 	}
 
@@ -80,6 +81,7 @@ class WorkspaceWriteToolsTests {
 		assertThat(result.replacements()).isEqualTo(1);
 		assertThat(result.previousSha256()).hasSize(64);
 		assertThat(result.sha256()).hasSize(64).isNotEqualTo(result.previousSha256());
+		assertThat(result.unifiedDiff()).contains("-hello agent", "+hi agent", " hello workspace");
 		assertThat(Files.readString(this.root.resolve("README.md"))).isEqualTo("hi agent\nhello workspace\n");
 	}
 

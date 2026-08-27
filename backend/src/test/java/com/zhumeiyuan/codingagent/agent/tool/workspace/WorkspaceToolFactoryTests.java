@@ -127,6 +127,7 @@ class WorkspaceToolFactoryTests {
 		assertThat(json.get("path").asText()).isEqualTo("src/New.java");
 		assertThat(json.get("created").asBoolean()).isTrue();
 		assertThat(json.get("sha256").asText()).hasSize(64);
+		assertThat(json.get("unifiedDiff").asText()).contains("+class New {}");
 	}
 
 	@Test
@@ -138,6 +139,7 @@ class WorkspaceToolFactoryTests {
 		JsonNode json = this.objectMapper.readTree(result.content());
 		assertThat(json.get("path").asText()).isEqualTo("README.md");
 		assertThat(json.get("replacements").asInt()).isEqualTo(1);
+		assertThat(json.get("unifiedDiff").asText()).contains("-hello agent", "+agent");
 	}
 
 	@Test

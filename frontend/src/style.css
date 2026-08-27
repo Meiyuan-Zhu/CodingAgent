@@ -393,11 +393,33 @@ dd {
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
-.diff-body p {
+.diff-card {
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.diff-card + .diff-card {
+  margin-top: 10px;
+}
+
+.diff-card strong {
+  display: block;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eaedf0;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.diff-card pre {
   margin: 0;
-  padding: 7px 8px;
-  color: #1f6f43;
-  font-size: 13px;
+  overflow: auto;
+  padding: 10px;
+  color: #24292f;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
 }
 
 .check-row {

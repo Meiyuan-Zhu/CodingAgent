@@ -33,6 +33,25 @@ const files = computed(() => {
   return ['workspaces/demo/README.md', 'workspaces/demo/src/hello.txt']
 })
 
+
+const diffs = computed(() => {
+  const parsedDiffs: Array<{ path: string; diff: string }> = []
+  for (const event of events.value) {
+    if (event.type !== 'TOOL_CALL_FINISHED') continue
+    const content = typeof event.payload.content === 'string' ? event.payload.content : ''
+    if (!content) continue
+    try {
+      const parsed = JSON.parse(content) as { path?: string; unifiedDiff?: string }
+      if (parsed.unifiedDiff) {
+        parsedDiffs.push({ path: parsed.path ?? String(event.payload.name ?? 'workspace change'), diff: parsed.unifiedDiff })
+      }
+    } catch {
+      // Non-JSON tool output is still shown in the event timeline.
+    }
+  }
+  return parsedDiffs
+})
+
 const checks = computed(() => [
   { name: 'Backend mock runner', result: 'wired' },
   { name: 'Tool registry', result: 'wired' },
@@ -98,6 +117,8 @@ function connectEventStream(runId: string) {
     'user_message_accepted',
     'run_started',
     'run_cancelling',
+    'approval_required',
+    'approval_resolved',
     'model_requested',
     'model_message_received',
     'tool_call_requested',
@@ -163,6 +184,7 @@ async function refreshRun(runId: string) {
 
 function eventKind(type: string) {
   if (type.startsWith('TOOL')) return 'tool'
+  if (type.startsWith('APPROVAL')) return 'approval'
   if (type.startsWith('MODEL')) return 'model'
   if (type.startsWith('RUN')) return 'run'
   return 'user'
@@ -174,6 +196,8 @@ function eventTitle(event: RunEvent) {
     USER_MESSAGE_ACCEPTED: 'User message accepted',
     RUN_STARTED: 'Mock runner started',
     RUN_CANCELLING: 'Run cancelling',
+    APPROVAL_REQUIRED: `Approval required: ${String(event.payload.name ?? '')}`,
+    APPROVAL_RESOLVED: 'Approval resolved',
     MODEL_REQUESTED: 'Mock model requested',
     MODEL_MESSAGE_RECEIVED: 'Assistant message',
     TOOL_CALL_REQUESTED: `Tool requested: ${String(event.payload.name ?? '')}`,
@@ -323,9 +347,11 @@ function truncate(value: string, limit: number) {
       </section>
 
       <section v-else-if="detailTab === 'diff'" class="tab-body diff-body">
-        <p>+ Vue workbench shell</p>
-        <p>+ Spring Boot health endpoint</p>
-        <p>+ Traceable framework decision</p>
+        <article v-for="diff in diffs" :key="diff.path" class="diff-card">
+          <strong>{{ diff.path }}</strong>
+          <pre>{{ diff.diff }}</pre>
+        </article>
+        <p v-if="diffs.length === 0" class="empty-state">No file changes in this run yet.</p>
       </section>
 
       <section v-else class="tab-body">

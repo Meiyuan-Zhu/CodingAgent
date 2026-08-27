@@ -17,6 +17,7 @@ import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
 import com.zhumeiyuan.codingagent.agent.run.RunStatus;
 import com.zhumeiyuan.codingagent.agent.run.StopReason;
+import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalPolicy;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,7 @@ class AgentRunServiceTests {
 		AgentRunStore store = new AgentRunStore();
 		RunEventStream stream = new RunEventStream();
 		MockAgentRunner runner = new MockAgentRunner(store, stream,
-				new ToolRegistry(List.of(), this.clock), request -> {
+				new ToolRegistry(List.of(), this.clock), new ToolApprovalPolicy(), request -> {
 					try {
 						Thread.sleep(Duration.ofSeconds(10));
 					} catch (InterruptedException ex) {
@@ -63,7 +64,7 @@ class AgentRunServiceTests {
 		AgentRunStore store = new AgentRunStore();
 		RunEventStream stream = new RunEventStream();
 		MockAgentRunner runner = new MockAgentRunner(store, stream,
-				new ToolRegistry(List.of(), this.clock),
+				new ToolRegistry(List.of(), this.clock), new ToolApprovalPolicy(),
 				request -> new ModelResponse("done", ModelFinishReason.STOP, List.of()),
 				new RunBudget(4, 12, 30), this.toolExecutor, this.clock);
 		AgentRunService service = new AgentRunService(store, stream, runner, new RunTaskManager(this.runExecutor), this.clock);

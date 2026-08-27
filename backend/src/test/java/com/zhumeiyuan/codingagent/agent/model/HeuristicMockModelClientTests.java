@@ -38,6 +38,16 @@ class HeuristicMockModelClientTests {
 	}
 
 	@Test
+	void choosesWriteToolForExplicitWritePrompt() {
+		ModelResponse response = this.client.complete(request("please write a note"));
+
+		assertThat(response.toolCalls()).singleElement().satisfies(call -> {
+			assertThat(call.name()).isEqualTo("write_file");
+			assertThat(call.arguments()).containsEntry("path", "src/mock-note.txt");
+		});
+	}
+
+	@Test
 	void defaultsToListFiles() {
 		ModelResponse response = this.client.complete(request("inspect the workspace"));
 

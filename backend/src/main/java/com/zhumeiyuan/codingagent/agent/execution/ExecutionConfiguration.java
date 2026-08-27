@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
+import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalPolicy;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,6 +28,11 @@ class ExecutionConfiguration {
 	@Bean
 	RunBudget runBudget() {
 		return RunBudget.defaults();
+	}
+
+	@Bean
+	ToolApprovalPolicy toolApprovalPolicy() {
+		return new ToolApprovalPolicy();
 	}
 
 	@Bean(destroyMethod = "shutdownNow")
@@ -54,8 +60,10 @@ class ExecutionConfiguration {
 
 	@Bean
 	MockAgentRunner mockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
-			ModelClient modelClient, RunBudget runBudget, @Qualifier("agentToolExecutor") ExecutorService agentToolExecutor, Clock clock) {
-		return new MockAgentRunner(store, runEventStream, toolRegistry, modelClient, runBudget, agentToolExecutor, clock);
+			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget,
+			@Qualifier("agentToolExecutor") ExecutorService agentToolExecutor, Clock clock) {
+		return new MockAgentRunner(store, runEventStream, toolRegistry, toolApprovalPolicy, modelClient, runBudget,
+				agentToolExecutor, clock);
 	}
 
 	@Bean

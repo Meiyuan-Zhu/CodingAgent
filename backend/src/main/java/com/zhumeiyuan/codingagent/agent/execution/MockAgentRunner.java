@@ -26,6 +26,8 @@ import com.zhumeiyuan.codingagent.agent.run.RunStatus;
 import com.zhumeiyuan.codingagent.agent.run.StopReason;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.run.ToolResult;
+import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalDecision;
+import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalPolicy;
 import com.zhumeiyuan.codingagent.agent.tool.ToolDefinition;
 import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionErrorCode;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
@@ -37,16 +39,19 @@ public class MockAgentRunner {
 	private final AgentRunStore store;
 	private final RunEventStream runEventStream;
 	private final ToolRegistry toolRegistry;
+	private final ToolApprovalPolicy toolApprovalPolicy;
 	private final ModelClient modelClient;
 	private final RunBudget runBudget;
 	private final ExecutorService toolExecutor;
 	private final Clock clock;
 
 	public MockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
-			ModelClient modelClient, RunBudget runBudget, ExecutorService toolExecutor, Clock clock) {
+			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget, ExecutorService toolExecutor,
+			Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
 		this.toolRegistry = Objects.requireNonNull(toolRegistry, "toolRegistry");
+		this.toolApprovalPolicy = Objects.requireNonNull(toolApprovalPolicy, "toolApprovalPolicy");
 		this.modelClient = Objects.requireNonNull(modelClient, "modelClient");
 		this.runBudget = Objects.requireNonNull(runBudget, "runBudget");
 		this.toolExecutor = Objects.requireNonNull(toolExecutor, "toolExecutor");
@@ -162,11 +167,17 @@ public class MockAgentRunner {
 	}
 
 	private ToolResult executeTool(RunId runId, int round, ToolCall call) {
+		ToolApprovalDecision approval = this.toolApprovalPolicy.decide(call);
 		emit(runId, RunEventType.TOOL_CALL_REQUESTED, Map.of(
 				"round", round,
 				"toolCallId", call.id(),
 				"name", call.name(),
-				"arguments", call.arguments()));
+				"arguments", call.arguments(),
+				"approval", approvalPayload(approval)));
+		if (approval.requiresUserApproval()) {
+			requestApproval(runId, round, call, approval);
+			return null;
+		}
 		emit(runId, RunEventType.TOOL_CALL_STARTED, Map.of("round", round, "toolCallId", call.id(), "name", call.name()));
 		ToolResult result = executeToolWithTimeout(runId, call);
 		if (result == null || isTerminal(runId)) {
@@ -180,6 +191,28 @@ public class MockAgentRunner {
 				"content", result.content(),
 				"metadata", result.metadata()));
 		return result;
+	}
+
+	private void requestApproval(RunId runId, int round, ToolCall call, ToolApprovalDecision approval) {
+		this.store.transition(runId, run -> run.waitForApproval(this.clock));
+		emit(runId, RunEventType.APPROVAL_REQUIRED, Map.of(
+				"round", round,
+				"toolCallId", call.id(),
+				"name", call.name(),
+				"arguments", call.arguments(),
+				"approval", approvalPayload(approval)));
+		emit(runId, RunEventType.APPROVAL_RESOLVED, Map.of(
+				"round", round,
+				"toolCallId", call.id(),
+				"name", call.name(),
+				"approved", false,
+				"reason", "approval_resume_api_not_implemented"));
+		fail(runId, StopReason.APPROVAL_REJECTED,
+				"Tool requires user approval before execution: " + call.name());
+	}
+
+	private Map<String, Object> approvalPayload(ToolApprovalDecision approval) {
+		return Map.of("mode", approval.mode().name(), "reason", approval.reason());
 	}
 
 	private ToolResult executeToolWithTimeout(RunId runId, ToolCall call) {

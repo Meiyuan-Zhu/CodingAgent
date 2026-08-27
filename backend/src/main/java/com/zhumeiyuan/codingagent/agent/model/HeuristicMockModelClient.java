@@ -31,6 +31,11 @@ public class HeuristicMockModelClient implements ModelClient {
 
 	private String scriptedResponse(String userPrompt) {
 		String lowerPrompt = userPrompt.toLowerCase(Locale.ROOT);
+		if (lowerPrompt.contains("write") || lowerPrompt.contains("create") || userPrompt.contains("写入")
+				|| userPrompt.contains("创建")) {
+			return response("Mock model asks to write a workspace file.", "write_file",
+					"{\"path\":\"src/mock-note.txt\",\"content\":\"mock note\\n\"}");
+		}
 		if (lowerPrompt.contains("readme")) {
 			return response("Mock model asks to read README.md.", "read_file", "{\"path\":\"README.md\"}");
 		}

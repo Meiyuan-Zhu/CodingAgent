@@ -26,6 +26,7 @@ import com.zhumeiyuan.codingagent.agent.run.StopReason;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.run.ToolResult;
 import com.zhumeiyuan.codingagent.agent.tool.RegisteredTool;
+import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalPolicy;
 import com.zhumeiyuan.codingagent.agent.tool.ToolDefinition;
 import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionResult;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
@@ -52,7 +53,7 @@ class MockAgentRunnerTests {
 				new ModelResponse("List files", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
 				new ModelResponse("Done after observing files", ModelFinishReason.STOP, List.of()));
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), model,
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(), model,
 				this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "please inspect workspace");
@@ -88,7 +89,7 @@ class MockAgentRunnerTests {
 						MockAgentRunnerTests.this.clock.instant());
 			}
 		};
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry,
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry, new ToolApprovalPolicy(),
 				request -> new ModelResponse("List files",
 						ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
@@ -108,7 +109,7 @@ class MockAgentRunnerTests {
 		ModelClient failingModel = request -> {
 			throw new ModelParseException("bad response");
 		};
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), failingModel,
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(), failingModel,
 				this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
@@ -122,7 +123,7 @@ class MockAgentRunnerTests {
 	void lengthFinishReasonStopsWithTokenBudgetLimit() {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(),
 				request -> new ModelResponse("partial", ModelFinishReason.LENGTH, List.of()), this.budget, this.toolExecutor, this.clock);
 
 		runner.run(run.id(), "inspect");
@@ -136,7 +137,7 @@ class MockAgentRunnerTests {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
 		RunBudget smallBudget = new RunBudget(2, 10, 30);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(),
 				request -> new ModelResponse("again", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-" + request.messages().size(), "list_files", Map.of("path", ".")))),
 				smallBudget, this.toolExecutor, this.clock);
@@ -154,7 +155,7 @@ class MockAgentRunnerTests {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
 		RunBudget smallBudget = new RunBudget(4, 1, 30);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(),
 				request -> new ModelResponse("two calls", ModelFinishReason.TOOL_CALLS,
 						List.of(
 								new ToolCall("call-1", "list_files", Map.of("path", ".")),
@@ -175,7 +176,7 @@ class MockAgentRunnerTests {
 		AgentRun run = store.create(this.clock);
 		List<ModelRequest> requests = new ArrayList<>();
 		RunBudget smallContext = new RunBudget(3, 10, 4);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), request -> {
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(), request -> {
 			requests.add(request);
 			if (requests.size() < 3) {
 				return new ModelResponse("again", ModelFinishReason.TOOL_CALLS,
@@ -209,7 +210,7 @@ class MockAgentRunnerTests {
 					}
 					return ToolExecutionResult.of("too late", Map.of());
 				})), this.clock);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry,
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry, new ToolApprovalPolicy(),
 				request -> new ModelResponse("slow", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "slow_tool", Map.of()))),
 				timeoutBudget, this.toolExecutor, this.clock);
@@ -229,7 +230,7 @@ class MockAgentRunnerTests {
 		AgentRun run = store.create(this.clock);
 		store.transition(run.id(), current -> current.requestCancel(this.clock));
 		AtomicBoolean modelCalled = new AtomicBoolean(false);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), request -> {
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), new ToolApprovalPolicy(), request -> {
 			modelCalled.set(true);
 			return new ModelResponse("done", ModelFinishReason.STOP, List.of());
 		}, this.budget, this.toolExecutor, this.clock);
@@ -239,6 +240,32 @@ class MockAgentRunnerTests {
 		assertThat(modelCalled).isFalse();
 		assertThat(store.get(run.id()).status().name()).isEqualTo("CANCELLED");
 		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.USER_CANCELLED);
+	}
+
+	@Test
+	void mutationToolRequiresApprovalAndIsNotExecuted() {
+		AgentRunStore store = new AgentRunStore();
+		AgentRun run = store.create(this.clock);
+		AtomicBoolean toolExecuted = new AtomicBoolean(false);
+		ToolRegistry registry = new ToolRegistry(List.of(new RegisteredTool(
+				new ToolDefinition("write_file", "Write file", Map.of("type", "object")),
+				arguments -> {
+					toolExecuted.set(true);
+					return ToolExecutionResult.of("{}", Map.of());
+				})), this.clock);
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry, new ToolApprovalPolicy(),
+				request -> new ModelResponse("write", ModelFinishReason.TOOL_CALLS,
+						List.of(new ToolCall("call-1", "write_file", Map.of("path", "x.txt", "content", "x")))),
+				this.budget, this.toolExecutor, this.clock);
+
+		runner.run(run.id(), "write a file");
+
+		assertThat(toolExecuted).isFalse();
+		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
+		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.APPROVAL_REJECTED);
+		assertThat(store.listEvents(run.id(), -1)).extracting(RunEvent::type)
+				.contains(RunEventType.APPROVAL_REQUIRED, RunEventType.APPROVAL_RESOLVED, RunEventType.RUN_FINISHED)
+				.doesNotContain(RunEventType.TOOL_CALL_STARTED);
 	}
 
 	private ToolRegistry registryReturningSuccess() {

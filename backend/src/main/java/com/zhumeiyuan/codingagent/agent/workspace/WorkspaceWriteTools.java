@@ -33,6 +33,7 @@ public class WorkspaceWriteTools {
 		boolean existed = Files.exists(path, LinkOption.NOFOLLOW_LINKS);
 
 		String previousHash = null;
+		String previousText = "";
 		long previousSize = 0;
 		if (existed) {
 			if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
@@ -44,7 +45,7 @@ public class WorkspaceWriteTools {
 						"Workspace file already exists");
 			}
 			byte[] previousBytes = readBytes(path, requestedPath);
-			decodeUtf8(previousBytes, requestedPath);
+			previousText = decodeUtf8(previousBytes, requestedPath);
 			previousHash = sha256(previousBytes);
 			previousSize = previousBytes.length;
 			rejectHashMismatch(requestedPath, previousHash, expectedSha256);
@@ -54,8 +55,9 @@ public class WorkspaceWriteTools {
 		}
 
 		writeBytes(path, nextBytes, requestedPath);
+		String nextText = decodeUtf8(nextBytes, requestedPath);
 		return new WriteFileResult(target.displayPath(), !existed, existed, previousHash, sha256(nextBytes),
-				previousSize, nextBytes.length);
+				previousSize, nextBytes.length, WorkspaceUnifiedDiff.create(target.displayPath(), previousText, nextText));
 	}
 
 	public TextReplacementResult replaceText(String requestedPath, String oldText, String newText, String expectedSha256,
@@ -89,7 +91,7 @@ public class WorkspaceWriteTools {
 		writeBytes(path, nextBytes, requestedPath);
 
 		return new TextReplacementResult(target.displayPath(), replacement.count(), previousHash, sha256(nextBytes),
-				nextBytes.length);
+				nextBytes.length, WorkspaceUnifiedDiff.create(target.displayPath(), previousText, replacement.text()));
 	}
 
 	private Replacement replaceLimited(String source, String oldText, String newText, int maxReplacements) {

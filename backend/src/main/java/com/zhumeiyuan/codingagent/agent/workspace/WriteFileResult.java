@@ -7,5 +7,6 @@ public record WriteFileResult(
 		String previousSha256,
 		String sha256,
 		long previousSizeBytes,
-		long sizeBytes) {
+		long sizeBytes,
+		String unifiedDiff) {
 }
