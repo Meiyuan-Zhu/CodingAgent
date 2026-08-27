@@ -8,6 +8,7 @@
 
 - Vue 3 前端，Java + Spring Boot 后端，前后端分离。见 [ADR-0001](../decisions/0001-frontend-backend-stack.md)。
 - 当前框架基线：Vue 3 + TypeScript + Vite，Java 21 + Maven + Spring Boot 3.5.16。见 [ADR-0003](../decisions/0003-framework-baseline.md)。
+- 产品形态：Web 界面作为本地 workspace 工作台，不采用上传文件作为主要工作流；界面方向简洁、清晰、Codex-like。见 [ADR-0004](../decisions/0004-local-workbench-ui.md)。
 - Agent 关键逻辑自行实现，项目不使用 Agent 框架/SDK 或 Spring AI。
 - decisions/ 记录决策，memory/ 记录开发状态与文档。见 [ADR-0002](../decisions/0002-development-records.md)。
 - 正式截止：北京时间 2026-09-03 00:00；此后不推送新提交。
@@ -30,7 +31,7 @@
 | 模块 | 当前状态 | 实现位置 | 验证证据 | 决策/说明 |
 | --- | --- | --- | --- | --- |
 | 前后端工程骨架及独立启动 | 已验证 | [frontend](../frontend)、[backend](../backend) | [APP-001](VERIFICATION.md) | ADR-0001、ADR-0003；验证覆盖构建和后端健康接口 |
-| 任务接口与 Web 页面 | 进行中 | [frontend/src/App.vue](../frontend/src/App.vue)、[backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java](../backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java) | [APP-001](VERIFICATION.md) | 当前只有控制台壳和健康状态，还不是任务执行界面 |
+| 任务接口与 Web 页面 | 进行中 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/style.css](../frontend/src/style.css)、[backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java](../backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java) | [APP-001](VERIFICATION.md)、[UI-001](VERIFICATION.md) | 当前是 Codex-like 工作台壳和健康状态，还不是可执行任务界面 |
 | 模型适配器及 Agent 循环 | 未开始 | 尚无 | 尚无 | 模型与协议待定 |
 | 文件工具、搜索与编辑 | 未开始 | 尚无 | 尚无 | 需要目录与编辑冲突校验 |
 | 命令执行、审批、取消 | 未开始 | 尚无 | 尚无 | 需要真实进程与权限测试 |

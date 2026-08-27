@@ -47,3 +47,30 @@
 - 关联：ADR-0003。
 - 代码版本/运行 ID：`3f220c9 chore: scaffold vue and spring boot apps`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## UI-001：Codex-like 工作台壳验证
+
+- 日期：2026-08-27。
+- 类型：前端构建与浏览器视觉检查。
+- 范围：`frontend/src/App.vue`、`frontend/src/style.css`。
+- 方法：
+  - 更新 Vue 页面为工作台式布局后执行 `cd frontend && npm run build`。
+  - 使用 in-app browser 打开 `http://127.0.0.1:5173/`，检查 DOM 布局、控制台日志、横向溢出和当前截图。
+- 结果：
+  - 通过，`vue-tsc -b` 与 `vite build` 均成功。
+  - 1280 x 720 视口下三栏存在，状态为 `ok`，`Run` 按钮处于禁用状态，浏览器 console 无 warning/error。
+  - 发现并修复右侧长文件路径造成的横向溢出；修复后 `documentElement.scrollWidth` 等于视口宽度，`hasHorizontalOverflow=false`。
+- 关联：ADR-0004。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：未做多尺寸响应式截图核验；未实现任务提交接口、SSE、文件树真实数据、Diff 真实数据或 Agent 执行。
+
+## DOC-003：工作台界面决策后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0004 索引、STATUS 对 ADR-0004 的引用、UI-001 浏览器检查记录。
+- 结果：通过。检查 15 个 Markdown 文件。
+- 关联：ADR-0004。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

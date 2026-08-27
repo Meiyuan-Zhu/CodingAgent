@@ -29,3 +29,12 @@
 - 执行 APP-001 骨架验证：后端 `mvn test`、前端 `npm run build` 均通过。
 - 创建框架提交 `3f220c9 chore: scaffold vue and spring boot apps`。
 - 已知环境现象：本机 Maven settings 有一个 `repositories` 标签位置警告，但未阻止构建；第一次尝试 Boot `4.1.1.RELEASE` 未能通过本机 Maven 镜像解析，因此未采用。
+
+## 2026-08-27：确认本地工作台式 Web 形态
+
+- 用户提出 Web 界面希望做成类似 Codex 的简洁、清晰、大气风格，并确认不应走上传文件式工作流。
+- 新增 ADR-0004，记录产品形态：前端是本地 workspace 控制台，后端负责文件、命令、模型和运行记录。
+- 更新 `frontend/src/App.vue`：左侧运行列表、中间任务线程与事件流、底部任务输入区、右侧文件/Diff/检查结果标签。
+- 更新 `frontend/src/style.css`：使用更克制的工程工具布局，减少展示页感。
+- `Run` 按钮暂时禁用，避免在任务接口和 Agent Core 未实现前制造假能力。
+- 执行 UI-001 验证：`npm run build` 通过。
