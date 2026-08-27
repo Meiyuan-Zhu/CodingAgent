@@ -3,6 +3,7 @@ package com.zhumeiyuan.codingagent.agent.execution;
 import java.time.Clock;
 import java.util.concurrent.Executor;
 
+import com.zhumeiyuan.codingagent.agent.model.ModelClient;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
 import org.springframework.context.annotation.Bean;
@@ -24,8 +25,8 @@ class ExecutionConfiguration {
 
 	@Bean
 	MockAgentRunner mockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
-			Clock clock) {
-		return new MockAgentRunner(store, runEventStream, toolRegistry, clock);
+			ModelClient modelClient, Clock clock) {
+		return new MockAgentRunner(store, runEventStream, toolRegistry, modelClient, clock);
 	}
 
 	@Bean

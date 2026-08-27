@@ -8,6 +8,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+import com.zhumeiyuan.codingagent.agent.model.ModelClient;
+import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
+import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
+import com.zhumeiyuan.codingagent.agent.model.ModelResponse;
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEvent;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
@@ -28,7 +32,15 @@ class MockAgentRunnerTests {
 	void runsThroughRegistryAndFinishesSuccessfully() {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), this.clock);
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
+				request -> request.lastUserMessage().orElseThrow().content().contains("README")
+						? new ModelResponse("Read README",
+								ModelFinishReason.TOOL_CALLS,
+								List.of(new ToolCall("call-1", "read_file", Map.of("path", "README.md"))))
+						: new ModelResponse("List files",
+								ModelFinishReason.TOOL_CALLS,
+								List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
+				this.clock);
 
 		runner.run(run.id(), "please inspect workspace");
 
@@ -57,12 +69,33 @@ class MockAgentRunnerTests {
 						MockAgentRunnerTests.this.clock.instant());
 			}
 		};
-		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry, this.clock);
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registry,
+				request -> new ModelResponse("List files",
+						ModelFinishReason.TOOL_CALLS,
+						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
+				this.clock);
 
 		runner.run(run.id(), "please inspect workspace");
 
 		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
 		assertThat(store.get(run.id()).errorMessage()).isEqualTo("tool failed");
+	}
+
+	@Test
+	void modelParseErrorFinishesRunWithParseStopReason() {
+		AgentRunStore store = new AgentRunStore();
+		AgentRun run = store.create(this.clock);
+		ModelClient failingModel = request -> {
+			throw new ModelParseException("bad response");
+		};
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(), failingModel,
+				this.clock);
+
+		runner.run(run.id(), "inspect");
+
+		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
+		assertThat(store.get(run.id()).stopReason().name()).isEqualTo("MODEL_PARSE_ERROR");
+		assertThat(store.get(run.id()).errorMessage()).isEqualTo("bad response");
 	}
 
 	private ToolRegistry registryReturningSuccess() {
@@ -72,7 +105,11 @@ class MockAgentRunnerTests {
 				new RegisteredTool(new ToolDefinition("read_file", "Read file", Map.of("type", "object")),
 						arguments -> ToolExecutionResult.of("{\"content\":\"hello\"}", Map.of("path", "README.md"))),
 				new RegisteredTool(new ToolDefinition("search_text", "Search text", Map.of("type", "object")),
-						arguments -> ToolExecutionResult.of("{\"matches\":[]}", Map.of("query", "agent")))),
+						arguments -> ToolExecutionResult.of("{\"matches\":[]}", Map.of("query", "agent"))),
+				new RegisteredTool(new ToolDefinition("write_file", "Write file", Map.of("type", "object")),
+						arguments -> ToolExecutionResult.of("{\"created\":true}", Map.of("path", "new.txt"))),
+				new RegisteredTool(new ToolDefinition("replace_text", "Replace text", Map.of("type", "object")),
+						arguments -> ToolExecutionResult.of("{\"replacements\":1}", Map.of("path", "README.md")))),
 				this.clock);
 	}
 }
