@@ -274,3 +274,35 @@
 - 关联：ADR-0009。
 - 代码版本/运行 ID：`8cc17f9 feat: add workspace write and edit tools`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+
+## MODEL-001：模型边界与响应解析器测试
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试与 Spring 上下文测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`。
+- 方法：实现模型请求/响应边界、JSON 响应解析器、mock 模型客户端和 runner 接入后执行 `cd backend && mvn test`。
+- 结果：通过。78 tests, 0 failures, 0 errors。
+- 覆盖：
+  - `ModelRequest` 拒绝空消息，并能取得最后一条 user message。
+  - `ModelResponseParser` 可解析 `stop` 响应和 `tool_calls` 响应。
+  - 非 JSON、非对象根、未知 finish reason、`stop` 携带工具调用、缺失或非对象 arguments、重复 tool call id、过多 tool calls 均被拒绝。
+  - `HeuristicMockModelClient` 对 README、搜索和默认 prompt 生成确定性的工具调用，并经过 parser。
+  - `MockAgentRunner` 通过 `ModelClient` 执行工具，工具失败以 `TOOL_ERROR` 结束，模型解析失败以 `MODEL_PARSE_ERROR` 结束。
+  - Spring Boot 上下文能加载 `ModelClient`、`ModelResponseParser`、`ToolRegistry` 和 run API 相关 bean。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0010。
+- 代码版本/运行 ID：`a58e31b feat: add model response parsing boundary`。
+- 限制：不包含真实模型 API、真实 provider-native tool calling、多轮 Agent loop、上下文裁剪、预算、取消、审批或命令工具验证。
+
+
+## DOC-009：模型边界子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0010 索引、STATUS 对 ADR-0010 和 MODEL-001 的引用、MODEL-001 代码版本、DEVLOG 子任务 6 记录。
+- 结果：通过。检查 22 个 Markdown 文件。
+- 关联：ADR-0010。
+- 代码版本/运行 ID：`a58e31b feat: add model response parsing boundary`；本条哈希信息由后续文档同步提交补充。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

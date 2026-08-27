@@ -114,3 +114,17 @@
 - 保持 mock runner 默认不写文件，避免用户反复点击 Run 时污染 Git 工作区。
 - 执行 WRITE-001 验证：`cd backend && mvn test` 通过，64 tests, 0 failures, 0 errors。
 - 限制：尚未实现 diff 渲染、用户审批、取消、真实模型调用或命令工具。
+
+
+## 2026-08-27：子任务 6 - 模型适配边界与响应解析器
+
+- 目标：把 mock runner 从直接“假装选择工具”改为经过模型客户端边界和响应解析器，为后续真实模型 API 接入留出可测试缝隙。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`：
+  - `ModelClient` 作为 runner 依赖的模型调用边界。
+  - `ModelRequest`、`ModelMessage`、`ModelRole`、`ModelResponse`、`ModelFinishReason` 表达 provider-neutral 的内部协议。
+  - `ModelResponseParser` 将模型原始 JSON 文本解析为内部响应，并校验 finish reason、工具调用数组、参数对象、重复 call id 和消息长度。
+  - `HeuristicMockModelClient` 继续提供可重复 demo，但现在先生成原始 JSON，再走解析器。
+- 更新 `MockAgentRunner`：通过 `ModelClient` 获取响应；模型解析错误以 `MODEL_PARSE_ERROR` 结束 run；工具执行失败仍以 `TOOL_ERROR` 结束。
+- 增加模型解析器、模型请求、mock 模型客户端和 runner 解析失败测试。
+- 执行 MODEL-001 验证：`cd backend && mvn test` 通过，78 tests, 0 failures, 0 errors。
+- 限制：仍未接入真实模型 API；runner 仍是单轮请求，不包含上下文裁剪、预算、取消或多轮 observe-think-act 循环。
