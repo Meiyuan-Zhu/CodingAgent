@@ -16,6 +16,7 @@
 | [ADR-0010](0010-model-boundary-response-parser.md) | 模型适配边界与响应解析器 | accepted | 模型请求/响应边界、JSON 解析、mock 客户端接入和解析失败终止已验证；真实 API 未接入 |
 | [ADR-0011](0011-agent-loop-budget.md) | 多轮 Agent loop 与运行预算 | accepted | 多轮模型/工具循环、轮次上限、工具调用上限和上下文消息窗口已验证；真实 API 未接入 |
 | [ADR-0012](0012-run-cancellation-timeout-lifecycle.md) | Run 取消、超时与后台任务生命周期 | accepted | 取消 API、后台任务句柄、工具超时和前端 Cancel 入口已验证；命令进程级取消未实现 |
+| [ADR-0013](0013-approval-policy-diff-display.md) | 审批策略与 diff/变更展示 | accepted | 可变更工具审批策略、审批事件、写入/替换 diff 元数据和前端 Diff 面板已验证；approve/resume API 未实现 |
 
 ## 规则
 

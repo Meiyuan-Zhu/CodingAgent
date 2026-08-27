@@ -155,3 +155,14 @@
 - 更新前端：新增 Cancel 按钮，调用 cancel endpoint，并订阅 `run_cancelling` SSE 事件。
 - 执行 LIFE-001 验证：`cd backend && mvn test` 通过，94 tests, 0 failures, 0 errors；`cd frontend && npm run build` 通过；本地 HTTP cancel run `844f0b97-1a46-4955-bf44-2bc47e8b2802` 最终 `CANCELLED / USER_CANCELLED`。
 - 限制：Java Future 取消依赖线程中断；未来 shell 命令工具还需要显式销毁 OS 子进程和进程树。
+
+## 2026-08-27：子任务 9 - 审批策略与 diff/变更展示
+
+- 目标：在接入真实模型和命令工具之前，先把可变更工具的安全审批边界和变更可视化做出来。
+- 新增 `ToolApprovalPolicy`、`ToolApprovalDecision`、`ToolApprovalMode`：`write_file`、`replace_text` 和预留的 `run_command` 均要求用户审批；其他工具继续交由注册表做正常校验。
+- 更新 `MockAgentRunner`：工具执行前发出带审批信息的 `TOOL_CALL_REQUESTED`；遇到需审批工具时发出 `APPROVAL_REQUIRED`，当前因 approve/resume API 未实现而发出 `APPROVAL_RESOLVED approved=false`，随后以 `APPROVAL_REJECTED` 结束 run，且不执行工具。
+- 新增 `WorkspaceUnifiedDiff`，让 `write_file` 和 `replace_text` 返回 `unifiedDiff`，同时保留已有 hash、大小和冲突校验。
+- 更新前端：订阅审批事件，从工具结果中提取 `unifiedDiff`，在 Diff 面板展示文件变更。
+- 更新 `HeuristicMockModelClient`：包含 write/create/写入/创建 的 prompt 会请求 `write_file`，用于验证审批拦截路径。
+- 执行 CHANGE-001 验证：后端 `mvn test` 通过 98 tests；前端 `npm run build` 通过；本地 HTTP run `68bb2c0d-b17f-4d5a-8219-d725451f1f68` 最终 `FAILED / APPROVAL_REJECTED`，事件含审批请求和拒绝，不含工具开始事件。
+- 限制：当前不是完整人工审批恢复流程；真实点击 Approve 后恢复执行、命令审批细分和浏览器视觉验收待后续实现。

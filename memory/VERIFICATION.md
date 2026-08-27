@@ -391,3 +391,47 @@
 - 关联：ADR-0012。
 - 代码版本/运行 ID：`e9fdc0c feat: add run cancellation and tool timeouts`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## CHANGE-001：审批策略与 diff/变更展示验证
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
+- 范围：`ToolApprovalPolicy`、`MockAgentRunner` 审批拦截、`WorkspaceUnifiedDiff`、`WorkspaceWriteTools` diff 返回、`HeuristicMockModelClient` 写入触发、`frontend/src/App.vue` 和 `frontend/src/style.css`。
+- 方法：实现审批策略、审批事件、写入/替换 diff 元数据和前端 Diff 面板后执行以下检查：
+  - `cd backend && mvn test`。
+  - `cd frontend && npm run build`。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 启动后端。
+  - 使用本地 HTTP 请求 `POST /api/runs`，prompt 为 `please write a note`，随后查询 run 状态与事件回看。
+- 结果：通过。
+  - 后端测试：98 tests, 0 failures, 0 errors。
+  - 前端构建：`vue-tsc -b` 与 `vite build` 均成功。
+  - 本地 HTTP run `68bb2c0d-b17f-4d5a-8219-d725451f1f68` 最终状态 `FAILED`，stopReason 为 `APPROVAL_REJECTED`。
+  - 事件序列为 `RUN_CREATED`、`USER_MESSAGE_ACCEPTED`、`RUN_STARTED`、`MODEL_REQUESTED`、`MODEL_MESSAGE_RECEIVED`、`TOOL_CALL_REQUESTED`、`APPROVAL_REQUIRED`、`APPROVAL_RESOLVED`、`RUN_FINISHED`。
+  - 事件中没有 `TOOL_CALL_STARTED`，说明需审批的 `write_file` 未被执行。
+- 覆盖：
+  - 审批策略对 `read_file` 自动通过，对 `write_file`、`replace_text` 和 `run_command` 要求用户审批。
+  - Runner 遇到可变更工具时进入审批事件路径，并安全失败，不执行工具 handler。
+  - `write_file` 创建文件时返回 unified diff。
+  - `replace_text` 编辑文件时返回包含删除行、添加行和上下文行的 unified diff。
+  - `write_file`、`replace_text` 经工具注册表返回的 JSON content 包含 `unifiedDiff`。
+  - Mock 模型可根据写入类 prompt 触发 `write_file`，用于演示审批拦截。
+  - 前端 TypeScript 构建覆盖审批事件订阅、事件标题和 Diff 面板解析展示逻辑。
+- 修正记录：
+  - 一次补丁命令以 `backend/` 为工作目录时误带 `backend/` 路径前缀，导致补丁未写入；随后从仓库根目录重新执行并验证。
+  - 首次 Maven 复核在受限沙箱中触发 Mockito/ByteBuddy self-attach 错误；修正路径后普通 `mvn test` 通过。
+  - 本地 HTTP 请求在沙箱内因 `Operation not permitted` 被拒绝；按权限规则使用提升权限访问 `localhost:18080` 后验证通过。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均不影响本次结果。
+- 关联：ADR-0013。
+- 代码版本/运行 ID：`afe23a3 feat: add approval policy and diff display`；HTTP run `68bb2c0d-b17f-4d5a-8219-d725451f1f68`。
+- 限制：当前审批路径是安全拦截，不是完整 approve/reject/resume 工作流；未验证真实浏览器视觉交互、真实模型 API、命令工具或进程级命令取消。
+
+## DOC-012：审批与 diff 子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0013 索引、STATUS 对 ADR-0013 和 CHANGE-001 的引用、CHANGE-001 验证记录、DEVLOG 子任务 9 记录。
+- 结果：通过。检查 25 个 Markdown 文件；未发现本地链接缺失、代码围栏未闭合、ADR-0013/CHANGE-001/DEVLOG 子任务 9 引用缺失。
+- 关联：ADR-0013。
+- 代码版本/运行 ID：`afe23a3 feat: add approval policy and diff display`；本条哈希信息由后续文档同步提交补充。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。
