@@ -203,7 +203,7 @@
   - 8080 和 5173 存在旧开发进程，联调前使用 `lsof` 定位并清理旧 Java/Vite 进程。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0008。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`6bddeed feat: wire mock run api and event stream`。
 - 限制：mock runner 不证明真实模型 API、真实响应解析、多轮推理、写入工具、命令执行、取消或审批能力。
 
 ## UI-002：Vue 工作台接入 run API 与 SSE 验证
@@ -224,7 +224,7 @@
   - 1280 视口下 `documentElement.scrollWidth` 等于 `clientWidth`，没有横向溢出。
 - 观察：5173 被旧 Vite 进程占用，当前验证使用 Vite 自动分配的 `http://127.0.0.1:5174/`。前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，不影响构建。
 - 关联：ADR-0008。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`6bddeed feat: wire mock run api and event stream`。
 - 限制：只验证 mock run UI 闭环；未验证真实模型、多轮任务、写入/diff、取消、审批或移动端响应式。
 
 ## DOC-007：Run API 与 SSE 子任务后的文档一致性检查
@@ -235,5 +235,5 @@
 - 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0008 索引、STATUS 对 ADR-0008、RUNAPI-001 和 UI-002 的引用。
 - 结果：通过。检查 20 个 Markdown 文件。
 - 关联：ADR-0008。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`6bddeed feat: wire mock run api and event stream`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
