@@ -143,3 +143,15 @@
 - 更新 `HeuristicMockModelClient`：收到 tool message 后返回 `STOP`，因此 mock run 现在能演示两轮 observe/tool/finish 流程。
 - 执行 LOOP-001 验证：`cd backend && mvn test` 通过，85 tests, 0 failures, 0 errors；`cd frontend && npm run build` 通过；本地 HTTP run 产生 11 条事件、2 次模型请求、1 次工具完成并以 `COMPLETED` 成功结束。
 - 限制：真实模型 API、取消、超时、审批、命令工具和精确 token 计数仍未实现。
+
+
+## 2026-08-27：子任务 8 - 取消、超时与后台任务生命周期
+
+- 目标：为多轮 Agent loop 增加可取消、可超时、可追踪的运行生命周期，避免后台任务 fire-and-forget。
+- 新增 `RunTaskManager`：按 `RunId` 保存 active `Future`，支持启动、取消和完成后清理。
+- 后端 executor 调整：run executor 和 tool executor 分离，均由 Spring 负责 `shutdownNow`。
+- 更新 `AgentRunService` 与 `RunController`：新增 `POST /api/runs/{runId}/cancel`，非终态 run 先发 `RUN_CANCELLING`，再以 `USER_CANCELLED` 结束；终态取消保持幂等。
+- 更新 `MockAgentRunner`：启动前、每轮模型请求前后、工具执行前后检查取消状态；工具执行通过 tool executor 和 `RunBudget.toolTimeout` 限时等待，超时转为 `TIME_LIMIT`。
+- 更新前端：新增 Cancel 按钮，调用 cancel endpoint，并订阅 `run_cancelling` SSE 事件。
+- 执行 LIFE-001 验证：`cd backend && mvn test` 通过，94 tests, 0 failures, 0 errors；`cd frontend && npm run build` 通过；本地 HTTP cancel run `844f0b97-1a46-4955-bf44-2bc47e8b2802` 最终 `CANCELLED / USER_CANCELLED`。
+- 限制：Java Future 取消依赖线程中断；未来 shell 命令工具还需要显式销毁 OS 子进程和进程树。

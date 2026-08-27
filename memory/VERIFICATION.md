@@ -347,3 +347,47 @@
 - 关联：ADR-0011。
 - 代码版本/运行 ID：`2b06ac8 feat: add bounded agent loop`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+
+## LIFE-001：取消、超时与后台任务生命周期验证
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunTaskManager.java`、`AgentRunService`、`MockAgentRunner`、`RunBudget`、`RunController`、`frontend/src/App.vue`、`frontend/src/api/runs.ts`。
+- 方法：实现 run task 管理、cancel endpoint、runner 取消检查、工具 timeout 和前端 Cancel 按钮后执行以下检查：
+  - `cd backend && mvn test`。
+  - `cd frontend && npm run build`。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 启动后端。
+  - 使用本地 HTTP 请求 `POST /api/runs` 创建 run，随后请求 `POST /api/runs/{runId}/cancel`，再查询 run 状态和事件回看。
+- 结果：通过。
+  - 后端测试：94 tests, 0 failures, 0 errors。
+  - 前端构建：`vue-tsc -b` 与 `vite build` 均成功。
+  - 本地 HTTP run `844f0b97-1a46-4955-bf44-2bc47e8b2802` 的 cancel response status 为 `CANCELLED`，最终状态 `CANCELLED`，stopReason 为 `USER_CANCELLED`。
+  - 事件共 9 条，其中 `RUN_CANCELLING` 1 条、`RUN_FINISHED` 1 条；`RUN_FINISHED` payload 包含 `interruptRequested=true`。
+- 覆盖：
+  - `RunTaskManager` 可跟踪 active task，完成后清理，并用 interrupt 取消 active task。
+  - `AgentRunService.cancelRun` 可将非终态 run 转为 `CANCELLED / USER_CANCELLED` 并发事件；终态取消保持幂等。
+  - `POST /api/runs/{runId}/cancel` endpoint 可返回 run state。
+  - `MockAgentRunner` 启动前遇到 `CANCELLING` 会跳过模型并完成取消。
+  - 工具执行超时会返回 `TOOL_TIMEOUT` metadata，并让 run 以 `TIME_LIMIT` 失败。
+  - 前端 TypeScript 构建覆盖 cancel API 封装、Cancel 按钮和 `run_cancelling` 事件订阅。
+- 修正记录：
+  - 首轮 runner 取消测试发现启动前 `CANCELLING` 状态只返回、不落到 `CANCELLED`；已修复为完成取消。
+  - 首轮任务管理器测试等待 future inactive 太早，future 已标记取消但线程尚未处理 interrupt；测试改为等待 interrupt 标记。
+  - 一次复核命令因工作目录写错导致 Python 补丁未执行，随后 Maven 在沙箱中触发 Mockito/ByteBuddy attach 错误；修正路径后普通 `mvn test` 通过。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均不影响本次结果。
+- 关联：ADR-0012。
+- 代码版本/运行 ID：`e9fdc0c feat: add run cancellation and tool timeouts`。
+- 限制：取消当前依赖 Java 线程中断；不证明未来 shell 命令子进程会被杀掉。仍未验证真实模型 API、审批策略、命令执行或浏览器交互。
+
+
+## DOC-011：取消与超时子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0012 索引、STATUS 对 ADR-0012 和 LIFE-001 的引用、LIFE-001 验证记录、DEVLOG 子任务 8 记录。
+- 结果：通过。检查 24 个 Markdown 文件。
+- 关联：ADR-0012。
+- 代码版本/运行 ID：`e9fdc0c feat: add run cancellation and tool timeouts`；本条哈希信息由后续文档同步提交补充。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

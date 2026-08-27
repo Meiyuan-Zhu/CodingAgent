@@ -2,7 +2,7 @@
 
 更新日期：2026-08-27（北京时间）。
 
-**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界、读写文件工具、工具注册表、HTTP run API、SSE 事件流、mock runner、模型适配边界、响应解析器、多轮 Agent loop 和运行预算已建立并验证；尚未接入真实模型 API、命令工具、取消、超时或审批策略。**
+**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界、读写文件工具、工具注册表、HTTP run API、SSE 事件流、mock runner、模型适配边界、响应解析器、多轮 Agent loop、运行预算、取消 API、工具超时和后台任务生命周期已建立并验证；尚未接入真实模型 API、命令工具或审批策略。**
 
 ## 已确认
 
@@ -16,6 +16,7 @@
 - Workspace 写入与文本编辑工具已建立：`write_file`、`replace_text` 具备路径边界、UTF-8/大小限制、hash 冲突检测和注册表接入。见 [ADR-0009](../decisions/0009-workspace-write-edit-tools.md)。
 - 模型适配边界与响应解析器已建立：runner 通过 `ModelClient` 获取响应，`ModelResponseParser` 校验 JSON 输出并将解析失败归为 `MODEL_PARSE_ERROR`。见 [ADR-0010](../decisions/0010-model-boundary-response-parser.md)。
 - 多轮 Agent loop 与运行预算已建立：模型工具调用结果会回填到下一轮请求，轮次、工具调用数和上下文消息窗口有明确限制。见 [ADR-0011](../decisions/0011-agent-loop-budget.md)。
+- Run 取消、工具超时和后台任务生命周期已建立：后端保留 run task 句柄，支持 cancel endpoint，runner 检查取消状态，工具执行有 timeout。见 [ADR-0012](../decisions/0012-run-cancellation-timeout-lifecycle.md)。
 - Agent 关键逻辑自行实现，项目不使用 Agent 框架/SDK 或 Spring AI。
 - decisions/ 记录决策，memory/ 记录开发状态与文档。见 [ADR-0002](../decisions/0002-development-records.md)。
 - 正式截止：北京时间 2026-09-03 00:00；此后不推送新提交。
@@ -37,6 +38,7 @@
 - 实现 `WorkspaceWriteTools`，将 `write_file` 和 `replace_text` 接入工具注册表。
 - 实现 `ModelClient`、模型请求/响应类型、`ModelResponseParser` 和 `HeuristicMockModelClient`；mock runner 已通过模型边界调用工具。
 - 实现 `RunBudget`，mock runner 已支持多轮模型/工具循环、工具观察回填、轮次上限、工具调用上限和上下文消息窗口。
+- 实现 `RunTaskManager`、`POST /api/runs/{runId}/cancel`、工具执行超时和前端 Cancel 按钮。
 
 ## 功能状态
 
@@ -45,11 +47,11 @@
 | 模块 | 当前状态 | 实现位置 | 验证证据 | 决策/说明 |
 | --- | --- | --- | --- | --- |
 | 前后端工程骨架及独立启动 | 已验证 | [frontend](../frontend)、[backend](../backend) | [APP-001](VERIFICATION.md) | ADR-0001、ADR-0003；验证覆盖构建和后端健康接口 |
-| 任务接口与 Web 页面 | 已验证 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/api/runs.ts](../frontend/src/api/runs.ts)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/api](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/api) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md) | 可创建 mock run 并显示事件；仍非真实模型任务界面 |
-| 模型适配器及 Agent 循环 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution) | [CORE-001](VERIFICATION.md)、[RUNAPI-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[LOOP-001](VERIFICATION.md) | 模型边界、多轮工具循环、预算和解析失败终止已验证；尚未实现真实模型 API、取消或超时 |
+| 任务接口与 Web 页面 | 已验证 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/api/runs.ts](../frontend/src/api/runs.ts)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/api](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/api) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[LIFE-001](VERIFICATION.md) | 可创建/cancel mock run 并显示事件；仍非真实模型任务界面 |
+| 模型适配器及 Agent 循环 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution) | [CORE-001](VERIFICATION.md)、[RUNAPI-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[LOOP-001](VERIFICATION.md)、[LIFE-001](VERIFICATION.md) | 模型边界、多轮工具循环、预算、取消和工具超时已验证；尚未实现真实模型 API |
 | 文件工具、搜索与编辑 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md) | list/read/search/write/replace 已验证；尚未实现 diff 渲染、审批策略或命令工具 |
 | 工具注册表与执行入口 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool) | [TOOLREG-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md) | `list_files`、`read_file`、`search_text`、`write_file`、`replace_text` 已注册；已接入 mock 模型边界，真实模型适配器未接入 |
-| 命令执行、审批、取消 | 未开始 | 尚无 | 尚无 | 需要真实进程与权限测试 |
+| 命令执行、审批、取消 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution)、[frontend/src/App.vue](../frontend/src/App.vue) | [LIFE-001](VERIFICATION.md) | Run 取消和工具 timeout 已验证；命令执行、审批和进程级取消未实现 |
 | 对话上下文及运行预算 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java) | [LOOP-001](VERIFICATION.md) | 轮次、工具调用和消息窗口已验证；真实 token 计数和 provider-specific 裁剪未实现 |
 | SSE、工具卡片、Diff、输出 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java)、[frontend/src/App.vue](../frontend/src/App.vue) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md) | SSE 基础事件流已验证；工具卡片、Diff 和 rich output 未实现 |
 | 运行记录与历史回看 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java) | [RUNAPI-001](VERIFICATION.md) | 进程内事件回看已验证；重启后持久化未实现 |
@@ -58,10 +60,10 @@
 
 ## 下一步
 
-1. 增加取消入口、工具执行超时和 run 后台任务生命周期管理。
-2. 设计写入/命令工具的审批策略，并让前端展示 diff 或变更摘要。
-3. 接入第一个真实模型 API adapter，但保持密钥只通过本地环境变量提供，不写进聊天、源码或文档。
-4. 实现命令执行工具：在 workspace 边界内执行审批后的命令，捕获 stdout/stderr/exit code。
+1. 设计写入/命令工具的审批策略，并让前端展示 diff 或变更摘要。
+2. 接入第一个真实模型 API adapter，但保持密钥只通过本地环境变量提供，不写进聊天、源码或文档。
+3. 实现命令执行工具：在 workspace 边界内执行审批后的命令，捕获 stdout/stderr/exit code，并补充进程级取消。
+4. 增强前端工具卡片和 diff 展示，让录屏能清楚呈现工具调用和文件变更。
 5. 确认公开仓库的账户、名称及可公开文件；首次公开推送前复核题目 PDF、日志、密钥和演示材料。
 
 ## 风险与待定项
@@ -69,4 +71,4 @@
 - 尚未做真实模型连通性验证，不能声称可调用真实模型。
 - 公开远程仓库尚未建立；当前只有本地 Git 历史。
 - 演示案例尚未最终确定，排期属于建议。
-- 当前有已验证的 mock run 前后端闭环、写入/编辑工具和多轮 loop，但没有已验证的命令执行、审批策略、取消/超时或真实模型能力。
+- 当前有已验证的 mock run 前后端闭环、写入/编辑工具、多轮 loop、取消和工具超时，但没有已验证的命令执行、审批策略、进程级取消或真实模型能力。
