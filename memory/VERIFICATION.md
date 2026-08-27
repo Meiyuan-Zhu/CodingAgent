@@ -261,7 +261,7 @@
   - 首次新增 resolver 写目标测试时，预期路径未使用 realpath，macOS `/var` 与 `/private/var` 差异导致断言失败；改为用 `root.toRealPath()` 构造预期。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0009。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`8cc17f9 feat: add workspace write and edit tools`。
 - 限制：不包含真实模型 API、真实 Agent loop 写入决策、前端 diff 渲染、用户审批、取消或命令工具验证。
 
 ## DOC-008：写入/编辑工具子任务后的文档一致性检查
@@ -272,5 +272,5 @@
 - 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0009 索引、STATUS 对 ADR-0009 和 WRITE-001 的引用。
 - 结果：通过。检查 21 个 Markdown 文件。
 - 关联：ADR-0009。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`8cc17f9 feat: add workspace write and edit tools`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
