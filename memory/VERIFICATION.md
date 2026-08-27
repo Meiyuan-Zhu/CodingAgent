@@ -34,7 +34,7 @@
   - Maven 每次读取用户全局 settings 时提示 `Unrecognised tag: 'repositories'`，目前不影响项目构建。
   - 前端构建时 Homebrew shellenv 输出 `/bin/ps: Operation not permitted`，目前不影响构建。
 - 关联：ADR-0003。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`3f220c9 chore: scaffold vue and spring boot apps`。
 - 限制：不包含真实浏览器交互截图；不包含模型 API、Agent 循环、文件工具、命令执行或安全边界。
 
 ## DOC-002：框架接入后的文档一致性检查
@@ -45,5 +45,5 @@
 - 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、STATUS 中 Git/APP-001 状态、ADR-0003 索引。
 - 结果：通过。检查 14 个 Markdown 文件。
 - 关联：ADR-0003。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`3f220c9 chore: scaffold vue and spring boot apps`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。

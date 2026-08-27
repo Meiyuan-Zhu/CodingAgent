@@ -27,4 +27,5 @@
 - 新增根目录 `README.md`，记录前后端运行和检查命令。
 - 新增 ADR-0003 记录框架基线与版本选择。
 - 执行 APP-001 骨架验证：后端 `mvn test`、前端 `npm run build` 均通过。
+- 创建框架提交 `3f220c9 chore: scaffold vue and spring boot apps`。
 - 已知环境现象：本机 Maven settings 有一个 `repositories` 标签位置警告，但未阻止构建；第一次尝试 Boot `4.1.1.RELEASE` 未能通过本机 Maven 镜像解析，因此未采用。
