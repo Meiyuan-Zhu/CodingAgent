@@ -127,7 +127,7 @@
   - 首次测试失败：macOS 临时目录 realpath 中 `/var` 与 `/private/var` 不一致，导致误判 symlink 逃逸；改为 workspace root 也使用 `toRealPath()`。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0006。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`93f572f feat: add workspace boundary and read tools`。
 - 限制：不包含 HTTP API、SSE、模型工具注册表、真实 Agent loop、写入工具、编辑工具或命令工具验证。
 
 ## DOC-005：Workspace 子任务后的文档与忽略规则检查
@@ -142,5 +142,5 @@
   - 使用 `git ls-files --others --exclude-standard workspaces/demo` 确认 demo workspace 文件会进入待跟踪列表。
 - 结果：通过。检查 18 个 Markdown 文件；`.vscode/`、私有 `workspaces/`、题目 PDF、构建产物和 `tmp/` 保持忽略，`workspaces/demo/README.md` 与 `workspaces/demo/src/hello.txt` 可被跟踪。
 - 关联：ADR-0006。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`93f572f feat: add workspace boundary and read tools`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档、状态描述和指定 Git 忽略样例，不证明应用运行、模型调用或工具集成能力。
