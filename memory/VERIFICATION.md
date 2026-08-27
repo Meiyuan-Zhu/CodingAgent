@@ -105,3 +105,42 @@
 - 关联：ADR-0005。
 - 代码版本/运行 ID：`e0369eb feat: add agent run protocol domain`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## WORKSPACE-001：Workspace 边界与只读文件工具测试
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试与 Spring 上下文测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/`、`workspaces/demo/`、`.gitignore`、`application.properties`。
+- 方法：实现 workspace 路径解析、拒绝规则和只读工具后执行 `cd backend && mvn test`。
+- 结果：通过。21 tests, 0 failures, 0 errors。
+- 覆盖：
+  - 相对路径 normalize 后仍在 workspace 内。
+  - 绝对路径和 `..` 路径逃逸被拒绝。
+  - `.env` 与嵌套 `.env.local` 被拒绝。
+  - symlink 指向 workspace 外部时被拒绝。
+  - `listFiles` 隐藏敏感文件。
+  - `readFile` 读取 UTF-8 文本，拒绝目录和非法 UTF-8。
+  - `searchText` 能找到匹配，跳过敏感文件，并在结果上限处标记截断。
+  - Spring Boot 上下文能加载 workspace 配置。
+- 修正记录：
+  - 首次编译失败：误用 `Path.stream()`；改为遍历 `Path`。
+  - 首次测试失败：macOS 临时目录 realpath 中 `/var` 与 `/private/var` 不一致，导致误判 symlink 逃逸；改为 workspace root 也使用 `toRealPath()`。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0006。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：不包含 HTTP API、SSE、模型工具注册表、真实 Agent loop、写入工具、编辑工具或命令工具验证。
+
+## DOC-005：Workspace 子任务后的文档与忽略规则检查
+
+- 日期：2026-08-27。
+- 类型：文档链接、状态一致性与 Git 忽略规则检查。
+- 范围：README.md、decisions/、memory/、`.gitignore`、`workspaces/demo/`。
+- 方法：
+  - 使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0006 索引、STATUS 对 ADR-0006 和 WORKSPACE-001 的引用。
+  - 使用 `git status --short --ignored` 检查本阶段改动与忽略文件范围。
+  - 使用 `git check-ignore -v -- .vscode/settings.json workspaces/private/a.txt workspaces/demo/README.md 推免考核题目学生版.pdf backend/target/classes/x frontend/node_modules/x frontend/dist/x tmp/x` 检查关键忽略/反忽略样例。
+  - 使用 `git ls-files --others --exclude-standard workspaces/demo` 确认 demo workspace 文件会进入待跟踪列表。
+- 结果：通过。检查 18 个 Markdown 文件；`.vscode/`、私有 `workspaces/`、题目 PDF、构建产物和 `tmp/` 保持忽略，`workspaces/demo/README.md` 与 `workspaces/demo/src/hello.txt` 可被跟踪。
+- 关联：ADR-0006。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档、状态描述和指定 Git 忽略样例，不证明应用运行、模型调用或工具集成能力。

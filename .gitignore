@@ -13,11 +13,14 @@ coverage/
 # Local runtime data, temporary files, and private demo workspaces.
 /tmp/
 /.runtime/
-/workspaces/
+/workspaces/*
+!/workspaces/demo/
+!/workspaces/demo/**
 *.log
 
 # OS and IDE metadata.
 .DS_Store
+.vscode/
 .idea/
 *.iml
 

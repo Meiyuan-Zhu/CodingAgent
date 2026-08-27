@@ -9,6 +9,7 @@
 | [ADR-0003](0003-framework-baseline.md) | Vue 3 与 Spring Boot 工程基线 | accepted | 前后端骨架及健康接口已验证 |
 | [ADR-0004](0004-local-workbench-ui.md) | 本地 workspace 工作台式 Web 界面 | accepted | Vue 工作台壳已实现，Agent 执行未实现 |
 | [ADR-0005](0005-run-protocol-domain.md) | Agent 运行协议领域模型 | accepted | 后端领域模型和状态转换测试已验证 |
+| [ADR-0006](0006-workspace-boundary-read-tools.md) | Workspace 边界与只读文件工具 | accepted | 后端路径边界和 list/read/search 已验证 |
 
 ## 规则
 

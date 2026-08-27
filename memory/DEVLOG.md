@@ -53,3 +53,18 @@
 - 执行 CORE-001 验证：`cd backend && mvn test` 通过，12 tests, 0 failures, 0 errors。
 - 创建子任务提交 `e0369eb feat: add agent run protocol domain`。
 - 限制：尚未实现 workspace、工具注册表、模型适配器、Agent loop、SSE 或运行持久化。
+
+## 2026-08-27：子任务 2 - Workspace 边界与只读文件工具
+
+- 目标：建立后端本地 workspace 边界，让文件工具只能访问配置的开发 workspace。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/`：
+  - `WorkspacePathResolver` 统一处理相对路径、normalize、realpath 和 symlink 逃逸校验。
+  - `WorkspaceAccessException` 与 `WorkspaceAccessCode` 明确拒绝原因。
+  - `WorkspaceReadTools` 提供 `listFiles`、`readFile`、`searchText`。
+  - DTO/结果类型：`FileListing`、`ListedWorkspaceFile`、`ReadFileResult`、`SearchResult`、`SearchMatch`。
+- 后端配置 `agent.workspace.root=../workspaces/demo`，并新增安全 demo workspace 文件。
+- 调整根 `.gitignore`：继续默认忽略 `workspaces/` 下私有内容，但允许提交 `workspaces/demo/`；忽略 IDE 自动生成的 `.vscode/`。
+- 测试覆盖绝对路径拒绝、`..` 逃逸拒绝、`.env` 拒绝、symlink 逃逸拒绝、目录读取拒绝、非法 UTF-8 拒绝、搜索跳过敏感文件和结果截断。
+- 首轮测试暴露 macOS 临时目录 `/var` 与 `/private/var` realpath 差异，已改为对 workspace root 使用真实路径再比较。
+- 执行 WORKSPACE-001 验证：`cd backend && mvn test` 通过，21 tests, 0 failures, 0 errors。
+- 限制：只读工具尚未暴露给 HTTP、SSE、模型工具注册表或真实 Agent loop；写入、编辑和命令工具未实现。
