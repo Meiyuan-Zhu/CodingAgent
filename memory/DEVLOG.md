@@ -100,3 +100,17 @@
 - 执行 RUNAPI-001 验证：`cd backend && mvn test` 通过，48 tests, 0 failures, 0 errors；本地 HTTP 创建 run 成功，最终 `SUCCEEDED`，事件回看 10 条，SSE replay 包含 `event:run_finished`。
 - 执行 UI-002 验证：`cd frontend && npm run build` 通过；in-app browser 打开前端、点击 Run、显示 10 条事件、控制台无 warning/error、无横向溢出。
 - 限制：当前 run 存储为进程内内存，重启丢失；mock runner 不是模型能力；没有写入、编辑、命令、取消或审批能力。
+
+## 2026-08-27：子任务 5 - Workspace 写入与文本编辑工具
+
+- 目标：在已有 workspace 安全边界上加入可变更文件的工具能力，但不把写入动作直接开放成前端裸 API。
+- 扩展 `WorkspacePathResolver`，新增 `resolveForWrite`：允许目标文件不存在，但要求父目录存在并经过 realpath 校验，防止路径逃逸和 symlink 逃逸。
+- 新增 `WorkspaceWriteTools`：
+  - `writeFile` 创建或覆盖完整 UTF-8 文本文件。
+  - `replaceText` 对已有 UTF-8 文件做精确文本替换。
+  - 两者都限制写入大小，拒绝敏感路径和非法 UTF-8，并返回 SHA-256 与变更摘要。
+- 扩展工具注册表适配：新增 `write_file`、`replace_text`，并增加 boolean 参数与可为空文本参数校验。
+- 写入错误在工具结果中区分为 workspace access denied、workspace conflict、workspace edit miss，便于后续 UI/Agent loop 判断。
+- 保持 mock runner 默认不写文件，避免用户反复点击 Run 时污染 Git 工作区。
+- 执行 WRITE-001 验证：`cd backend && mvn test` 通过，64 tests, 0 failures, 0 errors。
+- 限制：尚未实现 diff 渲染、用户审批、取消、真实模型调用或命令工具。

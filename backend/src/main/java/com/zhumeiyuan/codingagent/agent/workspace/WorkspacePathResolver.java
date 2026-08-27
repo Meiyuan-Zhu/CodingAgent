@@ -56,6 +56,55 @@ public class WorkspacePathResolver {
 		}
 	}
 
+	public ResolvedWorkspacePath resolveForWrite(String requestedPath) {
+		Path relativePath = normalizeRelativePath(requestedPath);
+		rejectSensitivePath(relativePath, requestedPath);
+		if (relativePath.getFileName() == null) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.INVALID_WRITE_TARGET, requestedPath,
+					"Workspace write target must be a file path");
+		}
+
+		Path candidate = this.configuredRoot.resolve(relativePath).normalize();
+		rejectEscape(candidate, requestedPath);
+
+		if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
+			return resolveExisting(requestedPath);
+		}
+
+		Path parent = candidate.getParent();
+		if (parent == null || !parent.startsWith(this.configuredRoot)) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.PATH_ESCAPE, requestedPath,
+					"Workspace path escapes the workspace root");
+		}
+		if (!Files.exists(parent, LinkOption.NOFOLLOW_LINKS)) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.PARENT_NOT_FOUND, requestedPath,
+					"Workspace parent directory not found");
+		}
+
+		try {
+			Path realParent = parent.toRealPath();
+			if (!realParent.startsWith(this.realRoot)) {
+				throw new WorkspaceAccessException(WorkspaceAccessCode.SYMLINK_ESCAPE, requestedPath,
+						"Workspace parent resolves outside the workspace root");
+			}
+			if (!Files.isDirectory(realParent, LinkOption.NOFOLLOW_LINKS)) {
+				throw new WorkspaceAccessException(WorkspaceAccessCode.PARENT_NOT_DIRECTORY, requestedPath,
+						"Workspace parent is not a directory");
+			}
+			Path realTarget = realParent.resolve(candidate.getFileName()).normalize();
+			if (!realTarget.startsWith(this.realRoot)) {
+				throw new WorkspaceAccessException(WorkspaceAccessCode.PATH_ESCAPE, requestedPath,
+						"Workspace path escapes the workspace root");
+			}
+			return new ResolvedWorkspacePath(this.realRoot.relativize(realTarget), realTarget);
+		} catch (WorkspaceAccessException ex) {
+			throw ex;
+		} catch (IOException ex) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.IO_ERROR, requestedPath,
+					"Cannot resolve workspace write target", ex);
+		}
+	}
+
 	public boolean isSensitiveRelativePath(Path relativePath) {
 		for (Path segment : relativePath.normalize()) {
 			if (SENSITIVE_NAMES.contains(segment.toString())) {

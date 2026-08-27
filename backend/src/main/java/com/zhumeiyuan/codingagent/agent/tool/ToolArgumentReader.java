@@ -34,6 +34,14 @@ public class ToolArgumentReader {
 		return stringValue;
 	}
 
+	public String requiredText(String name) {
+		Object value = this.arguments.get(name);
+		if (!(value instanceof String stringValue)) {
+			throw invalid("Argument '" + name + "' must be a string");
+		}
+		return stringValue;
+	}
+
 	public String optionalString(String name, String defaultValue) {
 		Object value = this.arguments.get(name);
 		if (value == null) {
@@ -43,6 +51,17 @@ public class ToolArgumentReader {
 			throw invalid("Argument '" + name + "' must be a non-blank string");
 		}
 		return stringValue;
+	}
+
+	public boolean optionalBoolean(String name, boolean defaultValue) {
+		Object value = this.arguments.get(name);
+		if (value == null) {
+			return defaultValue;
+		}
+		if (!(value instanceof Boolean booleanValue)) {
+			throw invalid("Argument '" + name + "' must be a boolean");
+		}
+		return booleanValue;
 	}
 
 	public int optionalPositiveInt(String name, int defaultValue, int maxValue) {

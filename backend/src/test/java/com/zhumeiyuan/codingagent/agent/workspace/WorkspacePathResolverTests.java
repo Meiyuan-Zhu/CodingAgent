@@ -73,6 +73,29 @@ class WorkspacePathResolverTests {
 		assertWorkspaceError(() -> resolver.resolveExisting("leak.txt"), WorkspaceAccessCode.SYMLINK_ESCAPE);
 	}
 
+	@Test
+	void resolvesMissingWriteTargetInsideExistingParent() throws IOException {
+		Path root = this.tempDir.resolve("workspace");
+		Files.createDirectories(root.resolve("src"));
+
+		WorkspacePathResolver resolver = new WorkspacePathResolver(root);
+		ResolvedWorkspacePath resolved = resolver.resolveForWrite("src/NewFile.java");
+
+		assertThat(resolved.displayPath()).isEqualTo("src/NewFile.java");
+		assertThat(resolved.realPath()).isEqualTo(root.toRealPath().resolve("src/NewFile.java"));
+	}
+
+	@Test
+	void rejectsWriteTargetWhenParentIsMissingOrSensitive() throws IOException {
+		Path root = this.tempDir.resolve("workspace");
+		Files.createDirectories(root);
+
+		WorkspacePathResolver resolver = new WorkspacePathResolver(root);
+
+		assertWorkspaceError(() -> resolver.resolveForWrite("missing/file.txt"), WorkspaceAccessCode.PARENT_NOT_FOUND);
+		assertWorkspaceError(() -> resolver.resolveForWrite(".env"), WorkspaceAccessCode.SENSITIVE_PATH);
+	}
+
 	private void assertWorkspaceError(Runnable action, WorkspaceAccessCode code) {
 		assertThatThrownBy(action::run)
 				.isInstanceOf(WorkspaceAccessException.class)

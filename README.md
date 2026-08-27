@@ -30,6 +30,14 @@ The frontend development server proxies `/api` requests to `http://localhost:808
 
 The current workbench can create a mock run, stream backend events through SSE, and execute read-only workspace tools through the backend tool registry. This is a verified local loop, not a real model integration yet.
 
+Currently registered model-facing tools:
+
+- `list_files`
+- `read_file`
+- `search_text`
+- `write_file`
+- `replace_text`
+
 Useful backend endpoints:
 
 - `POST /api/runs`

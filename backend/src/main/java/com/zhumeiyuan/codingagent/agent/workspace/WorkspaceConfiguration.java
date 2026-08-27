@@ -17,4 +17,9 @@ class WorkspaceConfiguration {
 	WorkspaceReadTools workspaceReadTools(WorkspacePathResolver resolver) {
 		return new WorkspaceReadTools(resolver);
 	}
+
+	@Bean
+	WorkspaceWriteTools workspaceWriteTools(WorkspacePathResolver resolver) {
+		return new WorkspaceWriteTools(resolver);
+	}
 }

@@ -21,6 +21,7 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionErrorCode;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspacePathResolver;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceReadTools;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,11 +43,15 @@ class WorkspaceToolFactoryTests {
 		Files.writeString(root.resolve("README.md"), "hello agent\n");
 		Files.writeString(root.resolve("src/App.java"), "class App { String name = \"agent\"; }\n");
 		Files.writeString(root.resolve(".env"), "API_KEY=secret\n");
-		WorkspaceReadTools workspaceReadTools = new WorkspaceReadTools(new WorkspacePathResolver(root));
+		WorkspacePathResolver resolver = new WorkspacePathResolver(root);
+		WorkspaceReadTools workspaceReadTools = new WorkspaceReadTools(resolver);
+		WorkspaceWriteTools workspaceWriteTools = new WorkspaceWriteTools(resolver);
 		this.registry = new ToolRegistry(List.of(
 				WorkspaceToolFactory.listFiles(workspaceReadTools, this.objectMapper),
 				WorkspaceToolFactory.readFile(workspaceReadTools, this.objectMapper),
-				WorkspaceToolFactory.searchText(workspaceReadTools, this.objectMapper)),
+				WorkspaceToolFactory.searchText(workspaceReadTools, this.objectMapper),
+				WorkspaceToolFactory.writeFile(workspaceWriteTools, this.objectMapper),
+				WorkspaceToolFactory.replaceText(workspaceWriteTools, this.objectMapper)),
 				this.clock);
 	}
 
@@ -55,7 +60,7 @@ class WorkspaceToolFactoryTests {
 		List<ToolDefinition> definitions = this.registry.definitions();
 
 		assertThat(definitions).extracting(ToolDefinition::name)
-				.containsExactly("list_files", "read_file", "search_text");
+				.containsExactly("list_files", "read_file", "replace_text", "search_text", "write_file");
 		assertThat(definitions.get(1).inputSchema()).containsEntry("additionalProperties", false);
 		assertThat(definitions.get(1).inputSchema()).containsEntry("required", List.of("path"));
 	}
@@ -109,5 +114,42 @@ class WorkspaceToolFactoryTests {
 		assertThat(result.success()).isFalse();
 		assertThat(result.content()).contains("escapes the workspace root");
 		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_ACCESS_DENIED.name());
+	}
+
+	@Test
+	void writeFileToolCreatesFileAndReturnsHashMetadata() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "write_file",
+				Map.of("path", "src/New.java", "content", "class New {}\n")));
+
+		assertThat(result.success()).isTrue();
+		assertThat(result.metadata()).containsEntry("toolName", "write_file").containsEntry("overwrite", false);
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("path").asText()).isEqualTo("src/New.java");
+		assertThat(json.get("created").asBoolean()).isTrue();
+		assertThat(json.get("sha256").asText()).hasSize(64);
+	}
+
+	@Test
+	void replaceTextToolEditsFileAndCanUseEmptyReplacement() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "replace_text",
+				Map.of("path", "README.md", "old_text", "hello ", "new_text", "")));
+
+		assertThat(result.success()).isTrue();
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("path").asText()).isEqualTo("README.md");
+		assertThat(json.get("replacements").asInt()).isEqualTo(1);
+	}
+
+	@Test
+	void writeConflictAndMissingTextUseSpecificToolErrorCodes() {
+		ToolResult conflict = this.registry.execute(new ToolCall("call-1", "write_file",
+				Map.of("path", "README.md", "content", "changed", "overwrite", false)));
+		ToolResult editMiss = this.registry.execute(new ToolCall("call-2", "replace_text",
+				Map.of("path", "README.md", "old_text", "missing", "new_text", "changed")));
+
+		assertThat(conflict.success()).isFalse();
+		assertThat(conflict.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_CONFLICT.name());
+		assertThat(editMiss.success()).isFalse();
+		assertThat(editMiss.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_EDIT_MISS.name());
 	}
 }

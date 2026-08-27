@@ -237,3 +237,40 @@
 - 关联：ADR-0008。
 - 代码版本/运行 ID：`6bddeed feat: wire mock run api and event stream`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## WRITE-001：Workspace 写入与文本编辑工具测试
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试与 Spring 上下文测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/`。
+- 方法：实现写入目标路径解析、`WorkspaceWriteTools`、`write_file`/`replace_text` 工具适配后执行 `cd backend && mvn test`。
+- 结果：通过。64 tests, 0 failures, 0 errors。
+- 覆盖：
+  - 缺失目标文件可在已存在父目录内解析为写入目标。
+  - 缺失父目录和敏感 `.env` 写入被拒绝。
+  - `writeFile` 可创建 UTF-8 文件并返回 SHA-256。
+  - 已存在文件在 `overwrite=false` 时被拒绝。
+  - `writeFile` 支持 `expected_sha256`，hash 不匹配返回冲突。
+  - 过大写入、敏感路径和已有非法 UTF-8 文件被拒绝。
+  - `replaceText` 可做精确文本替换，也支持空 replacement 删除文本。
+  - `replaceText` 对缺失文本、hash 冲突、目录、非法 UTF-8 和过多替换上限进行拒绝。
+  - `write_file`、`replace_text` 经注册表返回 JSON 文本结果。
+  - 文件已存在/内容冲突映射为 `WORKSPACE_CONFLICT`；替换文本缺失映射为 `WORKSPACE_EDIT_MISS`。
+  - Spring Boot 上下文能加载五个 workspace 工具：`list_files`、`read_file`、`search_text`、`write_file`、`replace_text`。
+- 修正记录：
+  - 首次新增 resolver 写目标测试时，预期路径未使用 realpath，macOS `/var` 与 `/private/var` 差异导致断言失败；改为用 `root.toRealPath()` 构造预期。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0009。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：不包含真实模型 API、真实 Agent loop 写入决策、前端 diff 渲染、用户审批、取消或命令工具验证。
+
+## DOC-008：写入/编辑工具子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0009 索引、STATUS 对 ADR-0009 和 WRITE-001 的引用。
+- 结果：通过。检查 21 个 Markdown 文件。
+- 关联：ADR-0009。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

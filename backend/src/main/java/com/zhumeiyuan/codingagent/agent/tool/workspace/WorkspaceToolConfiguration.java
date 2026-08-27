@@ -3,6 +3,7 @@ package com.zhumeiyuan.codingagent.agent.tool.workspace;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.tool.RegisteredTool;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceReadTools;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,5 +24,15 @@ class WorkspaceToolConfiguration {
 	@Bean
 	RegisteredTool searchTextTool(WorkspaceReadTools workspaceReadTools, ObjectMapper objectMapper) {
 		return WorkspaceToolFactory.searchText(workspaceReadTools, objectMapper);
+	}
+
+	@Bean
+	RegisteredTool writeFileTool(WorkspaceWriteTools workspaceWriteTools, ObjectMapper objectMapper) {
+		return WorkspaceToolFactory.writeFile(workspaceWriteTools, objectMapper);
+	}
+
+	@Bean
+	RegisteredTool replaceTextTool(WorkspaceWriteTools workspaceWriteTools, ObjectMapper objectMapper) {
+		return WorkspaceToolFactory.replaceText(workspaceWriteTools, objectMapper);
 	}
 }

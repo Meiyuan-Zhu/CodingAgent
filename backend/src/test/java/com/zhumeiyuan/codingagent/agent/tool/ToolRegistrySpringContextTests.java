@@ -15,6 +15,6 @@ class ToolRegistrySpringContextTests {
 	@Test
 	void springContextRegistersWorkspaceReadTools() {
 		assertThat(this.toolRegistry.definitions()).extracting(ToolDefinition::name)
-				.contains("list_files", "read_file", "search_text");
+				.contains("list_files", "read_file", "search_text", "write_file", "replace_text");
 	}
 }

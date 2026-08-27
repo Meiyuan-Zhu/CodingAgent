@@ -1,5 +1,6 @@
 package com.zhumeiyuan.codingagent.agent.tool;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
@@ -23,6 +24,22 @@ class ToolArgumentReaderTests {
 
 		assertToolError(() -> missing.requiredString("path"), ToolExecutionErrorCode.INVALID_ARGUMENTS);
 		assertToolError(() -> wrongType.requiredString("path"), ToolExecutionErrorCode.INVALID_ARGUMENTS);
+	}
+
+	@Test
+	void requiredTextAllowsEmptyStringButRejectsNonString() {
+		ToolArgumentReader empty = new ToolArgumentReader("demo_tool", Map.of("content", ""));
+		ToolArgumentReader wrongType = new ToolArgumentReader("demo_tool", Map.of("content", 123));
+
+		assertThatCode(() -> empty.requiredText("content")).doesNotThrowAnyException();
+		assertToolError(() -> wrongType.requiredText("content"), ToolExecutionErrorCode.INVALID_ARGUMENTS);
+	}
+
+	@Test
+	void optionalBooleanRejectsNonBoolean() {
+		ToolArgumentReader reader = new ToolArgumentReader("demo_tool", Map.of("overwrite", "true"));
+
+		assertToolError(() -> reader.optionalBoolean("overwrite", false), ToolExecutionErrorCode.INVALID_ARGUMENTS);
 	}
 
 	@Test
