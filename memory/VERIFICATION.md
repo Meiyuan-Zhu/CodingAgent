@@ -92,7 +92,7 @@
   - `ToolResult` 区分成功和失败。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 也有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0005。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`e0369eb feat: add agent run protocol domain`。
 - 限制：不包含并发运行、持久化、SSE、真实工具执行、模型调用、模型响应解析或前端接入验证。
 
 ## DOC-004：运行协议子任务后的文档一致性检查
@@ -103,5 +103,5 @@
 - 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0005 索引、STATUS 对 ADR-0005 的引用、CORE-001 验证记录。
 - 结果：通过。检查 16 个 Markdown 文件。
 - 关联：ADR-0005。
-- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 代码版本/运行 ID：`e0369eb feat: add agent run protocol domain`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。

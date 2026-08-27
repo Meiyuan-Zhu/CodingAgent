@@ -51,4 +51,5 @@
 - 新增 ADR-0005 记录为什么先做领域模型，以及为什么暂时不把它绑定到 Controller、SSE 或数据库。
 - 新增后端单元测试覆盖正常状态转换、审批状态、非法转换、终态约束、事件序号、Map 不可变快照和工具结果。
 - 执行 CORE-001 验证：`cd backend && mvn test` 通过，12 tests, 0 failures, 0 errors。
+- 创建子任务提交 `e0369eb feat: add agent run protocol domain`。
 - 限制：尚未实现 workspace、工具注册表、模型适配器、Agent loop、SSE 或运行持久化。
