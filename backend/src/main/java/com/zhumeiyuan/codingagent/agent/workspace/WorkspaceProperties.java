@@ -7,13 +7,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "agent.workspace")
 public class WorkspaceProperties {
 
-	private Path root = Path.of("../workspaces/demo");
+	private String root = "../workspaces/demo";
 
 	public Path getRoot() {
-		return this.root;
+		return Path.of(this.root);
 	}
 
-	public void setRoot(Path root) {
+	public void setRoot(String root) {
 		this.root = root;
 	}
 }

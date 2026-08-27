@@ -28,6 +28,15 @@ npm run dev
 
 The frontend development server proxies `/api` requests to `http://localhost:8080`.
 
+The current workbench can create a mock run, stream backend events through SSE, and execute read-only workspace tools through the backend tool registry. This is a verified local loop, not a real model integration yet.
+
+Useful backend endpoints:
+
+- `POST /api/runs`
+- `GET /api/runs/{runId}`
+- `GET /api/runs/{runId}/events`
+- `GET /api/runs/{runId}/events/stream`
+
 ## Checks
 
 ```bash

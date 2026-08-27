@@ -179,3 +179,61 @@
 - 关联：ADR-0007。
 - 代码版本/运行 ID：`38c3091 feat: add agent tool registry`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## RUNAPI-001：Run API、事件回看、SSE 与 mock runner 验证
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试、Spring MVC 测试、本地 HTTP/SSE 集成测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/api/`、`WorkspaceProperties` 配置绑定。
+- 方法：
+  - 实现 run store、run service、mock runner、SSE stream 和 run controller 后执行 `cd backend && mvn test`。
+  - 执行 `cd backend && mvn spring-boot:run` 启动真实后端。
+  - 使用本地 HTTP 请求 `POST /api/runs` 创建 run，随后请求 `GET /api/runs/{runId}` 和 `GET /api/runs/{runId}/events`。
+  - 使用本地 HTTP 请求 `GET /api/runs/{runId}/events/stream` 检查 SSE replay 文本格式。
+- 结果：
+  - `mvn test` 通过。48 tests, 0 failures, 0 errors。
+  - 真实后端启动通过，Tomcat started on port 8080。
+  - `POST /api/runs` 返回 HTTP 202。
+  - 测试 run `23076b47-df28-4e33-ae06-3f7ba709d313` 最终状态为 `SUCCEEDED`。
+  - 事件回看返回 10 条：`RUN_CREATED`、`USER_MESSAGE_ACCEPTED`、`RUN_STARTED`、`MODEL_REQUESTED`、`MODEL_MESSAGE_RECEIVED`、`TOOL_CALL_REQUESTED`、`TOOL_CALL_STARTED`、`TOOL_CALL_FINISHED`、`MODEL_MESSAGE_RECEIVED`、`RUN_FINISHED`。
+  - `TOOL_CALL_FINISHED` 显示 `list_files` 成功，并返回 `README.md` 与 `src`。
+  - SSE replay 样例 run `bb8511f5-6fe8-4d08-b636-4a3624ee1330` 返回 `id/event/data` 格式，并包含 `event:run_finished`。
+- 修正记录：
+  - 首次真实 `spring-boot:run` 失败：`WorkspaceProperties` 直接绑定 `Path` 时，Spring Boot 将 `../workspaces/demo` 作为资源路径转换并失败；改为配置字段使用 `String`，在 getter 中由项目代码 `Path.of(...)` 转换。
+  - 8080 和 5173 存在旧开发进程，联调前使用 `lsof` 定位并清理旧 Java/Vite 进程。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0008。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：mock runner 不证明真实模型 API、真实响应解析、多轮推理、写入工具、命令执行、取消或审批能力。
+
+## UI-002：Vue 工作台接入 run API 与 SSE 验证
+
+- 日期：2026-08-27。
+- 类型：前端构建与浏览器交互验证。
+- 范围：`frontend/src/App.vue`、`frontend/src/api/runs.ts`、Vite `/api` proxy、后端 run/SSE API。
+- 方法：
+  - 执行 `cd frontend && npm run build`。
+  - 启动后端 `mvn spring-boot:run`，启动前端 `npm run dev -- --host 127.0.0.1`。
+  - 使用 in-app browser 打开 `http://127.0.0.1:5174/`，检查初始状态、点击 Run、等待 timeline 出现 `Run finished`，读取 console warnings/errors 与页面宽度。
+- 结果：
+  - `npm run build` 通过，`vue-tsc -b` 与 `vite build` 均成功。
+  - 初始页面健康状态为 `ok`，Run 按钮可用。
+  - 点击 Run 后页面显示 10 条事件，包含 `Tool finished: list_files` 与 `Run finished`。
+  - 右侧文件列表从工具结果显示 `README.md` 和 `src`。
+  - 浏览器 console 无 warning/error。
+  - 1280 视口下 `documentElement.scrollWidth` 等于 `clientWidth`，没有横向溢出。
+- 观察：5173 被旧 Vite 进程占用，当前验证使用 Vite 自动分配的 `http://127.0.0.1:5174/`。前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，不影响构建。
+- 关联：ADR-0008。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只验证 mock run UI 闭环；未验证真实模型、多轮任务、写入/diff、取消、审批或移动端响应式。
+
+## DOC-007：Run API 与 SSE 子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0008 索引、STATUS 对 ADR-0008、RUNAPI-001 和 UI-002 的引用。
+- 结果：通过。检查 20 个 Markdown 文件。
+- 关联：ADR-0008。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

@@ -81,3 +81,22 @@
 - 保持注册表与模型提供商无关，后续再由模型适配器把 `ToolDefinition` 翻译成具体 API schema。
 - 执行 TOOLREG-001 验证：`cd backend && mvn test` 通过，39 tests, 0 failures, 0 errors。
 - 限制：注册表尚未接入 HTTP、SSE、真实模型循环；当前只包含只读 workspace 工具。
+
+## 2026-08-27：子任务 4 - Run API、SSE 与 mock runner
+
+- 目标：打通第一个可演示的前后端任务闭环，但明确保持 mock 模型，不接真实 API 密钥。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/`：
+  - `AgentRunStore` 保存进程内 run 状态和有序事件。
+  - `AgentRunService` 校验 prompt、创建 run、发初始事件并启动 runner。
+  - `MockAgentRunner` 模拟模型选择，只通过 `ToolRegistry` 执行一个只读 workspace 工具。
+  - `RunEventStream` 使用 `SseEmitter` 做事件 replay 和实时发布。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/api/`：
+  - `POST /api/runs` 创建 run。
+  - `GET /api/runs/{runId}` 查询状态。
+  - `GET /api/runs/{runId}/events` 回看事件。
+  - `GET /api/runs/{runId}/events/stream` 订阅 SSE。
+- 更新 Vue 工作台：Run 按钮现在会创建真实后端 run，通过 EventSource 展示事件 timeline，并从 `list_files` 结果更新右侧文件列表。
+- 联调发现 `WorkspaceProperties` 使用 `Path` 接收 `../workspaces/demo` 时，真实 `spring-boot:run` 会触发 Spring Boot 资源路径转换失败；改为用 `String` 接收配置，再由项目代码转换为 `Path`。
+- 执行 RUNAPI-001 验证：`cd backend && mvn test` 通过，48 tests, 0 failures, 0 errors；本地 HTTP 创建 run 成功，最终 `SUCCEEDED`，事件回看 10 条，SSE replay 包含 `event:run_finished`。
+- 执行 UI-002 验证：`cd frontend && npm run build` 通过；in-app browser 打开前端、点击 Run、显示 10 条事件、控制台无 warning/error、无横向溢出。
+- 限制：当前 run 存储为进程内内存，重启丢失；mock runner 不是模型能力；没有写入、编辑、命令、取消或审批能力。

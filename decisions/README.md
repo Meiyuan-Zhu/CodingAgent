@@ -11,6 +11,7 @@
 | [ADR-0005](0005-run-protocol-domain.md) | Agent 运行协议领域模型 | accepted | 后端领域模型和状态转换测试已验证 |
 | [ADR-0006](0006-workspace-boundary-read-tools.md) | Workspace 边界与只读文件工具 | accepted | 后端路径边界和 list/read/search 已验证 |
 | [ADR-0007](0007-tool-registry.md) | 工具注册表边界 | accepted | 后端工具定义、参数校验、执行入口和 workspace 只读工具注册已验证 |
+| [ADR-0008](0008-run-api-sse-mock-runner.md) | Run API、SSE 事件流与 mock runner | accepted | 后端 run 创建/查询/事件回看/SSE 和前端 Run 交互已验证 |
 
 ## 规则
 
