@@ -68,3 +68,16 @@
 - 首轮测试暴露 macOS 临时目录 `/var` 与 `/private/var` realpath 差异，已改为对 workspace root 使用真实路径再比较。
 - 执行 WORKSPACE-001 验证：`cd backend && mvn test` 通过，21 tests, 0 failures, 0 errors。
 - 限制：只读工具尚未暴露给 HTTP、SSE、模型工具注册表或真实 Agent loop；写入、编辑和命令工具未实现。
+
+## 2026-08-27：子任务 3 - 工具注册表
+
+- 目标：建立后端模型工具调用边界，把已有只读 workspace 工具注册为统一的工具定义和执行入口。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/`：
+  - `ToolDefinition`、`RegisteredTool`、`ToolHandler`、`ToolExecutionResult`。
+  - `ToolArgumentReader` 对模型传入参数做运行时校验。
+  - `ToolRegistry` 暴露工具定义并执行 `ToolCall`，返回统一 `ToolResult`。
+  - `ToolExecutionErrorCode` 和 `ToolExecutionException` 归一化未知工具、参数错误、workspace 拒绝和运行时错误。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/`，将 `WorkspaceReadTools` 适配为 `list_files`、`read_file`、`search_text`。
+- 保持注册表与模型提供商无关，后续再由模型适配器把 `ToolDefinition` 翻译成具体 API schema。
+- 执行 TOOLREG-001 验证：`cd backend && mvn test` 通过，39 tests, 0 failures, 0 errors。
+- 限制：注册表尚未接入 HTTP、SSE、真实模型循环；当前只包含只读 workspace 工具。

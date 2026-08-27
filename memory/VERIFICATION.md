@@ -144,3 +144,38 @@
 - 关联：ADR-0006。
 - 代码版本/运行 ID：`93f572f feat: add workspace boundary and read tools`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档、状态描述和指定 Git 忽略样例，不证明应用运行、模型调用或工具集成能力。
+
+## TOOLREG-001：工具注册表与 workspace 工具适配测试
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试与 Spring 上下文测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/`。
+- 方法：实现工具定义、注册表、参数校验、执行结果归一化和 workspace 只读工具适配后执行 `cd backend && mvn test`。
+- 结果：通过。39 tests, 0 failures, 0 errors。
+- 覆盖：
+  - 工具定义名称和说明校验。
+  - 工具 schema 深拷贝，不被外部修改。
+  - 注册表按工具名稳定排序。
+  - 重复工具名拒绝。
+  - 已知工具执行成功并补充基础 metadata。
+  - 未知工具返回失败结果。
+  - 参数错误返回 `INVALID_ARGUMENTS`。
+  - workspace 路径拒绝返回 `WORKSPACE_ACCESS_DENIED`。
+  - 未预期运行时异常返回 `TOOL_RUNTIME_ERROR`，不把内部异常消息直接暴露给模型。
+  - `list_files`、`read_file`、`search_text` 经注册表返回 JSON 文本结果。
+  - Spring Boot 上下文能加载 `ToolRegistry` 和三个 workspace 工具。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0007。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：不包含 HTTP API、SSE、模型适配器、真实 Agent loop、写入工具、编辑工具或命令工具验证。
+
+## DOC-006：工具注册表子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0007 索引、STATUS 对 ADR-0007 和 TOOLREG-001 的引用。
+- 结果：通过。检查 19 个 Markdown 文件。
+- 关联：ADR-0007。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

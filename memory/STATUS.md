@@ -2,7 +2,7 @@
 
 更新日期：2026-08-27（北京时间）。
 
-**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界与只读文件工具已建立并验证；尚未接入模型、HTTP 任务接口、SSE 或写入/命令工具。**
+**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界、只读文件工具和工具注册表已建立并验证；尚未接入模型、HTTP 任务接口、SSE 或写入/命令工具。**
 
 ## 已确认
 
@@ -11,6 +11,7 @@
 - 产品形态：Web 界面作为本地 workspace 工作台，不采用上传文件作为主要工作流；界面方向简洁、清晰、Codex-like。见 [ADR-0004](../decisions/0004-local-workbench-ui.md)。
 - Agent 运行协议领域模型已建立，核心仍未接入模型、工具执行或 API。见 [ADR-0005](../decisions/0005-run-protocol-domain.md)。
 - Workspace 边界和只读文件工具已建立：相对路径、realpath、敏感路径、UTF-8 和大小限制均有测试。见 [ADR-0006](../decisions/0006-workspace-boundary-read-tools.md)。
+- 工具注册表已建立：`list_files`、`read_file`、`search_text` 具备工具定义、参数校验、统一执行入口和失败归一化。见 [ADR-0007](../decisions/0007-tool-registry.md)。
 - Agent 关键逻辑自行实现，项目不使用 Agent 框架/SDK 或 Spring AI。
 - decisions/ 记录决策，memory/ 记录开发状态与文档。见 [ADR-0002](../decisions/0002-development-records.md)。
 - 正式截止：北京时间 2026-09-03 00:00；此后不推送新提交。
@@ -27,6 +28,7 @@
 - 已执行应用骨架验证：见 [APP-001](VERIFICATION.md)。
 - 建立 `workspaces/demo/` 示例 workspace。
 - 实现后端 `WorkspacePathResolver` 与只读工具 `listFiles`、`readFile`、`searchText`。
+- 实现后端 `ToolRegistry`，将只读 workspace 工具注册为模型后续可调用的工具入口。
 
 ## 功能状态
 
@@ -38,6 +40,7 @@
 | 任务接口与 Web 页面 | 进行中 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/style.css](../frontend/src/style.css)、[backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java](../backend/src/main/java/com/zhumeiyuan/codingagent/health/HealthController.java) | [APP-001](VERIFICATION.md)、[UI-001](VERIFICATION.md) | 当前是 Codex-like 工作台壳和健康状态，还不是可执行任务界面 |
 | 模型适配器及 Agent 循环 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/run](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/run) | [CORE-001](VERIFICATION.md) | 已完成运行协议领域模型；尚未实现模型适配器、循环调度或响应解析 |
 | 文件工具、搜索与编辑 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md) | Workspace 边界和只读 list/read/search 已验证；写入与编辑工具未实现 |
+| 工具注册表与执行入口 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool) | [TOOLREG-001](VERIFICATION.md) | `list_files`、`read_file`、`search_text` 已注册；尚未接入模型适配器、HTTP 或 SSE |
 | 命令执行、审批、取消 | 未开始 | 尚无 | 尚无 | 需要真实进程与权限测试 |
 | 对话上下文及运行预算 | 未开始 | 尚无 | 尚无 | 裁剪与终止规则待定 |
 | SSE、工具卡片、Diff、输出 | 未开始 | 尚无 | 尚无 | 基于后端真实事件展示 |
@@ -47,12 +50,11 @@
 
 ## 下一步
 
-1. 定义后端工具注册表，将 `list_files`、`read_file`、`search_text` 暴露为模型可调用工具描述。
-2. 定义第一条任务提交接口、运行状态查询接口和 SSE 事件协议。
-3. 建立模型适配边界和 mock agent runner，用假模型先打通事件流。
-4. 实现写入与编辑工具，并补编辑冲突、大小限制和变更摘要测试。
-5. 确认可用模型 API、工具调用支持和测试预算；密钥由用户在本地环境中配置，不写进聊天或文档。
-6. 确认公开仓库的账户、名称及可公开文件；首次公开推送前复核题目 PDF、日志、密钥和演示材料。
+1. 定义第一条任务提交接口、运行状态查询接口和 SSE 事件协议。
+2. 建立模型适配边界和 mock agent runner，用假模型先打通事件流。
+3. 实现写入与编辑工具，并补编辑冲突、大小限制和变更摘要测试。
+4. 确认可用模型 API、工具调用支持和测试预算；密钥由用户在本地环境中配置，不写进聊天或文档。
+5. 确认公开仓库的账户、名称及可公开文件；首次公开推送前复核题目 PDF、日志、密钥和演示材料。
 
 ## 风险与待定项
 
