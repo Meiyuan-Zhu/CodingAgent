@@ -24,9 +24,14 @@ class ExecutionConfiguration {
 	}
 
 	@Bean
+	RunBudget runBudget() {
+		return RunBudget.defaults();
+	}
+
+	@Bean
 	MockAgentRunner mockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
-			ModelClient modelClient, Clock clock) {
-		return new MockAgentRunner(store, runEventStream, toolRegistry, modelClient, clock);
+			ModelClient modelClient, RunBudget runBudget, Clock clock) {
+		return new MockAgentRunner(store, runEventStream, toolRegistry, modelClient, runBudget, clock);
 	}
 
 	@Bean

@@ -19,6 +19,10 @@ public class HeuristicMockModelClient implements ModelClient {
 	@Override
 	public ModelResponse complete(ModelRequest request) {
 		Objects.requireNonNull(request, "request");
+		ModelMessage lastMessage = request.messages().get(request.messages().size() - 1);
+		if (lastMessage.role() == ModelRole.TOOL) {
+			return this.parser.parse(stopResponse("Mock model observed the tool result and finished."));
+		}
 		String userPrompt = request.lastUserMessage()
 				.map(ModelMessage::content)
 				.orElse("");
@@ -36,6 +40,19 @@ public class HeuristicMockModelClient implements ModelClient {
 		}
 		return response("Mock model asks to inspect workspace files.", "list_files",
 				"{\"path\":\".\",\"max_entries\":50}");
+	}
+
+	private String stopResponse(String message) {
+		try {
+			return """
+					{
+					  "message": %s,
+					  "finish_reason": "stop"
+					}
+					""".formatted(this.objectMapper.writeValueAsString(message));
+		} catch (JsonProcessingException ex) {
+			throw new IllegalStateException("Cannot serialize mock model response", ex);
+		}
 	}
 
 	private String response(String message, String toolName, String argumentsJson) {

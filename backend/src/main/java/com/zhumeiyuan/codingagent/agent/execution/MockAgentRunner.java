@@ -1,6 +1,7 @@
 package com.zhumeiyuan.codingagent.agent.execution;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,6 +12,7 @@ import com.zhumeiyuan.codingagent.agent.model.ModelMessage;
 import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
 import com.zhumeiyuan.codingagent.agent.model.ModelRequest;
 import com.zhumeiyuan.codingagent.agent.model.ModelResponse;
+import com.zhumeiyuan.codingagent.agent.model.ModelRole;
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEvent;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
@@ -23,37 +25,73 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
 public class MockAgentRunner {
 
+	private static final String SYSTEM_PROMPT = "You are a local coding agent. Return the agreed JSON response format.";
+
 	private final AgentRunStore store;
 	private final RunEventStream runEventStream;
 	private final ToolRegistry toolRegistry;
 	private final ModelClient modelClient;
+	private final RunBudget runBudget;
 	private final Clock clock;
 
 	public MockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
-			ModelClient modelClient, Clock clock) {
+			ModelClient modelClient, RunBudget runBudget, Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
 		this.toolRegistry = Objects.requireNonNull(toolRegistry, "toolRegistry");
 		this.modelClient = Objects.requireNonNull(modelClient, "modelClient");
+		this.runBudget = Objects.requireNonNull(runBudget, "runBudget");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
 	public void run(RunId runId, String prompt) {
 		try {
 			this.store.transition(runId, run -> run.start(this.clock));
-			emit(runId, RunEventType.RUN_STARTED, Map.of("runner", "mock"));
-			List<String> toolNames = this.toolRegistry.definitions().stream().map(ToolDefinition::name).toList();
-			emit(runId, RunEventType.MODEL_REQUESTED, Map.of("provider", "mock", "availableTools", toolNames));
+			emit(runId, RunEventType.RUN_STARTED, Map.of("runner", "mock", "budget", budgetPayload()));
 
-			ModelResponse response = this.modelClient.complete(new ModelRequest(List.of(
-					ModelMessage.system("You are a local coding agent. Return the agreed JSON response format."),
-					ModelMessage.user(prompt)), this.toolRegistry.definitions()));
-			emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED,
-					Map.of("mock", true, "content", response.message(), "finishReason", response.finishReason().name()));
+			List<ModelMessage> messages = new ArrayList<>();
+			messages.add(ModelMessage.system(SYSTEM_PROMPT));
+			messages.add(ModelMessage.user(prompt));
+			int toolCallsUsed = 0;
 
-			if (response.finishReason() == ModelFinishReason.TOOL_CALLS) {
-				for (ToolCall call : response.toolCalls()) {
-					ToolResult result = executeTool(runId, call);
+			for (int round = 1; round <= this.runBudget.maxRounds(); round++) {
+				List<String> toolNames = this.toolRegistry.definitions().stream().map(ToolDefinition::name).toList();
+				emit(runId, RunEventType.MODEL_REQUESTED, Map.of(
+						"provider", "mock",
+						"round", round,
+						"availableTools", toolNames,
+						"contextMessages", contextWindow(messages).size(),
+						"toolCallsUsed", toolCallsUsed));
+
+				ModelResponse response = this.modelClient.complete(new ModelRequest(
+						contextWindow(messages), this.toolRegistry.definitions()));
+				emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of(
+						"mock", true,
+						"round", round,
+						"content", response.message(),
+						"finishReason", response.finishReason().name()));
+				messages.add(ModelMessage.assistant(response.message()));
+
+				if (response.finishReason() == ModelFinishReason.STOP) {
+					finishSuccessfully(runId, round, toolCallsUsed);
+					return;
+				}
+				if (response.finishReason() == ModelFinishReason.LENGTH) {
+					fail(runId, StopReason.TOKEN_BUDGET_LIMIT, "Model response stopped because of length limit");
+					return;
+				}
+
+				List<ToolCall> calls = response.toolCalls();
+				if (toolCallsUsed + calls.size() > this.runBudget.maxToolCalls()) {
+					fail(runId, StopReason.TOOL_CALL_LIMIT,
+							"Run exceeded tool call limit of " + this.runBudget.maxToolCalls());
+					return;
+				}
+
+				for (ToolCall call : calls) {
+					ToolResult result = executeTool(runId, round, call);
+					toolCallsUsed++;
+					messages.add(ModelMessage.tool(toolObservation(call, result)));
 					if (!result.success()) {
 						fail(runId, StopReason.TOOL_ERROR, result.content());
 						return;
@@ -61,12 +99,7 @@ public class MockAgentRunner {
 				}
 			}
 
-			String summary = "Mock run completed through ModelClient, ModelResponseParser, and ToolRegistry.";
-			emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of("mock", true, "content", summary));
-			this.store.transition(runId, run -> run.succeed(this.clock));
-			AgentRun run = this.store.get(runId);
-			emit(runId, RunEventType.RUN_FINISHED,
-					Map.of("status", run.status().name(), "stopReason", run.stopReason().name()));
+			fail(runId, StopReason.ROUND_LIMIT, "Run exceeded round limit of " + this.runBudget.maxRounds());
 		} catch (ModelParseException ex) {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
@@ -74,20 +107,54 @@ public class MockAgentRunner {
 		}
 	}
 
-	private ToolResult executeTool(RunId runId, ToolCall call) {
+	private List<ModelMessage> contextWindow(List<ModelMessage> messages) {
+		if (messages.size() <= this.runBudget.maxContextMessages()) {
+			return List.copyOf(messages);
+		}
+		int maxTail = this.runBudget.maxContextMessages();
+		List<ModelMessage> window = new ArrayList<>();
+		ModelMessage first = messages.get(0);
+		if (first.role() == ModelRole.SYSTEM) {
+			window.add(first);
+			maxTail--;
+		}
+		window.addAll(messages.subList(messages.size() - maxTail, messages.size()));
+		return List.copyOf(window);
+	}
+
+	private ToolResult executeTool(RunId runId, int round, ToolCall call) {
 		emit(runId, RunEventType.TOOL_CALL_REQUESTED, Map.of(
+				"round", round,
 				"toolCallId", call.id(),
 				"name", call.name(),
 				"arguments", call.arguments()));
-		emit(runId, RunEventType.TOOL_CALL_STARTED, Map.of("toolCallId", call.id(), "name", call.name()));
+		emit(runId, RunEventType.TOOL_CALL_STARTED, Map.of("round", round, "toolCallId", call.id(), "name", call.name()));
 		ToolResult result = this.toolRegistry.execute(call);
 		emit(runId, RunEventType.TOOL_CALL_FINISHED, Map.of(
+				"round", round,
 				"toolCallId", result.toolCallId(),
 				"name", call.name(),
 				"success", result.success(),
 				"content", result.content(),
 				"metadata", result.metadata()));
 		return result;
+	}
+
+	private String toolObservation(ToolCall call, ToolResult result) {
+		return "tool_call_id=" + call.id() + "\n"
+				+ "tool_name=" + call.name() + "\n"
+				+ "success=" + result.success() + "\n"
+				+ result.content();
+	}
+
+	private void finishSuccessfully(RunId runId, int roundsUsed, int toolCallsUsed) {
+		this.store.transition(runId, run -> run.succeed(this.clock));
+		AgentRun run = this.store.get(runId);
+		emit(runId, RunEventType.RUN_FINISHED, Map.of(
+				"status", run.status().name(),
+				"stopReason", run.stopReason().name(),
+				"roundsUsed", roundsUsed,
+				"toolCallsUsed", toolCallsUsed));
 	}
 
 	private void fail(RunId runId, StopReason stopReason, String message) {
@@ -100,6 +167,13 @@ public class MockAgentRunner {
 					"stopReason", failed.stopReason().name(),
 					"errorMessage", failed.errorMessage()));
 		}
+	}
+
+	private Map<String, Object> budgetPayload() {
+		return Map.of(
+				"maxRounds", this.runBudget.maxRounds(),
+				"maxToolCalls", this.runBudget.maxToolCalls(),
+				"maxContextMessages", this.runBudget.maxContextMessages());
 	}
 
 	private RunEvent emit(RunId runId, RunEventType type, Map<String, Object> payload) {
