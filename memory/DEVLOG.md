@@ -14,3 +14,17 @@
 - 当前没有关联提交；后续有真实提交后再关联，不伪造哈希。
 
 此前讨论内容保存在迁移后的方案与 ADR-0001 中，本条不是对早期过程补造逐次提交记录。
+
+## 2026-08-27：Git 初始化与框架骨架
+
+- 初始化本地 Git 仓库，默认分支调整为 `main`。
+- 创建首个提交 `ced7616 docs: establish project planning records`，保存需求、决策、状态和开发约定基线；题目 PDF 和 `tmp/` 未入库。
+- 使用 Vite 创建 `frontend/`，选择 Vue 3 + TypeScript 模板并安装依赖。
+- 使用 Spring Initializr 创建 `backend/` Maven 项目，随后根据 Maven Central 可解析版本调整为 Spring Boot 3.5.16 + Java 21。
+- 保留依赖最小集：后端使用 Spring Web、Validation、Starter Test；前端使用 Vite 模板生成的 Vue/TypeScript 依赖。
+- 新增 `GET /api/health` 健康接口，前端通过 Vite proxy 请求 `/api/health` 并显示后端状态。
+- 清理默认 Vite 示例页面与未引用模板素材。
+- 新增根目录 `README.md`，记录前后端运行和检查命令。
+- 新增 ADR-0003 记录框架基线与版本选择。
+- 执行 APP-001 骨架验证：后端 `mvn test`、前端 `npm run build` 均通过。
+- 已知环境现象：本机 Maven settings 有一个 `repositories` 标签位置警告，但未阻止构建；第一次尝试 Boot `4.1.1.RELEASE` 未能通过本机 Maven 镜像解析，因此未采用。

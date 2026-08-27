@@ -4,8 +4,9 @@
 
 | 编号 | 主题 | 状态 | 实现情况 |
 | --- | --- | --- | --- |
-| [ADR-0001](0001-frontend-backend-stack.md) | Vue 3 + Java/Spring Boot，前后端分离 | accepted | 选型已确认，业务代码未实现 |
+| [ADR-0001](0001-frontend-backend-stack.md) | Vue 3 + Java/Spring Boot，前后端分离 | accepted | 工程骨架已建立，Agent 核心未实现 |
 | [ADR-0002](0002-development-records.md) | 决策与开发记录分开维护 | accepted | 目录和初始记录已建立 |
+| [ADR-0003](0003-framework-baseline.md) | Vue 3 与 Spring Boot 工程基线 | accepted | 前后端骨架及健康接口已验证 |
 
 ## 规则
 
