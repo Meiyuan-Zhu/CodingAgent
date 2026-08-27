@@ -74,3 +74,34 @@
 - 关联：ADR-0004。
 - 代码版本/运行 ID：`8fc625b feat: shape codex-like workbench shell`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## CORE-001：Agent 运行协议领域模型测试
+
+- 日期：2026-08-27。
+- 类型：后端核心单元测试。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/run/` 与对应测试。
+- 方法：实现运行 ID、状态、结束原因、事件、工具调用、工具结果和运行状态转换后执行 `cd backend && mvn test`。
+- 结果：通过。12 tests, 0 failures, 0 errors；其中新增 10 个运行协议相关测试，原有 2 个 Spring Boot 骨架测试仍通过。
+- 覆盖：
+  - 正常创建、启动、事件递增和成功结束。
+  - 等待审批与审批后恢复。
+  - 非法状态转换拒绝。
+  - 失败运行必须携带失败原因和错误消息。
+  - 终态必须有 `StopReason`。
+  - `RunEvent` payload 与 `ToolCall` arguments 构造后不可被外部 Map 修改。
+  - `ToolResult` 区分成功和失败。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 也有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0005。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：不包含并发运行、持久化、SSE、真实工具执行、模型调用、模型响应解析或前端接入验证。
+
+## DOC-004：运行协议子任务后的文档一致性检查
+
+- 日期：2026-08-27。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0005 索引、STATUS 对 ADR-0005 的引用、CORE-001 验证记录。
+- 结果：通过。检查 16 个 Markdown 文件。
+- 关联：ADR-0005。
+- 代码版本/运行 ID：待本阶段提交后补充提交哈希。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

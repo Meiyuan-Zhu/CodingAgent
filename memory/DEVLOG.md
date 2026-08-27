@@ -39,3 +39,16 @@
 - `Run` 按钮暂时禁用，避免在任务接口和 Agent Core 未实现前制造假能力。
 - 执行 UI-001 验证：`npm run build` 通过。
 - 创建 UI 提交 `8fc625b feat: shape codex-like workbench shell`。
+
+## 2026-08-27：子任务 1 - Agent 运行协议领域模型
+
+- 目标：先建立后端核心运行协议，不接真实模型、不接工具执行、不接 Controller/SSE。
+- 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/run/`：
+  - `RunId`、`RunStatus`、`StopReason`、`RunEventType`、`RunEvent`。
+  - `ToolCall`、`ToolResult`。
+  - `AgentRun`、`RunEventEnvelope`。
+- 运行协议使用显式状态和结束原因，事件使用递增序号，工具参数和事件 payload 在构造时复制为不可变快照。
+- 新增 ADR-0005 记录为什么先做领域模型，以及为什么暂时不把它绑定到 Controller、SSE 或数据库。
+- 新增后端单元测试覆盖正常状态转换、审批状态、非法转换、终态约束、事件序号、Map 不可变快照和工具结果。
+- 执行 CORE-001 验证：`cd backend && mvn test` 通过，12 tests, 0 failures, 0 errors。
+- 限制：尚未实现 workspace、工具注册表、模型适配器、Agent loop、SSE 或运行持久化。

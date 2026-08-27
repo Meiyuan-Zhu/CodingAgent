@@ -1,0 +1,15 @@
+package com.zhumeiyuan.codingagent.agent.run;
+
+public enum StopReason {
+	COMPLETED,
+	USER_CANCELLED,
+	APPROVAL_REJECTED,
+	MODEL_ERROR,
+	MODEL_PARSE_ERROR,
+	TOOL_ERROR,
+	ROUND_LIMIT,
+	TIME_LIMIT,
+	TOKEN_BUDGET_LIMIT,
+	NO_PROGRESS,
+	INTERNAL_ERROR
+}
