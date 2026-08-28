@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -149,7 +150,7 @@ public class MockAgentRunner {
 					"round", round,
 					"content", response.message(),
 					"finishReason", response.finishReason().name()));
-			messages.add(ModelMessage.assistant(response.message()));
+			messages.add(ModelMessage.assistant(assistantTranscript(response)));
 
 			if (response.finishReason() == ModelFinishReason.STOP) {
 				finishSuccessfully(runId, round, toolCallsUsed);
@@ -272,6 +273,16 @@ public class MockAgentRunner {
 					Map.of("toolName", call.name(), "errorCode", ToolExecutionErrorCode.TOOL_RUNTIME_ERROR.name()),
 					this.clock.instant());
 		}
+	}
+
+	private String assistantTranscript(ModelResponse response) {
+		if (response.toolCalls().isEmpty()) {
+			return response.message();
+		}
+		String toolCalls = response.toolCalls().stream()
+				.map(call -> "tool_call_id=" + call.id() + ", name=" + call.name() + ", arguments=" + call.arguments())
+				.collect(Collectors.joining("\n"));
+		return response.message() + "\nRequested tool calls:\n" + toolCalls;
 	}
 
 	private String toolObservation(ToolCall call, ToolResult result) {

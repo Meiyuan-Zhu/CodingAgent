@@ -251,3 +251,9 @@
 - 事实：真实 demo run `e186f02c-94f1-4c67-949d-6401d4295568` 在第三轮失败，错误形状为 `finish_reason=stop, message_fields=[role, content]`，说明 provider 返回了空 content；run 未进入写入审批，demo workspace 未被修改。
 - 决策：新增 ADR-0018，仅对 HTTP 2xx 且 `choices[0].message.content` 为空/缺失的响应追加一条协议修复提醒，并最多重试一次。
 - 验证：后端 `mvn test` 通过，119 tests, 0 failures, 0 errors。
+
+## 2026-08-28：Agent transcript 保留工具动作
+
+- 事实：多次 DeepSeek V4 Flash demo run 在读完 README 后返回空 content；排查发现 runner 只把模型 `message` 放入下一轮上下文，未保留上一轮 `tool_calls` 动作。
+- 决策：新增 ADR-0019。模型返回工具调用时，下一轮 assistant transcript 记录用户可读 message 以及工具调用 id、名称和参数摘要；工具观察继续作为单独消息回填。
+- 验证：后端 `mvn test` 通过，119 tests, 0 failures, 0 errors；新增断言覆盖第二轮 ModelRequest 包含上一轮工具动作 transcript。

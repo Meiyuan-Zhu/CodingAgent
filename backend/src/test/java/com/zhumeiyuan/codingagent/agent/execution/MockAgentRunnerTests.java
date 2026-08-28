@@ -51,7 +51,7 @@ class MockAgentRunnerTests {
 	void runsMultipleRoundsThroughRegistryAndFinishesSuccessfully() {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
-		ModelClient model = new SequencedModelClient(
+		SequencedModelClient model = new SequencedModelClient(
 				new ModelResponse("List files", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "list_files", Map.of("path", ".")))),
 				new ModelResponse("Done after observing files", ModelFinishReason.STOP, List.of()));
@@ -75,6 +75,12 @@ class MockAgentRunnerTests {
 				.satisfies(event -> assertThat(event.payload())
 						.containsEntry("roundsUsed", 2)
 						.containsEntry("toolCallsUsed", 1));
+		ModelRequest secondRequest = model.requests().get(1);
+		assertThat(secondRequest.messages()).extracting(ModelMessage::content)
+				.anySatisfy(content -> assertThat(content)
+						.contains("Requested tool calls")
+						.contains("tool_call_id=call-1")
+						.contains("name=list_files"));
 	}
 
 	@Test
@@ -305,6 +311,7 @@ class MockAgentRunnerTests {
 
 	private static class SequencedModelClient implements ModelClient {
 		private final List<ModelResponse> responses;
+		private final List<ModelRequest> requests = new ArrayList<>();
 		private int index;
 
 		SequencedModelClient(ModelResponse... responses) {
@@ -313,9 +320,14 @@ class MockAgentRunnerTests {
 
 		@Override
 		public ModelResponse complete(ModelRequest request) {
+			this.requests.add(request);
 			ModelResponse response = this.responses.get(Math.min(this.index, this.responses.size() - 1));
 			this.index++;
 			return response;
+		}
+
+		List<ModelRequest> requests() {
+			return this.requests;
 		}
 	}
 }

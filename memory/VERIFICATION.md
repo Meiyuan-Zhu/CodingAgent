@@ -632,3 +632,11 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 119 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：新增测试覆盖第一次空 content、第二次请求追加协议修复提醒并返回有效 JSON 协议内容的路径；不对 HTTP 错误、非 JSON、协议解析失败进行重试。
+
+## LOOP-002：Agent transcript 工具动作回填验证
+
+- 日期：2026-08-28（北京时间）
+- 范围：多轮 Agent loop 中，上一轮模型工具调用动作是否进入下一轮模型上下文。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 119 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：新增测试确认第二轮 `ModelRequest` 中包含 `Requested tool calls`、`tool_call_id` 和工具名；这验证上下文可追踪性修复，不等同于真实模型 demo 已完成。
