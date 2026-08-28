@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
+import com.zhumeiyuan.codingagent.agent.model.ModelClientException;
 import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
 import com.zhumeiyuan.codingagent.agent.model.ModelMessage;
 import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
@@ -84,6 +85,8 @@ public class MockAgentRunner {
 			continueRunLoop(runId, messages, 1, 0);
 		} catch (ModelParseException ex) {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
+		} catch (ModelClientException ex) {
+			fail(runId, StopReason.MODEL_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
 			if (!stopIfCancellationRequested(runId)) {
 				fail(runId, StopReason.INTERNAL_ERROR, "Agent runner failed");
@@ -114,6 +117,8 @@ public class MockAgentRunner {
 			continueRunLoop(runId, messages, approval.round() + 1, toolCallsUsed);
 		} catch (ModelParseException ex) {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
+		} catch (ModelClientException ex) {
+			fail(runId, StopReason.MODEL_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
 			if (!stopIfCancellationRequested(runId)) {
 				fail(runId, StopReason.INTERNAL_ERROR, "Agent runner failed");

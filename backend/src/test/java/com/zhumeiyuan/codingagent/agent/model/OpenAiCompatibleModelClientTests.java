@@ -38,6 +38,7 @@ class OpenAiCompatibleModelClientTests {
 		assertThat(transport.request.uri().toString()).isEqualTo("https://api.deepseek.com/chat/completions");
 		JsonNode body = this.objectMapper.readTree(transport.request.body());
 		assertThat(body.path("model").asText()).isEqualTo("deepseek-v4-flash");
+		assertThat(body.path("thinking").path("type").asText()).isEqualTo("disabled");
 		assertThat(body.path("response_format").path("type").asText()).isEqualTo("json_object");
 		assertThat(body.path("messages")).hasSize(2);
 		assertThat(body.path("messages").path(0).path("content").asText()).contains("Available tools");

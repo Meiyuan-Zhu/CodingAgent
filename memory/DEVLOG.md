@@ -191,3 +191,14 @@
 - 新增 ADR-0015，记录为什么使用 OpenAI-compatible HTTP 适配器而不是 DeepSeek SDK 或写死 DeepSeek。
 - 执行 MODELAPI-001 验证：后端 `mvn test` 通过 106 tests；前端 `npm run build` 通过；真实 DeepSeek 端到端调用因会向外部服务发送 prompt、工具定义和后续工具观察，待用户明确授权后执行。
 - 限制：当前不使用 provider-native tool calls，不做流式 token 输出或 usage 统计；真实 DeepSeek V4 Flash 任务尚未验证成功。
+
+## 2026-08-28：DeepSeek V4 Flash 真实只读 run 验证
+
+- 用户明确授权向 DeepSeek 发送 demo workspace 测试上下文后，执行真实 DeepSeek V4 Flash 端到端验证。
+- 首次真实 run `7e68ea76-0b04-4381-bf9c-90506eb6fb0b` 成功完成模型调用、`list_files`、`read_file` 与 run 结束，但暴露最终 `STOP` 消息为空的问题。
+- 收紧 `ModelResponseParser`：模型响应必须包含非空 `message`；新增缺失/空白 message 的解析失败测试。
+- 增加 `ModelClientException` 在 runner 中的专门处理，provider 调用错误现在以 `MODEL_ERROR` 结束，不再泛化为 `INTERNAL_ERROR`。
+- 根据 DeepSeek 官方文档，V4 默认开启 thinking mode，且 thinking/tool 场景需要额外回传 `reasoning_content`；当前内部消息模型不保存该字段，因此在 OpenAI-compatible 请求中显式设置 `thinking: {type: "disabled"}`。
+- 验证 run `eade6508-edad-476f-986c-5d48ef18458a` 成功：DeepSeek V4 Flash 三轮模型循环，调用 `list_files` 和 `read_file`，最终以中文总结结束，状态 `SUCCEEDED / COMPLETED`。
+- 后端测试通过 108 tests。
+- 限制：真实写入审批、取消、超时、命令工具和浏览器 UI 下的 DeepSeek run 尚未验证。

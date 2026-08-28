@@ -35,7 +35,7 @@ public class ModelResponseParser {
 			throw new ModelParseException("Model response must be a JSON object");
 		}
 
-		String message = optionalText(root, "message", "");
+		String message = requiredText(root, "message");
 		if (message.length() > MAX_MESSAGE_CHARS) {
 			throw new ModelParseException("Model response message is too long");
 		}

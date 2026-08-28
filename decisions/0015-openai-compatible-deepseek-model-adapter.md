@@ -3,7 +3,7 @@
 - 日期：2026-08-28
 - 状态：accepted
 - 决策依据/确认来源：用户已配置 DeepSeek API key，并要求先接入 DeepSeek V4 Flash 试用
-- 实现状态：已实现，真实 DeepSeek 连通性待用户明确授权后验证
+- 实现状态：已实现，DeepSeek V4 Flash 真实只读端到端 run 已验证
 - 取代/被取代：无
 
 ## 问题与约束
@@ -39,12 +39,12 @@ agent.model.api-key-env=DEEPSEEK_API_KEY
 
 应用默认仍使用 `mock`，只有启动参数或本地配置显式切换到 `openai-compatible` 时才调用真实模型。这样可以保证本地开发、测试和演示准备不依赖付费 API，也避免 CI 或他人环境因为没有 key 直接失败。
 
-真实模型回复仍要求遵守项目内部 JSON 协议，并继续交给 `ModelResponseParser` 校验；工具执行和审批仍由本项目完成。当前不使用 provider-native tool calls，避免把工具调用状态绑定到某家 API 的消息格式。
+真实模型回复仍要求遵守项目内部 JSON 协议，并继续交给 `ModelResponseParser` 校验；工具执行和审批仍由本项目完成。当前不使用 provider-native tool calls，避免把工具调用状态绑定到某家 API 的消息格式。DeepSeek 适配路径显式关闭 thinking mode，因为当前内部 `ModelMessage` 不保存 provider 的 `reasoning_content`，关闭后多轮 JSON 协议更容易保持稳定。
 
 ## 代价与限制
 
 - 真实 DeepSeek 调用会把用户 prompt、系统协议、工具定义，以及后续工具观察发送给外部模型服务；执行前需要用户明确授权。
-- 当前适配器只实现 Chat Completions 风格的单次请求，不处理流式 token、provider usage 统计或模型原生 tool call message。
+- 当前适配器只实现 Chat Completions 风格的单次请求，不处理流式 token、provider usage 统计、thinking/reasoning 内容保存或模型原生 tool call message。
 - 工具观察被映射为普通 user message，以保持 OpenAI 兼容格式简单；如果后续需要原生 tool calls，应重新设计 `ModelMessage`，记录 assistant tool calls 和 tool_call_id。
 - 默认 JSON 模式依赖模型遵循提示；模型输出异常仍会以 `MODEL_PARSE_ERROR` 结束 run。
 
@@ -55,7 +55,7 @@ agent.model.api-key-env=DEEPSEEK_API_KEY
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/AgentModelProperties.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/JavaHttpModelTransport.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/ModelConfiguration.java`
-- 验证记录：[MODELAPI-001](../memory/VERIFICATION.md#modelapi-001openai-compatible-deepseek-adapter-测试)
+- 验证记录：[MODELAPI-001](../memory/VERIFICATION.md#modelapi-001openai-compatible-deepseek-adapter-测试)、[REALMODEL-001](../memory/VERIFICATION.md#realmodel-001deepseek-v4-flash-真实只读-run-验证)
 - 关联提交/运行：`60aeba7 feat: add openai compatible model adapter`。
 
 ## 何时重新考虑

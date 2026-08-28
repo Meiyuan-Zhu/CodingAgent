@@ -53,6 +53,16 @@ class ModelResponseParserTests {
 	}
 
 	@Test
+	void rejectsMissingOrBlankMessage() {
+		assertParseError(() -> this.parser.parse("""
+				{"finish_reason":"stop"}
+				"""));
+		assertParseError(() -> this.parser.parse("""
+				{"message":"   ","finish_reason":"stop"}
+				"""));
+	}
+
+	@Test
 	void rejectsMalformedJsonAndNonObjectRoot() {
 		assertParseError(() -> this.parser.parse("{bad json"));
 		assertParseError(() -> this.parser.parse("[1,2,3]"));

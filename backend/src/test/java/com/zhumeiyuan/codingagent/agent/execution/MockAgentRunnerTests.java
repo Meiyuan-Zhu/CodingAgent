@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
+import com.zhumeiyuan.codingagent.agent.model.ModelClientException;
 import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
 import com.zhumeiyuan.codingagent.agent.model.ModelMessage;
 import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
@@ -118,6 +119,23 @@ class MockAgentRunnerTests {
 		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
 		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.MODEL_PARSE_ERROR);
 		assertThat(store.get(run.id()).errorMessage()).isEqualTo("bad response");
+	}
+
+	@Test
+	void modelClientErrorFinishesRunWithModelError() {
+		AgentRunStore store = new AgentRunStore();
+		AgentRun run = store.create(this.clock);
+		ModelClient failingModel = request -> {
+			throw new ModelClientException("provider unavailable");
+		};
+		MockAgentRunner runner = new MockAgentRunner(store, new RunEventStream(), registryReturningSuccess(),
+				new ToolApprovalPolicy(), failingModel, this.budget, this.toolExecutor, this.clock);
+
+		runner.run(run.id(), "inspect");
+
+		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
+		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.MODEL_ERROR);
+		assertThat(store.get(run.id()).errorMessage()).isEqualTo("provider unavailable");
 	}
 
 	@Test

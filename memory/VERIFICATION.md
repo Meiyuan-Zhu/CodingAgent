@@ -501,3 +501,33 @@
 - 关联：ADR-0015。
 - 代码版本/运行 ID：`60aeba7 feat: add openai compatible model adapter`。
 - 限制：替身 HTTP 测试证明适配器请求/解析边界，不证明 DeepSeek 真实服务已可用；启动成功不证明真实模型返回可被项目解析。
+
+
+## REALMODEL-001：DeepSeek V4 Flash 真实只读 run 验证
+
+- 日期：2026-08-28。
+- 类型：真实模型 API 端到端验证、后端回归测试。
+- 用户授权：用户明确授权向 DeepSeek 发送 demo workspace 测试上下文，执行一次真实模型验证。
+- 范围：`OpenAiCompatibleModelClient`、`ModelResponseParser`、`MockAgentRunner`、run API、工具注册表、`list_files`、`read_file`、demo workspace。
+- 方法：
+  - 使用 `source ~/.zshrc` 读取本机 `DEEPSEEK_API_KEY`，未打印 key。
+  - 启动后端：`cd backend && mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=18080 --agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash"`。
+  - 通过本地 HTTP `POST /api/runs` 创建只读任务，请求模型查看 demo workspace 文件并用中文总结。
+  - 轮询 `GET /api/runs/{runId}`，并读取 `GET /api/runs/{runId}/events` 检查事件链。
+  - 根据验证中暴露的问题，收紧模型 message 校验、增加 `MODEL_ERROR` 分类、关闭 DeepSeek thinking mode 后重新执行后端测试与真实 run。
+- 结果：
+  - 后端 `mvn test` 通过。108 tests, 0 failures, 0 errors。
+  - 成功 run：`eade6508-edad-476f-986c-5d48ef18458a`，最终状态 `SUCCEEDED`，结束原因 `COMPLETED`。
+  - 事件链包含三轮 `MODEL_REQUESTED`，provider 均为 `openai-compatible:deepseek-v4-flash`。
+  - 工具调用成功：第一轮 `list_files` 返回 `README.md` 与 `src`；第二轮 `read_file` 读取 `README.md`。
+  - 最终模型消息为中文总结：该 demo workspace 是用于开发本地编码代理的小型安全工作区，包含 `README.md` 和 `src`，后端将其作为开发期间 agent 工具唯一可检查的文件区域；未执行写入或修改。
+- 修正记录：
+  - run `7e68ea76-0b04-4381-bf9c-90506eb6fb0b` 初次完成真实模型与工具闭环，但最终 `STOP` message 为空，不能作为完整用户体验验收。
+  - run `02719d2a-1c5a-4254-8479-77d73a2b68d6` 在收紧 message 校验后失败为 `INTERNAL_ERROR`，暴露 provider 错误分类不足。
+  - run `bc19391d-aa97-427b-a924-40fbac1d5ebc` 在新增 `MODEL_ERROR` 分类后失败原因变为 `Model provider response does not contain choices[0].message.content`。
+  - 查阅 DeepSeek 官方 thinking mode 文档后，发现 V4 默认开启 thinking mode；当前项目不保存 `reasoning_content`，因此显式关闭 thinking mode。
+- 安全记录：本验证只使用 demo workspace；未读取或发送题目 PDF、`.zshrc` 内容、私有 workspace 或真实 API key。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；不影响验证。
+- 关联：ADR-0015。
+- 代码版本/运行 ID：本阶段提交后补充。
+- 限制：真实写入审批、取消、超时、命令工具和前端浏览器 UI 下的 DeepSeek run 尚未验证；不证明 DeepSeek V4 Pro 或其他 provider 可用。

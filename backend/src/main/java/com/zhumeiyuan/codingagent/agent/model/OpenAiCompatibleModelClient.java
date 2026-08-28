@@ -33,8 +33,9 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			  ]
 			}
 
+			The message field is required and must never be empty.
 			If you need workspace information or a file change, call one of the available tools.
-			If no tool is needed, set finish_reason to "stop" and omit tool_calls.
+			If no tool is needed, set finish_reason to "stop", omit tool_calls, and put your final user-facing answer in message.
 			Use only the tools listed below. The application, not you, executes tools and enforces approvals.
 			""";
 
@@ -110,6 +111,7 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("model", this.properties.getName());
 		body.put("temperature", this.properties.getTemperature());
+		body.put("thinking", Map.of("type", "disabled"));
 		body.put("response_format", Map.of("type", "json_object"));
 		body.put("messages", chatMessages(request));
 		try {
