@@ -290,3 +290,10 @@
 - 事实：`ModelMessage` 扩展为结构化消息，assistant 消息可携带上一轮工具调用，tool 消息携带 `tool_call_id`，runner 将工具动作和工具结果以结构化形式回填下一轮上下文。
 - 事实：新增/更新模型适配器测试，覆盖 native tools 请求体、native tool_calls 响应解析、assistant tool_calls 与 tool result 消息序列化，以及 legacy JSON content fallback。
 - 验证：在 `backend/` 执行 `mvn test`，124 个测试通过；DeepSeek V4 Flash 原生 tool calling 只读 run `0edd0f1a-cc84-484e-b436-0888a85a30a5` 成功，模型通过原生 `tool_calls` 调用本地 `list_files` / `read_file` 并最终完成。
+
+## 2026-08-28：DeepSeek V4 Flash 原生工具真实修复 demo
+
+- 事实：先将 `workspaces/demo/src/price_calculator.py` 恢复到 failing baseline，并用 unittest 确认 4 个测试中 2 个失败。
+- 事实：DeepSeek V4 Flash 在 native tool calling 模式下完成真实修复 run `d2f4ab1e-5f4c-4458-9248-c38383aa31fa`：读文件、定位折扣符号错误、提出 `replace_text`、审批后改一行、提出 `run_command`、审批后运行测试并最终总结。
+- 验证：Agent 内部 `run_command` exitCode 0，4 个 unittest 全部 OK；随后外部直接执行同一 unittest，也通过 4 tests, 0 failures, 0 errors。
+- 注意：这次成功基于 ADR-0023 的原生 `tools` / `tool_calls` 协议，和此前 JSON content 协议下 V4 Flash 不稳定的结果应分开解释。

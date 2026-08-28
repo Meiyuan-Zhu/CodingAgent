@@ -695,3 +695,19 @@
 - 结果：通过。Run 以 `SUCCEEDED` / `COMPLETED` 结束，`roundsUsed=4`，`toolCallsUsed=7`。
 - 证据：事件流显示模型以原生 tool calling 请求 `list_files`、`read_file`，本地工具返回 workspace 目录、`README.md`、源码和测试文件内容；最终模型输出中文总结。
 - 限制：该验证是只读任务，未覆盖 native 模式下的写入审批和命令审批；模型在部分轮次一次返回多个只读工具调用，说明“每轮最多一个工具”的提示不是 provider 硬约束，本地预算和审批仍需作为最终控制。
+
+## REALDEMO-002：DeepSeek V4 Flash 原生 tool calling 真实修复闭环
+
+- 日期：2026-08-28（北京时间）。
+- 前置恢复：执行 `git checkout -- workspaces/demo/src/price_calculator.py` 恢复 failing baseline。
+- 基线验证：执行 `cd workspaces/demo && python3 -m unittest discover -s tests -v`，结果为 4 tests，2 failures；失败用例是 `test_discount_is_applied_before_tax` 和 `test_full_discount_leaves_only_zero_taxable_amount`。
+- 后端启动：`mvn spring-boot:run`，参数包括 `--server.port=18080 --agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash --agent.model.tool-protocol=native-tools`。
+- Run ID：`d2f4ab1e-5f4c-4458-9248-c38383aa31fa`。
+- 模型链路：DeepSeek V4 Flash 使用原生 `tool_calls` 调用 `list_files`、`read_file` 读取 README、源码和测试，随后提出 `replace_text`。
+- 审批 1：`replace_text`，toolCallId `call_00_FU3cYlwyC56Z8eLM90kj0628`，path `src/price_calculator.py`，只把 `discounted = base * (1 + discount_percent / 100)` 改为 `discounted = base * (1 - discount_percent / 100)`。
+- 审批 2：`run_command`，toolCallId `call_00_GoOtpsAG8oCP55uAuqj50792`，command `python3 -m unittest discover -s tests -v`，cwd `.`。
+- Agent 工具结果：`run_command` exitCode 0；stderr 显示 4 个 unittest 全部 `ok`，`Ran 4 tests ... OK`。
+- 外部复核命令：`cd workspaces/demo && python3 -m unittest discover -s tests -v`。
+- 外部复核结果：通过，4 tests, 0 failures, 0 errors。
+- Run 结果：`SUCCEEDED` / `COMPLETED`。
+- 限制：当前 `workspaces/demo/src/price_calculator.py` 保留真实模型修复后的未提交修改；如需重新录制从失败到修复，需要再次恢复 failing baseline。
