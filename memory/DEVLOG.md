@@ -313,3 +313,12 @@
 - 样式：新增右侧竖向 resize handle、底部横向 resize handle、右侧折叠后的 reopen pill，并压缩工具卡片视觉密度，让对话区更接近 Codex 的轻量工作流。
 - 验证：`frontend/` 执行 `npm run build` 通过。
 - 限制：本次只做前端构建验证，尚未做浏览器拖拽和完整审批后终态目视验收；Terminal 仍显示命令完成后的聚合 stdout/stderr，不是进程级实时字符流。
+
+## 2026-08-28：精简审查/文件侧栏并移除底部命令栏
+
+- 目标：根据用户反馈继续向 Codex 图二靠近，取消底部 command/terminal 常驻栏，减少右侧面板无用入口。
+- 实现：从 `App.vue` 移除 `BottomTerminal` 使用、底部 terminal 开合和纵向拖拽状态；工作台改回单行主布局，主对话区获得更多垂直空间。
+- 实现：删除 `BottomTerminal.vue`；`InspectorPane` 右侧入口精简为「审查」和「文件」。点击「审查」优先展示已产生的 diff；点击「文件」展示文件列表并支持选中文件预览。
+- 实现：清理 `timeline.ts` 中已无 UI 入口的 checks/terminal 投影类型和函数，避免展示层模型残留无用概念。
+- 验证：`frontend/` 执行 `npm run build` 通过。
+- 限制：命令结果仍可从工具卡进入审查详情查看，但不再作为独立底部栏或右侧 tab；本次未做浏览器目视验收。

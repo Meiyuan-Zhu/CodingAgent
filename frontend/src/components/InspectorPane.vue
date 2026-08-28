@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import type { RunEvent } from '../api/runs'
 import { commandCwd, commandLine, commandResult, formatArguments, outputText, toolStatusLabel, type ToolCard } from '../run/toolCards'
 import {
-  checksForRun,
   diffPreview,
   filePreview,
   filesFromEvents,
@@ -35,10 +34,27 @@ const selectedTool = computed(() => {
 })
 const selectedDiff = computed(() => selectedTool.value ? diffPreview(selectedTool.value) : null)
 const selectedFile = computed(() => props.selection.kind === 'file' ? filePreview(props.events, props.selection.path) : null)
-const checks = computed(() => checksForRun(props.activeRun, props.events, props.toolCards))
 const selectedCommand = computed(() => selectedTool.value?.name === 'run_command' ? commandResult(selectedTool.value) : null)
 const firstDiffTool = computed(() => props.toolCards.find((card) => diffPreview(card)) ?? null)
 const latestCommandTool = computed(() => [...props.toolCards].reverse().find((card) => card.name === 'run_command') ?? null)
+const firstReviewTool = computed(() => firstDiffTool.value ?? latestCommandTool.value ?? props.toolCards[0] ?? null)
+
+function selectReview() {
+  const card = firstReviewTool.value
+  if (!card) {
+    emit('select', { kind: 'diff', toolCallId: 'none' })
+    return
+  }
+  emit('select', diffPreview(card) ? { kind: 'diff', toolCallId: card.id } : card.name === 'run_command' ? { kind: 'command', toolCallId: card.id } : { kind: 'tool', toolCallId: card.id })
+}
+
+function selectFiles() {
+  emit('select', { kind: 'welcome' })
+}
+
+function isReviewSelection(selection: InspectorSelection) {
+  return selection.kind === 'tool' || selection.kind === 'diff' || selection.kind === 'command'
+}
 
 function isToolSelection(selection: InspectorSelection): selection is Extract<InspectorSelection, { toolCallId: string }> {
   return selection.kind === 'tool' || selection.kind === 'diff' || selection.kind === 'command'
@@ -48,7 +64,7 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
 <template>
   <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Inspector">
     <header class="inspector-header">
-      <p class="section-label">Inspector</p>
+      <p class="section-label">Panel</p>
       <h2>{{ title }}</h2>
       <div class="inspector-header-actions">
         <span class="backend-chip">backend {{ props.healthStatus }}</span>
@@ -56,11 +72,9 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
       </div>
     </header>
 
-    <nav class="inspector-tabs" aria-label="Inspector tabs">
-      <button type="button" :class="{ active: props.selection.kind === 'welcome' || props.selection.kind === 'file' }" @click="emit('select', { kind: 'welcome' })">Files</button>
-      <button type="button" :class="{ active: props.selection.kind === 'diff' }" @click="emit('select', firstDiffTool ? { kind: 'diff', toolCallId: firstDiffTool.id } : { kind: 'welcome' })">Diff</button>
-      <button type="button" :class="{ active: props.selection.kind === 'command' }" @click="emit('select', latestCommandTool ? { kind: 'command', toolCallId: latestCommandTool.id } : { kind: 'welcome' })">Command</button>
-      <button type="button" :class="{ active: props.selection.kind === 'checks' }" @click="emit('select', { kind: 'checks' })">Checks</button>
+    <nav class="inspector-tabs compact-tabs" aria-label="Workspace panel tabs">
+      <button type="button" :class="{ active: isReviewSelection(props.selection) }" @click="selectReview">审查</button>
+      <button type="button" :class="{ active: props.selection.kind === 'welcome' || props.selection.kind === 'file' }" @click="selectFiles">文件</button>
     </nav>
 
     <section class="inspector-body">
@@ -83,7 +97,7 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
           <h3>{{ selectedDiff.path }}</h3>
           <pre>{{ selectedDiff.diff }}</pre>
         </article>
-        <p v-else class="empty-copy">No diff selected.</p>
+        <p v-else class="empty-copy">No diff yet. Changes will appear here after the agent proposes an edit.</p>
       </template>
 
       <template v-else-if="props.selection.kind === 'command'">
@@ -110,14 +124,6 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
         </article>
       </template>
 
-      <template v-else-if="props.selection.kind === 'checks'">
-        <div class="checks-list">
-          <div v-for="check in checks" :key="check.name" class="check-item" :class="`tone-${check.tone}`">
-            <span>{{ check.name }}</span>
-            <strong>{{ check.result }}</strong>
-          </div>
-        </div>
-      </template>
 
       <template v-else>
         <section class="file-list">

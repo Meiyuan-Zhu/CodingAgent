@@ -1081,3 +1081,43 @@ button:disabled {
     grid-column: 2;
   }
 }
+
+/* Focused side panel layout: command output no longer occupies a bottom drawer. */
+.codex-workbench {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.sidebar {
+  grid-row: 1;
+}
+
+.inspector-tabs.compact-tabs {
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  padding: 10px 12px;
+}
+
+.inspector-tabs.compact-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.inspector-tabs.compact-tabs button:first-child::before {
+  content: '▣';
+  margin-right: 8px;
+  color: #68707d;
+  font-size: 13px;
+}
+
+.inspector-tabs.compact-tabs button:last-child::before {
+  content: '▢';
+  margin-right: 8px;
+  color: #68707d;
+  font-size: 13px;
+}
+
+.terminal-resize-handle,
+.bottom-terminal {
+  display: none;
+}

@@ -730,3 +730,12 @@
 - 结果：通过，`vue-tsc -b` 和 Vite production build 成功。
 - 覆盖：确认前端新增的可收起/可展开面板状态、组件事件和模板绑定通过类型检查与打包。
 - 限制：未做浏览器实际拖拽验收；未验证完整真实模型 run 的审批后 UI 终态。
+
+## UI-006 侧栏精简与底部命令栏移除构建验证
+
+- 时间：2026-08-28 22:09 CST。
+- 命令：`cd frontend && npm run build`。
+- 范围：移除底部 `BottomTerminal` 页面路径、精简 Inspector tabs、清理 checks/terminal 投影类型后的前端类型检查和生产构建。
+- 结果：通过，`vue-tsc -b` 和 Vite production build 成功。
+- 覆盖：确认右侧面板只保留审查/文件入口后的组件绑定、类型导出和打包链路有效。
+- 限制：未做浏览器目视验收；未验证完整审批后 UI 终态。

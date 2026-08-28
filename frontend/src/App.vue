@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import BottomTerminal from './components/BottomTerminal.vue'
 import ChatTimeline from './components/ChatTimeline.vue'
 import ComposerBox from './components/ComposerBox.vue'
 import InspectorPane from './components/InspectorPane.vue'
@@ -8,7 +7,7 @@ import ProjectSidebar from './components/ProjectSidebar.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
 import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
 import { buildToolCards } from './run/toolCards'
-import { buildTimelineItems, latestTerminal, pendingApprovalView, type InspectorSelection } from './run/timeline'
+import { buildTimelineItems, pendingApprovalView, type InspectorSelection } from './run/timeline'
 
 const workspacePath = '/Users/zhumeiyuan/Desktop/CodingAgent'
 const defaultPrompt = 'Fix the failing Python pricing tests in the demo workspace, then run the unittest command to verify the fix'
@@ -30,13 +29,10 @@ const eventSource = ref<EventSource | null>(null)
 const inspectorSelection = ref<InspectorSelection>({ kind: 'welcome' })
 const inspectorOpen = ref(true)
 const inspectorWidth = ref(420)
-const terminalOpen = ref(false)
-const terminalHeight = ref(260)
-const resizingPanel = ref<'inspector' | 'terminal' | null>(null)
+const resizingPanel = ref<'inspector' | null>(null)
 
 const layoutStyle = computed(() => ({
   gridTemplateColumns: `300px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
-  gridTemplateRows: `minmax(0, 1fr) ${terminalOpen.value ? `${terminalHeight.value}px` : '44px'}`,
 }))
 
 const healthStatus = computed(() => {
@@ -56,11 +52,6 @@ const canCancel = computed(() => {
 const toolCards = computed(() => buildToolCards(events.value))
 const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, activeRun.value))
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
-const terminal = computed(() => latestTerminal(toolCards.value))
-
-watch(terminal, (next) => {
-  if (next) terminalOpen.value = true
-})
 
 watch(inspectorSelection, (next) => {
   if (next.kind !== 'welcome') inspectorOpen.value = true
@@ -170,11 +161,6 @@ function startInspectorResize() {
   resizingPanel.value = 'inspector'
 }
 
-function startTerminalResize() {
-  if (!terminalOpen.value) terminalOpen.value = true
-  resizingPanel.value = 'terminal'
-}
-
 function handlePanelResize(event: MouseEvent) {
   if (!resizingPanel.value) return
   if (resizingPanel.value === 'inspector') {
@@ -182,8 +168,6 @@ function handlePanelResize(event: MouseEvent) {
     inspectorWidth.value = clamp(nextWidth, 320, Math.min(720, window.innerWidth - 760))
     return
   }
-  const nextHeight = window.innerHeight - event.clientY
-  terminalHeight.value = clamp(nextHeight, 160, Math.min(520, window.innerHeight - 260))
 }
 
 function stopPanelResize() {
@@ -199,7 +183,6 @@ function selectTool(toolCallId: string) {
   if (!card) return
   if (card.name === 'run_command') {
     inspectorSelection.value = { kind: 'command', toolCallId }
-    terminalOpen.value = true
   } else if (card.result && typeof card.result.unifiedDiff === 'string') {
     inspectorSelection.value = { kind: 'diff', toolCallId }
   } else {
@@ -327,7 +310,7 @@ function closeEventStream() {
 </script>
 
 <template>
-  <main class="codex-workbench" :class="{ 'is-resizing': resizingPanel !== null, 'inspector-is-closed': !inspectorOpen, 'terminal-is-closed': !terminalOpen }" :style="layoutStyle">
+  <main class="codex-workbench" :class="{ 'is-resizing': resizingPanel !== null, 'inspector-is-closed': !inspectorOpen }" :style="layoutStyle">
     <ProjectSidebar
       :active-run-id="activeRun?.id ?? null"
       :runs="runHistory"
@@ -384,7 +367,5 @@ function closeEventStream() {
       @toggle="inspectorOpen = !inspectorOpen"
     />
 
-    <div class="terminal-resize-handle" role="separator" aria-orientation="horizontal" title="Drag to resize terminal" @mousedown.prevent="startTerminalResize"></div>
-    <BottomTerminal :open="terminalOpen" :terminal="terminal" @toggle="terminalOpen = !terminalOpen" />
   </main>
 </template>

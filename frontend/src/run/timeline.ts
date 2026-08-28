@@ -3,11 +3,8 @@ import {
   buildToolCards,
   commandCwd,
   commandLine,
-  commandResult,
   compactArguments,
-  outputText,
   parseJsonObject,
-  toolStatusLabel,
   type ToolCard,
 } from './toolCards'
 
@@ -59,7 +56,6 @@ export type InspectorSelection =
   | { kind: 'diff'; toolCallId: string }
   | { kind: 'command'; toolCallId: string }
   | { kind: 'file'; path: string }
-  | { kind: 'checks' }
 
 export type FilePreview = {
   path: string
@@ -76,23 +72,6 @@ export type FileEntry = {
 export type DiffPreview = {
   path: string
   diff: string
-}
-
-export type CheckItem = {
-  name: string
-  result: string
-  tone: 'neutral' | 'good' | 'warn' | 'bad'
-}
-
-export type TerminalSession = {
-  title: string
-  command: string
-  cwd: string
-  status: string
-  exitCode: number | null
-  duration: string
-  stdout: string
-  stderr: string
 }
 
 export type ApprovalView = {
@@ -187,7 +166,6 @@ export function inspectorTitle(selection: InspectorSelection, toolCards: ToolCar
     return card ? card.name : 'Inspector'
   }
   if (selection.kind === 'file') return selection.path
-  if (selection.kind === 'checks') return 'Checks'
   return 'Workspace'
 }
 
@@ -241,65 +219,6 @@ export function diffPreview(card: ToolCard): DiffPreview | null {
     path: typeof card.result.path === 'string' ? card.result.path : compactArguments(card.arguments),
     diff: card.result.unifiedDiff,
   }
-}
-
-export function allDiffs(toolCards: ToolCard[]): DiffPreview[] {
-  return toolCards.map(diffPreview).filter((item): item is DiffPreview => item !== null)
-}
-
-export function latestTerminal(toolCards: ToolCard[]): TerminalSession | null {
-  const commandCard = [...toolCards].reverse().find((card) => card.name === 'run_command')
-  if (!commandCard) return null
-  const result = commandResult(commandCard)
-  return {
-    title: commandCard.status === 'waiting' ? 'Command awaiting approval' : 'Latest command',
-    command: commandLine(commandCard),
-    cwd: commandCwd(commandCard),
-    status: toolStatusLabel(commandCard.status),
-    exitCode: typeof result?.exitCode === 'number' ? result.exitCode : null,
-    duration: typeof result?.durationMillis === 'number' ? `${result.durationMillis} ms` : '—',
-    stdout: outputText(result?.stdout),
-    stderr: outputText(result?.stderr),
-  }
-}
-
-export function checksForRun(activeRun: RunResponse | null, events: RunEvent[], toolCards: ToolCard[]): CheckItem[] {
-  const hasDiff = allDiffs(toolCards).length > 0
-  const latestCommandCard = [...toolCards].reverse().find((card) => card.name === 'run_command')
-  const exitCode = latestCommandCard ? commandResult(latestCommandCard)?.exitCode : null
-  const failedTool = toolCards.find((card) => card.error || (card.name === 'run_command' && exitCode !== null && exitCode !== 0))
-  return [
-    {
-      name: 'Backend connection',
-      result: 'connected',
-      tone: 'good',
-    },
-    {
-      name: 'Run status',
-      result: activeRun?.status ? activeRun.status.toLowerCase() : 'ready',
-      tone: activeRun?.status === 'FAILED' ? 'bad' : activeRun?.status === 'WAITING_FOR_APPROVAL' ? 'warn' : 'neutral',
-    },
-    {
-      name: 'Tool approvals',
-      result: toolCards.some((card) => card.status === 'waiting') ? 'waiting for you' : 'clear',
-      tone: toolCards.some((card) => card.status === 'waiting') ? 'warn' : 'good',
-    },
-    {
-      name: 'Workspace diff',
-      result: hasDiff ? 'change produced' : 'no changes yet',
-      tone: hasDiff ? 'warn' : 'neutral',
-    },
-    {
-      name: 'Command result',
-      result: exitCode === null ? 'not run yet' : `exit ${exitCode}`,
-      tone: exitCode === 0 ? 'good' : exitCode === null ? 'neutral' : 'bad',
-    },
-    {
-      name: 'Event stream',
-      result: `${events.length} events`,
-      tone: failedTool ? 'bad' : 'neutral',
-    },
-  ]
 }
 
 function modelTitle(event: RunEvent) {
