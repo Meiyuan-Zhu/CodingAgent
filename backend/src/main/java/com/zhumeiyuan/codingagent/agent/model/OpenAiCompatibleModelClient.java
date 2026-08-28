@@ -42,8 +42,9 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			Use only the tools listed below. The application, not you, executes tools and enforces approvals.
 			""";
 
-	private static final String EMPTY_CONTENT_RETRY_MESSAGE = "Previous provider response was empty. "
-			+ "Reply again with exactly one non-empty JSON object following the required local agent schema.";
+	private static final String PROTOCOL_REPAIR_RETRY_MESSAGE = "Previous provider response could not be accepted: %s. "
+			+ "Reply again with exactly one non-empty JSON object following the required local agent schema. "
+			+ "If you need to act, include finish_reason=tool_calls and one valid tool_calls item.";
 
 	private final AgentModelProperties properties;
 	private final ModelResponseParser parser;
@@ -70,9 +71,9 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		Objects.requireNonNull(request, "request");
 		validateProperties();
 		String apiKey = apiKey();
-		EmptyModelContentException firstEmptyContent = null;
+		RuntimeException firstRecoverableFailure = null;
 		for (int attempt = 1; attempt <= 2; attempt++) {
-			ModelRequest effectiveRequest = attempt == 1 ? request : requestWithEmptyContentReminder(request);
+			ModelRequest effectiveRequest = attempt == 1 ? request : requestWithProtocolRepairReminder(request, firstRecoverableFailure);
 			ModelHttpRequest httpRequest = new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
 					requestBody(effectiveRequest), this.properties.getTimeout());
 			ModelHttpResponse response = this.transport.send(httpRequest);
@@ -81,16 +82,19 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			}
 			try {
 				return this.parser.parse(extractMessageContent(response.body()));
-			} catch (EmptyModelContentException ex) {
-				if (firstEmptyContent == null) {
-					firstEmptyContent = ex;
+			} catch (EmptyModelContentException | ModelParseException ex) {
+				if (!isRecoverableProtocolFailure(ex)) {
+					throw ex;
+				}
+				if (firstRecoverableFailure == null) {
+					firstRecoverableFailure = ex;
 				}
 				if (attempt == 2) {
-					throw firstEmptyContent;
+					throw firstRecoverableFailure;
 				}
 			}
 		}
-		throw firstEmptyContent;
+		throw firstRecoverableFailure;
 	}
 
 	private void validateProperties() {
@@ -128,10 +132,20 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		return URI.create(baseUrl + "/chat/completions");
 	}
 
-	private ModelRequest requestWithEmptyContentReminder(ModelRequest request) {
+	private ModelRequest requestWithProtocolRepairReminder(ModelRequest request, RuntimeException failure) {
 		List<ModelMessage> messages = new ArrayList<>(request.messages());
-		messages.add(ModelMessage.user(EMPTY_CONTENT_RETRY_MESSAGE));
+		String reason = failure == null ? "unknown protocol failure" : failure.getMessage();
+		messages.add(ModelMessage.user(PROTOCOL_REPAIR_RETRY_MESSAGE.formatted(reason)));
 		return new ModelRequest(messages, request.tools());
+	}
+
+	private boolean isRecoverableProtocolFailure(RuntimeException ex) {
+		if (ex instanceof EmptyModelContentException) {
+			return true;
+		}
+		String message = ex.getMessage();
+		return message != null && (message.contains("Model response is not valid JSON")
+				|| message.contains("Model field 'message' must be a non-blank string"));
 	}
 
 	private String requestBody(ModelRequest request) {

@@ -78,7 +78,7 @@ class OpenAiCompatibleModelClientTests {
 	}
 
 	@Test
-	void retriesOnceWhenProviderReturnsEmptyContent() throws Exception {
+	void retriesOnceWithProtocolRepairReminderWhenProviderReturnsEmptyContent() throws Exception {
 		CapturingTransport transport = new CapturingTransport(
 				new ModelHttpResponse(200, completionResponseAllowingEmpty("")),
 				new ModelHttpResponse(200, completionResponse("{\"message\":\"Done\",\"finish_reason\":\"stop\"}")));
@@ -88,8 +88,22 @@ class OpenAiCompatibleModelClientTests {
 
 		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
 		assertThat(transport.requestCount()).isEqualTo(2);
-		assertThat(transport.requests().get(0).body()).doesNotContain("Previous provider response was empty");
-		assertThat(transport.requests().get(1).body()).contains("Previous provider response was empty");
+		assertThat(transport.requests().get(0).body()).doesNotContain("Previous provider response could not be accepted");
+		assertThat(transport.requests().get(1).body()).contains("Previous provider response could not be accepted");
+	}
+
+	@Test
+	void retriesOnceWithProtocolRepairReminderWhenModelProtocolMessageIsBlank() throws Exception {
+		CapturingTransport transport = new CapturingTransport(
+				new ModelHttpResponse(200, completionResponse("{\"message\":\"   \",\"finish_reason\":\"stop\"}")),
+				new ModelHttpResponse(200, completionResponse("{\"message\":\"Done\",\"finish_reason\":\"stop\"}")));
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+
+		ModelResponse response = client.complete(new ModelRequest(List.of(ModelMessage.user("hi")), List.of()));
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
+		assertThat(transport.requestCount()).isEqualTo(2);
+		assertThat(transport.requests().get(1).body()).contains("Model field 'message' must be a non-blank string");
 	}
 
 	@Test

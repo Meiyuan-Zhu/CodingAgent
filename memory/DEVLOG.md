@@ -269,3 +269,9 @@
 - 事实：真实 run `1c85a983-fb96-4692-b387-1a9a545c104f` 在第二轮进入 `MODEL_PARSE_ERROR`，错误为 `Model response is not valid JSON`，说明真实模型可能返回带 Markdown 或说明文字的 JSON 外壳。
 - 决策：新增 ADR-0021。解析器先按纯 JSON 解析，失败时提取第一个完整 JSON object，再执行原协议字段校验。
 - 验证：后端 `mvn test` 通过，121 tests, 0 failures, 0 errors；新增测试覆盖 Markdown 代码块和前后夹杂文字。
+
+## 2026-08-28：模型协议修复重试
+
+- 事实：真实模型多轮 demo 暴露出空 content、非 JSON、不可降级空 message 等 provider/模型格式漂移；这些失败发生在执行任何新工具动作之前。
+- 决策：新增 ADR-0022。OpenAI-compatible 适配器对可恢复协议问题追加一条协议修复提醒并最多重试一次；工具结构错误、参数错误、未知 finish reason、HTTP 错误、工具/审批/预算错误不重试。
+- 验证：后端 `mvn test` 通过，122 tests, 0 failures, 0 errors；新增测试覆盖空 message 协议修复重试。

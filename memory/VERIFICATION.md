@@ -656,3 +656,11 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 121 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：提取后仍执行原有协议字段、工具调用和参数校验；提取不到完整 JSON object 时仍失败。
+
+## MODELAPI-004：模型协议修复重试验证
+
+- 日期：2026-08-28（北京时间）
+- 范围：OpenAI-compatible 适配器对可恢复协议问题的单次修复重试。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 122 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：重试发生在模型边界，尚未执行工具动作；工具结构错误、HTTP 错误、审批、预算和工具执行错误不重试。
