@@ -263,3 +263,9 @@
 - 事实：真实 run `82b73d41-6eae-4b85-a92b-219462d13c2c` 在 transcript 修复后进入 `MODEL_PARSE_ERROR`，错误为 `Model field 'message' must be a non-blank string`，说明 provider content 已非空，但 JSON 协议里的展示 message 为空。
 - 决策：新增 ADR-0020。仅当 `finish_reason=tool_calls` 且 `tool_calls` 合法非空时，为空/缺失 message 补默认展示文案；最终回答或无工具动作的空 message 仍失败。
 - 验证：后端 `mvn test` 通过，120 tests, 0 failures, 0 errors。
+
+## 2026-08-28：模型 JSON 外壳容错提取
+
+- 事实：真实 run `1c85a983-fb96-4692-b387-1a9a545c104f` 在第二轮进入 `MODEL_PARSE_ERROR`，错误为 `Model response is not valid JSON`，说明真实模型可能返回带 Markdown 或说明文字的 JSON 外壳。
+- 决策：新增 ADR-0021。解析器先按纯 JSON 解析，失败时提取第一个完整 JSON object，再执行原协议字段校验。
+- 验证：后端 `mvn test` 通过，121 tests, 0 failures, 0 errors；新增测试覆盖 Markdown 代码块和前后夹杂文字。

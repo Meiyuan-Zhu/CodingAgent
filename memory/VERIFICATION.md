@@ -648,3 +648,11 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 120 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：降级只适用于可执行工具动作合法的响应；最终回答空 message、非字符串 message 和无效 tool_calls 仍按解析错误处理。
+
+## MODEL-003：模型 JSON 外壳容错提取验证
+
+- 日期：2026-08-28（北京时间）
+- 范围：`ModelResponseParser` 对 Markdown 代码块和前后夹杂文字中的 JSON object 提取。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 121 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：提取后仍执行原有协议字段、工具调用和参数校验；提取不到完整 JSON object 时仍失败。

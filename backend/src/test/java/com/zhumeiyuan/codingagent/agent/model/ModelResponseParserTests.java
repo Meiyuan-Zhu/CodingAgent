@@ -71,6 +71,26 @@ class ModelResponseParserTests {
 	}
 
 	@Test
+	void extractsJsonObjectFromMarkdownOrSurroundingText() {
+		ModelResponse fenced = this.parser.parse("""
+				```json
+				{"message":"Need files","finish_reason":"tool_calls","tool_calls":[{"id":"call-1","name":"list_files","arguments":{"path":"."}}]}
+				```
+				""");
+		ModelResponse prose = this.parser.parse("""
+				I will inspect files now:
+				{"message":"Need files with brace { inside string }","finish_reason":"tool_calls","tool_calls":[{"id":"call-2","name":"list_files","arguments":{"path":"."}}]}
+				Done.
+				""");
+
+		assertThat(fenced.toolCalls()).singleElement()
+				.satisfies(call -> assertThat(call.id()).isEqualTo("call-1"));
+		assertThat(prose.message()).contains("brace { inside string }");
+		assertThat(prose.toolCalls()).singleElement()
+				.satisfies(call -> assertThat(call.id()).isEqualTo("call-2"));
+	}
+
+	@Test
 	void rejectsMissingOrBlankMessage() {
 		assertParseError(() -> this.parser.parse("""
 				{"finish_reason":"stop"}

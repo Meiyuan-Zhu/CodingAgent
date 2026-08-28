@@ -51,9 +51,55 @@ public class ModelResponseParser {
 	private JsonNode parseJson(String rawResponse) {
 		try {
 			return this.objectMapper.readTree(rawResponse);
-		} catch (JsonProcessingException ex) {
-			throw new ModelParseException("Model response is not valid JSON", ex);
+		} catch (JsonProcessingException firstFailure) {
+			String extracted = extractFirstJsonObject(rawResponse);
+			if (extracted == null) {
+				throw new ModelParseException("Model response is not valid JSON", firstFailure);
+			}
+			try {
+				return this.objectMapper.readTree(extracted);
+			} catch (JsonProcessingException secondFailure) {
+				throw new ModelParseException("Model response is not valid JSON", secondFailure);
+			}
 		}
+	}
+
+	private String extractFirstJsonObject(String rawResponse) {
+		int start = rawResponse.indexOf('{');
+		if (start < 0) {
+			return null;
+		}
+		boolean inString = false;
+		boolean escaped = false;
+		int depth = 0;
+		for (int index = start; index < rawResponse.length(); index++) {
+			char current = rawResponse.charAt(index);
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (current == '\\' && inString) {
+				escaped = true;
+				continue;
+			}
+			if (current == '"') {
+				inString = !inString;
+				continue;
+			}
+			if (inString) {
+				continue;
+			}
+			if (current == '{') {
+				depth++;
+			}
+			else if (current == '}') {
+				depth--;
+				if (depth == 0) {
+					return rawResponse.substring(start, index + 1);
+				}
+			}
+		}
+		return null;
 	}
 
 	private ModelFinishReason finishReason(JsonNode root) {

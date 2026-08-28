@@ -24,6 +24,7 @@
 | [ADR-0018](0018-empty-model-content-retry.md) | OpenAI-compatible 空 content 响应重试 | accepted | content 为空/缺失时最多追加协议修复提醒并重试一次；真实 demo 修复闭环待验证 |
 | [ADR-0019](0019-agent-transcript-tool-call-context.md) | Agent transcript 中保留模型工具动作 | accepted | 下一轮模型上下文包含上一轮工具调用摘要；真实 demo 修复闭环待验证 |
 | [ADR-0020](0020-blank-tool-message-normalization.md) | 工具调用响应的空 message 降级 | accepted | tool_calls 合法时为空 message 补默认展示文案；真实 demo 修复闭环待验证 |
+| [ADR-0021](0021-model-json-envelope-extraction.md) | 模型 JSON 外壳容错提取 | accepted | 解析器可从 Markdown/prose 外壳中提取第一个 JSON object；真实 demo 修复闭环待验证 |
 
 ## 规则
 
