@@ -566,3 +566,29 @@
 - 关联：ADR-0016。
 - 代码版本/运行 ID：`941015c feat: add workspace command tool`；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
 - 限制：当前不是 OS 级沙箱；命令 cwd 被限制在 workspace 内，但进程权限仍可访问主机上自身权限允许的路径；命令中断只显式销毁直接子进程，不证明完整进程树取消；真实 DeepSeek 命令审批 run 尚未验证。
+
+
+## UI-003：前端工具卡片与命令输出展示验证
+
+- 日期：2026-08-28。
+- 类型：前端构建、本地浏览器交互验证。
+- 范围：`frontend/src/App.vue`、`frontend/src/run/toolCards.ts`、`frontend/src/style.css`、后端 mock run/SSE/approval API。
+- 方法：
+  - 执行 `cd frontend && npm run build`。
+  - 启动后端：`cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8080`。
+  - 启动前端：`cd frontend && npm run dev -- --host 127.0.0.1`，访问 `http://127.0.0.1:5173/`。
+  - 使用 in-app browser 点击默认命令任务的 Run，等待 `Approval required: run_command`，确认 Approve 按钮可用。
+  - 点击 Approve and run，等待 Run finished，并检查命令卡片、Command tab、页面宽度和 console。
+- 结果：通过。
+  - 前端构建：`vue-tsc -b` 与 `vite build` 均成功。
+  - 浏览器初始健康状态为 `ok`，没有横向溢出。
+  - 审批前页面显示 `run_command`、`Waiting approval` 和 `/bin/echo mock command`，Approve 按钮可点击。
+  - 审批后页面显示 `run_command` 工具卡片 `Finished`，包含 `$ /bin/echo mock command`、`cwd: .`、`exit: 0`、stdout `mock command`、stderr 空输出和 duration。
+  - 右侧详情栏存在 Command tab；浏览器 console 无 warning/error；最终 run 短 id 为 `ec6cabf0`，状态显示 `succeeded`。
+- 修正记录：
+  - 首次浏览器验收发现审批面板出现但 Approve 按钮 disabled，因为前端未在 `APPROVAL_REQUIRED` 事件后同步刷新 `activeRun.status`；已调整禁用条件为存在 pending approval 且未在处理审批即可点击，状态合法性由后端 endpoint 兜底。
+  - 一次前端 patch 和 CSS 写入命令使用了错误工作目录，导致脚本未修改目标文件；随后从仓库根目录重新执行并验证。
+- 安全记录：本验证只访问本地 `localhost`，使用 mock 模型和固定命令 `/bin/echo mock command`；未调用真实模型，未读取或发送 API key、题目 PDF、`.zshrc` 或私有 workspace。
+- 关联：ADR-0004、ADR-0008、ADR-0014、ADR-0016。
+- 代码版本/运行 ID：本阶段提交后补充；浏览器 run 短 id `ec6cabf0`。
+- 限制：不证明真实 DeepSeek 命令审批 run；未做多浏览器、多视口或移动端视觉验收。

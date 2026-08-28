@@ -37,7 +37,7 @@ The key must stay in your shell or local untracked environment. Do not commit it
 
 The frontend development server proxies `/api` requests to `http://localhost:8080`.
 
-The current workbench can create a run, stream backend events through SSE, execute workspace tools through the backend tool registry, request approval for mutating tools and local commands, and show resulting diffs. The default model provider is still `mock` for safe local development. A DeepSeek/OpenAI-compatible adapter is implemented but real DeepSeek runs require an API key and explicit approval to send task context to the external model service.
+The current workbench can create a run, stream backend events through SSE, execute workspace tools through the backend tool registry, request approval for mutating tools and local commands, show resulting diffs, and render command stdout/stderr/exit code in tool cards. The default model provider is still `mock` for safe local development. A DeepSeek/OpenAI-compatible adapter is implemented but real DeepSeek runs require an API key and explicit approval to send task context to the external model service.
 
 Currently registered model-facing tools:
 

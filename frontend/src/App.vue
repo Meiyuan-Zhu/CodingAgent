@@ -2,12 +2,25 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchHealth, type HealthResponse } from './api/health'
 import { approveToolCall, cancelRun, createRun, fetchRun, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
+import {
+  approvalReason,
+  buildToolCards,
+  commandCwd,
+  commandLine,
+  commandResult,
+  compactArguments,
+  formatArguments,
+  formatDuration,
+  formatOccurredAt,
+  outputText,
+  toolStatusLabel,
+} from './run/toolCards'
 
 const health = ref<HealthResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const detailTab = ref<'files' | 'diff' | 'checks'>('files')
-const taskDraft = ref('List files in the demo workspace')
+const detailTab = ref<'files' | 'command' | 'diff' | 'checks'>('files')
+const taskDraft = ref('Run a simple test command in the demo workspace')
 const submitting = ref(false)
 const cancelling = ref(false)
 const resolvingApproval = ref(false)
@@ -17,6 +30,14 @@ const activePrompt = ref('')
 const runHistory = ref<RunResponse[]>([])
 const events = ref<RunEvent[]>([])
 const eventSource = ref<EventSource | null>(null)
+
+const toolCards = computed(() => buildToolCards(events.value))
+
+const hasToolCards = computed(() => toolCards.value.length > 0)
+
+const latestCommandCard = computed(() => {
+  return [...toolCards.value].reverse().find((card) => card.name === 'run_command') ?? null
+})
 
 const files = computed(() => {
   for (const event of [...events.value].reverse()) {
@@ -98,7 +119,7 @@ const cancelButtonDisabled = computed(() => {
 })
 
 const approvalButtonDisabled = computed(() => {
-  return resolvingApproval.value || !activeRun.value || activeRun.value.status !== 'WAITING_FOR_APPROVAL' || !pendingApproval.value
+  return resolvingApproval.value || !activeRun.value || !pendingApproval.value
 })
 
 onMounted(async () => {
@@ -265,11 +286,6 @@ function eventTitle(event: RunEvent) {
   return titles[event.type] ?? event.type
 }
 
-function approvalReason(event: RunEvent) {
-  const approval = event.payload.approval as { reason?: unknown } | undefined
-  return typeof approval?.reason === 'string' ? approval.reason : 'This tool requires approval before it can run.'
-}
-
 function eventDetail(event: RunEvent) {
   if (typeof event.payload.content === 'string') {
     return truncate(event.payload.content, 420)
@@ -339,10 +355,72 @@ function truncate(value: string, limit: number) {
         <article v-if="activeRun" class="message assistant-message">
           <p class="message-role">Assistant</p>
           <p>
-            The backend defaults to mock mode for safe development, and can be started with a configured
-            DeepSeek-compatible model adapter for real model runs.
+            Watch the run move through model thinking, tool proposal, approval, execution, and observation.
+            Command tools show stdout, stderr, exit code, and duration after approval.
           </p>
         </article>
+
+        <section v-if="hasToolCards" class="tool-card-stack" aria-label="Tool calls">
+          <article v-for="card in toolCards" :key="card.id" class="tool-card" :class="[`tool-${card.status}`, { 'command-card': card.name === 'run_command' }]">
+            <header class="tool-card-header">
+              <div>
+                <p class="eyebrow">Tool call</p>
+                <h3>{{ card.name }}</h3>
+              </div>
+              <span class="tool-status" :class="`tool-status-${card.status}`">{{ toolStatusLabel(card.status) }}</span>
+            </header>
+
+            <p class="tool-summary">{{ compactArguments(card.arguments) }}</p>
+
+            <div class="tool-meta-grid">
+              <div>
+                <span>Call ID</span>
+                <strong>{{ card.id }}</strong>
+              </div>
+              <div>
+                <span>Requested</span>
+                <strong>{{ formatOccurredAt(card.requestedAt) }}</strong>
+              </div>
+              <div>
+                <span>Started</span>
+                <strong>{{ formatOccurredAt(card.startedAt) }}</strong>
+              </div>
+              <div>
+                <span>Finished</span>
+                <strong>{{ formatOccurredAt(card.finishedAt) }}</strong>
+              </div>
+            </div>
+
+            <div v-if="card.name === 'run_command'" class="command-output">
+              <div class="command-line">
+                <span>$</span>
+                <code>{{ commandLine(card) }}</code>
+              </div>
+              <div class="command-facts">
+                <span>cwd: {{ commandCwd(card) }}</span>
+                <span>exit: {{ commandResult(card)?.exitCode ?? '—' }}</span>
+                <span>duration: {{ formatDuration(commandResult(card)?.durationMillis) }}</span>
+              </div>
+              <div class="terminal-block">
+                <div class="terminal-title">stdout <small v-if="commandResult(card)?.stdoutTruncated">truncated</small></div>
+                <pre>{{ outputText(commandResult(card)?.stdout) }}</pre>
+              </div>
+              <div class="terminal-block stderr-block">
+                <div class="terminal-title">stderr <small v-if="commandResult(card)?.stderrTruncated">truncated</small></div>
+                <pre>{{ outputText(commandResult(card)?.stderr) }}</pre>
+              </div>
+            </div>
+
+            <details v-else class="tool-details">
+              <summary>Arguments and result</summary>
+              <pre>{{ formatArguments(card.arguments) }}</pre>
+              <pre v-if="card.rawContent">{{ card.rawContent }}</pre>
+            </details>
+
+            <p v-if="card.reason && card.status === 'waiting'" class="approval-note">{{ card.reason }}</p>
+            <p v-if="card.error" class="error-text">{{ card.error }}</p>
+          </article>
+        </section>
 
         <ol class="timeline" aria-label="Run events">
           <li v-for="item in events" :key="item.eventId">
@@ -409,6 +487,9 @@ function truncate(value: string, limit: number) {
         <button :class="{ active: detailTab === 'files' }" type="button" @click="detailTab = 'files'">
           Files
         </button>
+        <button :class="{ active: detailTab === 'command' }" type="button" @click="detailTab = 'command'">
+          Command
+        </button>
         <button :class="{ active: detailTab === 'diff' }" type="button" @click="detailTab = 'diff'">
           Diff
         </button>
@@ -421,6 +502,27 @@ function truncate(value: string, limit: number) {
         <button v-for="file in files" :key="file" class="file-row" type="button">
           {{ file }}
         </button>
+      </section>
+
+      <section v-else-if="detailTab === 'command'" class="tab-body command-tab">
+        <article v-if="latestCommandCard" class="command-inspector">
+          <p class="eyebrow">Latest command</p>
+          <h3>{{ commandLine(latestCommandCard) }}</h3>
+          <div class="command-facts stacked">
+            <span>status: {{ toolStatusLabel(latestCommandCard.status) }}</span>
+            <span>cwd: {{ commandCwd(latestCommandCard) }}</span>
+            <span>exit: {{ commandResult(latestCommandCard)?.exitCode ?? '—' }}</span>
+          </div>
+          <div class="terminal-block">
+            <div class="terminal-title">stdout</div>
+            <pre>{{ outputText(commandResult(latestCommandCard)?.stdout) }}</pre>
+          </div>
+          <div class="terminal-block stderr-block">
+            <div class="terminal-title">stderr</div>
+            <pre>{{ outputText(commandResult(latestCommandCard)?.stderr) }}</pre>
+          </div>
+        </article>
+        <p v-else class="empty-state">No command has been proposed in this run yet.</p>
       </section>
 
       <section v-else-if="detailTab === 'diff'" class="tab-body diff-body">

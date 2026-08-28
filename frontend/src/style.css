@@ -350,7 +350,7 @@ dd {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 14px;
   border-bottom: 1px solid #d8dee4;
@@ -512,4 +512,263 @@ dd {
 .danger-action {
   border-color: rgba(248, 113, 113, 0.35);
   color: #fecaca;
+}
+
+.tool-card-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.tool-card {
+  border: 1px solid #d8dee4;
+  border-radius: 12px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.05);
+}
+
+.tool-card.command-card {
+  border-color: #b6c7db;
+  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 72%);
+}
+
+.tool-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tool-card h3,
+.command-inspector h3 {
+  margin: 3px 0 0;
+  color: #1f2328;
+  font-size: 15px;
+}
+
+.tool-status {
+  flex: 0 0 auto;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #57606a;
+  background: #f6f8fa;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.tool-status-waiting {
+  border-color: #d7bb69;
+  color: #7a5d00;
+  background: #fff8d6;
+}
+
+.tool-status-running {
+  border-color: #8bb7f0;
+  color: #0a4a8f;
+  background: #eef6ff;
+}
+
+.tool-status-finished {
+  border-color: #91c499;
+  color: #1f6f43;
+  background: #eef7ee;
+}
+
+.tool-status-rejected {
+  border-color: #e3a0a0;
+  color: #8d2525;
+  background: #fff1f1;
+}
+
+.tool-summary {
+  margin: 10px 0 12px;
+  overflow-wrap: anywhere;
+  color: #57606a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tool-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tool-meta-grid div {
+  min-width: 0;
+  border: 1px solid #eaedf0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.tool-meta-grid span,
+.command-facts span {
+  display: block;
+  color: #68707d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tool-meta-grid strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #24292f;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-output,
+.command-inspector {
+  display: grid;
+  gap: 10px;
+}
+
+.command-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #d1d7e0;
+  background: #0d1117;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.command-line span {
+  color: #7ee787;
+  font-weight: 800;
+}
+
+.command-line code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.command-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-facts span {
+  border: 1px solid #d8dee4;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #f6f8fa;
+}
+
+.command-facts.stacked {
+  display: grid;
+}
+
+.command-facts.stacked span {
+  border-radius: 8px;
+}
+
+.terminal-block {
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  background: #0d1117;
+}
+
+.terminal-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.terminal-title small {
+  color: #f2cc60;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.terminal-block pre {
+  min-height: 42px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  color: #d1d7e0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.stderr-block pre {
+  color: #ffdad7;
+}
+
+.tool-details {
+  border-top: 1px solid #eaedf0;
+  padding-top: 10px;
+}
+
+.tool-details summary {
+  cursor: pointer;
+  color: #57606a;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.tool-details pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 8px 0 0;
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f6f8fa;
+  color: #24292f;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.approval-note {
+  margin: 10px 0 0;
+  border-left: 3px solid #d7bb69;
+  padding-left: 10px;
+  color: #7a5d00;
+  font-size: 13px;
+}
+
+.command-tab {
+  font-family: inherit;
+}
+
+.command-inspector {
+  border: 1px solid #d8dee4;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.command-inspector h3 {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  .tool-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

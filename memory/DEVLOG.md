@@ -214,3 +214,15 @@
 - 修复新增测试暴露的取消竞态：当 runner 和 cancel endpoint 同时尝试结束 run 时，`completeCancellation` 现在对终态保持幂等，不再对已终止 run 做二次状态转换。
 - 执行 COMMAND-001 验证：后端 `mvn test` 通过 118 tests；本地 HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19` 先进入 `WAITING_FOR_APPROVAL`，批准后执行 `/bin/echo mock command` 并最终 `SUCCEEDED / COMPLETED`。
 - 限制：当前不是 OS 级沙箱；只销毁直接子进程，不保证完整进程树清理；清空 HOME 等环境变量可能让依赖本机配置的构建命令失败；真实 DeepSeek 命令 run 尚未验证。
+
+
+## 2026-08-28：前端工具卡片和命令输出展示
+
+- 目标：让录屏能清楚呈现“模型提出命令 → 用户审批 → 执行 → stdout/stderr/exit code 回填”的链路。
+- 更新 Vue 工作台：在时间线之外新增 tool card stack，按 tool call id 聚合 `TOOL_CALL_REQUESTED`、`APPROVAL_REQUIRED`、`APPROVAL_RESOLVED`、`TOOL_CALL_STARTED`、`TOOL_CALL_FINISHED`。
+- 新增 `frontend/src/run/toolCards.ts`，将事件聚合、命令结果解析、命令行展示、状态标签和输出格式化逻辑从 `App.vue` 抽出，降低页面组件复杂度。
+- 为 `run_command` 增加专门命令卡片：展示 argv 合成的命令行、cwd、exit code、duration、stdout、stderr 和截断标记。
+- 右侧详情栏新增 Command tab，展示最近一次命令输出，便于演示时聚焦查看。
+- 修复浏览器验收中发现的审批按钮禁用问题：前端已收到 pending approval 事件时允许点击 Approve/Reject，合法状态仍由后端 approve/reject endpoint 校验。
+- 执行 UI-003 验证：`cd frontend && npm run build` 通过；in-app browser 打开 `http://127.0.0.1:5173/`，默认命令任务进入审批，Approve 后 run 成功，页面显示 `run_command` Finished、`exit: 0`、stdout `mock command`、stderr 空输出，console 无 warning/error 且无横向溢出。
+- 限制：本阶段验证使用 mock 模型和固定 `/bin/echo mock command`；真实 DeepSeek 命令审批 run 尚未验证。
