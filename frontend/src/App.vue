@@ -32,7 +32,7 @@ const inspectorWidth = ref(420)
 const resizingPanel = ref<'inspector' | null>(null)
 
 const layoutStyle = computed(() => ({
-  gridTemplateColumns: `300px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
+  gridTemplateColumns: `260px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
 }))
 
 const healthStatus = computed(() => {
@@ -314,7 +314,6 @@ function closeEventStream() {
     <ProjectSidebar
       :active-run-id="activeRun?.id ?? null"
       :runs="runHistory"
-      :workspace-path="workspacePath"
       @new-task="resetComposer"
       @select-run="selectRun"
     />
@@ -361,8 +360,6 @@ function closeEventStream() {
       :selection="inspectorSelection"
       :events="events"
       :tool-cards="toolCards"
-      :active-run="activeRun"
-      :health-status="healthStatus"
       @select="inspectorSelection = $event"
       @toggle="inspectorOpen = !inspectorOpen"
     />

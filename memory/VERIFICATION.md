@@ -739,3 +739,12 @@
 - 结果：通过，`vue-tsc -b` 和 Vite production build 成功。
 - 覆盖：确认右侧面板只保留审查/文件入口后的组件绑定、类型导出和打包链路有效。
 - 限制：未做浏览器目视验收；未验证完整审批后 UI 终态。
+
+## UI-007 Codex-like 空状态视觉验收
+
+- 时间：2026-08-28 22:18 CST。
+- 命令：`cd frontend && npm run build`。
+- 构建结果：通过，`vue-tsc -b` 和 Vite production build 成功。
+- 浏览器检查：in-app browser 打开并刷新 `http://localhost:5173/`。
+- 检查结果：左侧栏 computed width 为 260px；右侧审查/文件入口高度约 34px；右侧 Inspector 不再显示 backend chip；底部 `.bottom-terminal` DOM 不存在；浏览器 console 无 warning/error。
+- 限制：只覆盖空状态页面和基础布局，不覆盖完整审批后终态。

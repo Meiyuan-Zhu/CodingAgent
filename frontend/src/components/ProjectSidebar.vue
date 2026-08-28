@@ -4,7 +4,6 @@ import type { RunResponse } from '../api/runs'
 const props = defineProps<{
   activeRunId: string | null
   runs: RunResponse[]
-  workspacePath: string
 }>()
 
 const emit = defineEmits<{
@@ -23,7 +22,6 @@ function shortId(id: string) {
       <div class="brand-dot">CA</div>
       <div>
         <div class="brand-title">Coding Agent</div>
-        <div class="brand-subtitle">Local workbench</div>
       </div>
     </header>
 
@@ -38,7 +36,6 @@ function shortId(id: string) {
         <span class="folder-icon">▱</span>
         <span>
           <strong>CodingAgent</strong>
-          <small>{{ props.workspacePath }}</small>
         </span>
       </button>
     </section>

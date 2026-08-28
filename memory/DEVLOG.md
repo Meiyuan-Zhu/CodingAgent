@@ -322,3 +322,12 @@
 - 实现：清理 `timeline.ts` 中已无 UI 入口的 checks/terminal 投影类型和函数，避免展示层模型残留无用概念。
 - 验证：`frontend/` 执行 `npm run build` 通过。
 - 限制：命令结果仍可从工具卡进入审查详情查看，但不再作为独立底部栏或右侧 tab；本次未做浏览器目视验收。
+
+## 2026-08-28：Codex-like 视觉降噪
+
+- 目标：继续对照 Codex 图二调整空白工作台状态，降低侧栏、右侧工具入口和 welcome 区域的视觉重量。
+- 实现：左侧栏宽度从 300px 收紧到 260px；项目卡不再重复显示完整 workspace path，仅保留项目名；品牌副标题移除。
+- 实现：右侧 Inspector header 移除 `backend ok` 开发态 chip，仅保留 workspace 标题和收起按钮；「审查/文件」从大面积按钮改成轻量工具入口。
+- 样式：压缩 workspace header、empty thread、composer、Inspector tab 和文件卡片的 padding/radius/shadow，让初始界面更接近 Codex 的清爽工作台。
+- 验证：`frontend/` 执行 `npm run build` 通过；in-app browser 刷新 `http://localhost:5173/` 后确认左栏为 260px、右侧两个入口约 34px 高、Inspector 无 backend chip、底部 terminal DOM 不存在、console 无 warning/error。
+- 限制：本次仍是空状态目视验收，尚未录制或验收完整真实模型修复闭环的动态界面。

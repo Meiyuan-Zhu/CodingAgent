@@ -9,15 +9,11 @@ import {
   inspectorTitle,
   type InspectorSelection,
 } from '../run/timeline'
-import type { RunResponse } from '../api/runs'
-
 const props = defineProps<{
   open: boolean
   selection: InspectorSelection
   events: RunEvent[]
   toolCards: ToolCard[]
-  activeRun: RunResponse | null
-  healthStatus: string
 }>()
 
 const emit = defineEmits<{
@@ -64,17 +60,16 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
 <template>
   <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Inspector">
     <header class="inspector-header">
-      <p class="section-label">Panel</p>
-      <h2>{{ title }}</h2>
-      <div class="inspector-header-actions">
-        <span class="backend-chip">backend {{ props.healthStatus }}</span>
-        <button class="panel-icon-button" type="button" aria-label="Hide inspector" @click="emit('toggle')">〉</button>
+      <div>
+        <p class="section-label">Workspace</p>
+        <h2>{{ title }}</h2>
       </div>
+      <button class="panel-icon-button" type="button" aria-label="Hide inspector" @click="emit('toggle')">〉</button>
     </header>
 
     <nav class="inspector-tabs compact-tabs" aria-label="Workspace panel tabs">
-      <button type="button" :class="{ active: isReviewSelection(props.selection) }" @click="selectReview">审查</button>
-      <button type="button" :class="{ active: props.selection.kind === 'welcome' || props.selection.kind === 'file' }" @click="selectFiles">文件</button>
+      <button type="button" :class="{ active: isReviewSelection(props.selection) }" @click="selectReview"><span>▣</span>审查</button>
+      <button type="button" :class="{ active: props.selection.kind === 'welcome' || props.selection.kind === 'file' }" @click="selectFiles"><span>□</span>文件</button>
     </nav>
 
     <section class="inspector-body">
