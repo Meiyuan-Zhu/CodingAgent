@@ -564,5 +564,5 @@
 - 安全记录：本验证只执行 `/bin/pwd`、`/bin/echo`、`/usr/bin/false`、`/usr/bin/printf` 等固定测试命令；未调用真实模型；未读取或发送 API key、题目 PDF、`.zshrc` 或私有 workspace。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0016。
-- 代码版本/运行 ID：本阶段提交后补充；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
+- 代码版本/运行 ID：`941015c feat: add workspace command tool`；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
 - 限制：当前不是 OS 级沙箱；命令 cwd 被限制在 workspace 内，但进程权限仍可访问主机上自身权限允许的路径；命令中断只显式销毁直接子进程，不证明完整进程树取消；真实 DeepSeek 命令审批 run 尚未验证。

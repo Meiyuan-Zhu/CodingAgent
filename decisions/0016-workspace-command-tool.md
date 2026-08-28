@@ -55,7 +55,7 @@ stdout 和 stderr 分开捕获，均做长度截断并返回 `stdoutTruncated` /
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/WorkspaceToolFactory.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java`
 - 验证记录：[COMMAND-001](../memory/VERIFICATION.md#command-001workspace-命令执行工具验证)
-- 关联提交/运行：本阶段提交后补充；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
+- 关联提交/运行：`941015c feat: add workspace command tool`；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
 
 ## 何时重新考虑
 
