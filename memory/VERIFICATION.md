@@ -435,3 +435,48 @@
 - 关联：ADR-0013。
 - 代码版本/运行 ID：`afe23a3 feat: add approval policy and diff display`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## APPROVAL-001：完整审批恢复工作流验证
+
+- 日期：2026-08-28。
+- 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
+- 范围：`PendingToolApproval`、`AgentRunStore` pending approval 管理、`AgentRunService` approve/reject、`MockAgentRunner` 审批后恢复、`RunController` approve/reject endpoint、`RunTaskManager` 已完成任务替换、`frontend/src/App.vue` 和 `frontend/src/api/runs.ts`。
+- 方法：实现完整 approve/reject/resume 工作流后执行以下检查：
+  - `cd backend && mvn test`。
+  - `cd frontend && npm run build`。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 启动后端。
+  - 使用本地 HTTP 请求 `POST /api/runs`，prompt 为 `please write a note`，等待 run 到 `WAITING_FOR_APPROVAL`。
+  - 调用 `POST /api/runs/{runId}/approvals/mock-call-1/approve`，再查询 run 状态和事件回看。
+  - 删除验证过程中创建的 `workspaces/demo/src/mock-note.txt`。
+- 结果：通过。
+  - 后端测试：101 tests, 0 failures, 0 errors。
+  - 前端构建：`vue-tsc -b` 与 `vite build` 均成功。
+  - 本地 HTTP run `fd830860-d275-4484-8fbc-249a51142722` 先进入 `WAITING_FOR_APPROVAL`，approve response 返回 `RUNNING`，最终状态 `SUCCEEDED`，stopReason 为 `COMPLETED`。
+  - 事件序列为 `RUN_CREATED`、`USER_MESSAGE_ACCEPTED`、`RUN_STARTED`、`MODEL_REQUESTED`、`MODEL_MESSAGE_RECEIVED`、`TOOL_CALL_REQUESTED`、`APPROVAL_REQUIRED`、`APPROVAL_RESOLVED`、`TOOL_CALL_STARTED`、`TOOL_CALL_FINISHED`、`MODEL_REQUESTED`、`MODEL_MESSAGE_RECEIVED`、`RUN_FINISHED`。
+  - `TOOL_CALL_FINISHED` 的 content 包含 `unifiedDiff`，其中有 `+mock note`。
+  - 验证创建的 `workspaces/demo/src/mock-note.txt` 已删除。
+- 覆盖：
+  - Runner 遇到可变更工具会停在 `WAITING_FOR_APPROVAL`，审批前不执行工具。
+  - Approve 会恢复同一 run，执行 pending tool，把工具结果回填上下文，并继续下一轮模型请求。
+  - Reject 会以 `FAILED / APPROVAL_REJECTED` 结束，且不执行 pending tool。
+  - Controller 暴露 reject endpoint，并能返回失败后的 run state。
+  - 前端 TypeScript 构建覆盖 approve/reject API 封装、pending approval 面板、按钮状态和审批后 diff 展示路径。
+- 修正记录：
+  - 首轮实现后补充了 `RunTaskManager.start` 对已完成旧 task 的替换逻辑，降低审批恢复时旧 task 清理尚未完成的竞态风险。
+  - 一次复核 Maven 在受限沙箱触发 Mockito/ByteBuddy self-attach 错误；后续普通 `mvn test` 通过。
+  - 本地 HTTP 请求需要访问 `localhost:18080`，按权限规则使用提升权限执行。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均不影响本次结果。
+- 关联：ADR-0014。
+- 代码版本/运行 ID：`736aa7e feat: add approval resume workflow`；HTTP run `fd830860-d275-4484-8fbc-249a51142722`。
+- 限制：pending approval 仍保存在进程内存，后端重启后无法恢复等待审批的 run；当前只覆盖串行工具模型下的单个 pending approval；未验证真实浏览器点击、真实模型 API、命令工具或进程级命令取消。
+
+## DOC-013：完整审批恢复子任务后的文档一致性检查
+
+- 日期：2026-08-28。
+- 类型：文档链接与状态一致性检查。
+- 范围：README.md、decisions/、memory/、前后端生成文档中的 Markdown 文件。
+- 方法：使用 Python 标准库内联脚本检查本地 Markdown 链接、代码围栏配对、ADR-0014 索引、ADR-0013 superseded 状态、STATUS 对 ADR-0014 和 APPROVAL-001 的引用、APPROVAL-001 验证记录、DEVLOG 子任务 10 记录。
+- 结果：通过。检查 26 个 Markdown 文件；未发现本地链接缺失、代码围栏未闭合、ADR-0014 索引缺失、ADR-0013 superseded 状态缺失、STATUS/DEVLOG/VERIFICATION 关键记录缺失。
+- 关联：ADR-0014。
+- 代码版本/运行 ID：`736aa7e feat: add approval resume workflow`；本条哈希信息由后续文档同步提交补充。
+- 限制：只检查文档结构和状态关键词，不证明应用功能。

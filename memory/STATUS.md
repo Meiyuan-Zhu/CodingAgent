@@ -1,8 +1,8 @@
 # 当前开发状态
 
-更新日期：2026-08-27（北京时间）。
+更新日期：2026-08-28（北京时间）。
 
-**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界、读写文件工具、工具注册表、HTTP run API、SSE 事件流、mock runner、模型适配边界、响应解析器、多轮 Agent loop、运行预算、取消 API、工具超时、后台任务生命周期、审批策略和 diff/变更展示已建立并验证；尚未接入真实模型 API、命令工具或完整 approve/resume 工作流。**
+**当前阶段：工程骨架、Agent 运行协议领域模型、本地 workspace 边界、读写文件工具、工具注册表、HTTP run API、SSE 事件流、mock runner、模型适配边界、响应解析器、多轮 Agent loop、运行预算、取消 API、工具超时、后台任务生命周期、审批策略、完整 approve/reject/resume 工作流和 diff/变更展示已建立并验证；尚未接入真实模型 API 或命令工具。**
 
 ## 已确认
 
@@ -17,7 +17,8 @@
 - 模型适配边界与响应解析器已建立：runner 通过 `ModelClient` 获取响应，`ModelResponseParser` 校验 JSON 输出并将解析失败归为 `MODEL_PARSE_ERROR`。见 [ADR-0010](../decisions/0010-model-boundary-response-parser.md)。
 - 多轮 Agent loop 与运行预算已建立：模型工具调用结果会回填到下一轮请求，轮次、工具调用数和上下文消息窗口有明确限制。见 [ADR-0011](../decisions/0011-agent-loop-budget.md)。
 - Run 取消、工具超时和后台任务生命周期已建立：后端保留 run task 句柄，支持 cancel endpoint，runner 检查取消状态，工具执行有 timeout。见 [ADR-0012](../decisions/0012-run-cancellation-timeout-lifecycle.md)。
-- 审批策略和 diff/变更展示已建立：可变更工具在后端需要审批；当前阶段未实现 approve/resume API，因此安全拒绝且不执行；写入/替换工具返回 unified diff，前端 Diff 面板可展示。见 [ADR-0013](../decisions/0013-approval-policy-diff-display.md)。
+- 审批策略和 diff/变更展示已建立：可变更工具在后端需要审批；写入/替换工具返回 unified diff，前端 Diff 面板可展示。见 [ADR-0013](../decisions/0013-approval-policy-diff-display.md)。
+- 完整 approve/reject/resume 工作流已建立：可变更工具会让 run 进入 `WAITING_FOR_APPROVAL`，前端可批准或拒绝；批准后同一 run 恢复执行工具并继续 Agent loop。见 [ADR-0014](../decisions/0014-approval-resume-workflow.md)。
 - Agent 关键逻辑自行实现，项目不使用 Agent 框架/SDK 或 Spring AI。
 - decisions/ 记录决策，memory/ 记录开发状态与文档。见 [ADR-0002](../decisions/0002-development-records.md)。
 - 正式截止：北京时间 2026-09-03 00:00；此后不推送新提交。
@@ -41,6 +42,7 @@
 - 实现 `RunBudget`，mock runner 已支持多轮模型/工具循环、工具观察回填、轮次上限、工具调用上限和上下文消息窗口。
 - 实现 `RunTaskManager`、`POST /api/runs/{runId}/cancel`、工具执行超时和前端 Cancel 按钮。
 - 实现 `ToolApprovalPolicy`、审批事件拦截、写入/替换 unified diff 元数据和前端 Diff 面板。
+- 实现 `PendingToolApproval`、approve/reject API、审批后恢复执行和前端审批按钮。
 
 ## 功能状态
 
@@ -49,23 +51,23 @@
 | 模块 | 当前状态 | 实现位置 | 验证证据 | 决策/说明 |
 | --- | --- | --- | --- | --- |
 | 前后端工程骨架及独立启动 | 已验证 | [frontend](../frontend)、[backend](../backend) | [APP-001](VERIFICATION.md) | ADR-0001、ADR-0003；验证覆盖构建和后端健康接口 |
-| 任务接口与 Web 页面 | 已验证 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/api/runs.ts](../frontend/src/api/runs.ts)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/api](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/api) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | 可创建/cancel mock run、显示事件和审批拦截；仍非真实模型任务界面 |
-| 模型适配器及 Agent 循环 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution) | [CORE-001](VERIFICATION.md)、[RUNAPI-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[LOOP-001](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | 模型边界、多轮工具循环、预算、取消、工具超时和可变更工具审批拦截已验证；尚未实现真实模型 API |
-| 文件工具、搜索与编辑 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | list/read/search/write/replace 已验证；write/replace 会返回 unified diff；命令工具未实现 |
-| 工具注册表与执行入口 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool) | [TOOLREG-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | `list_files`、`read_file`、`search_text`、`write_file`、`replace_text` 已注册；可变更工具经过审批策略；真实模型适配器未接入 |
-| 命令执行、审批、取消 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java)、[frontend/src/App.vue](../frontend/src/App.vue) | [LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | Run 取消、工具 timeout 和可变更工具审批拦截已验证；完整 approve/resume、命令执行和进程级取消未实现 |
+| 任务接口与 Web 页面 | 已验证 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/api/runs.ts](../frontend/src/api/runs.ts)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/api](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/api) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | 可创建/cancel mock run、显示事件、审批、批准后恢复和 diff；仍非真实模型任务界面 |
+| 模型适配器及 Agent 循环 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution) | [CORE-001](VERIFICATION.md)、[RUNAPI-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[LOOP-001](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | 模型边界、多轮工具循环、预算、取消、工具超时、可变更工具审批和审批后恢复已验证；尚未实现真实模型 API |
+| 文件工具、搜索与编辑 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | list/read/search/write/replace 已验证；write/replace 会返回 unified diff；审批批准后可执行写入；命令工具未实现 |
+| 工具注册表与执行入口 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool) | [TOOLREG-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | `list_files`、`read_file`、`search_text`、`write_file`、`replace_text` 已注册；可变更工具经过审批策略和 approve/reject 流程；真实模型适配器未接入 |
+| 命令执行、审批、取消 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java)、[frontend/src/App.vue](../frontend/src/App.vue) | [LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | Run 取消、工具 timeout、可变更工具审批、approve/reject/resume 已验证；命令执行和进程级取消未实现 |
 | 对话上下文及运行预算 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java) | [LOOP-001](VERIFICATION.md) | 轮次、工具调用和消息窗口已验证；真实 token 计数和 provider-specific 裁剪未实现 |
-| SSE、工具卡片、Diff、输出 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java)、[frontend/src/App.vue](../frontend/src/App.vue) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md) | SSE 基础事件流、审批事件订阅和 Diff 面板构建已验证；工具卡片和 rich output 仍待增强 |
+| SSE、工具卡片、Diff、输出 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java)、[frontend/src/App.vue](../frontend/src/App.vue) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md) | SSE 基础事件流、审批事件订阅、审批按钮和 Diff 面板构建已验证；工具卡片和 rich output 仍待增强 |
 | 运行记录与历史回看 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java) | [RUNAPI-001](VERIFICATION.md) | 进程内事件回看已验证；重启后持久化未实现 |
 | 真实模型任务及回归测试 | 未开始 | 尚无 | 尚无 | 与模拟模型测试分开 |
 | 提交说明、视频与面试材料 | 未开始 | 尚无 | 尚无 | 依据真实能力编写 |
 
 ## 下一步
 
-1. 实现完整 approve/reject/resume 工作流：前端审批按钮、后端审批接口、run 从 `WAITING_FOR_APPROVAL` 恢复执行。
-2. 接入第一个真实模型 API adapter，但保持密钥只通过本地环境变量提供，不写进聊天、源码或文档。
-3. 实现命令执行工具：在 workspace 边界内执行审批后的命令，捕获 stdout/stderr/exit code，并补充进程级取消。
-4. 增强前端工具卡片和 rich output 展示，让录屏能清楚呈现工具调用、审批和文件变更。
+1. 接入第一个真实模型 API adapter，但保持密钥只通过本地环境变量提供，不写进聊天、源码或文档。
+2. 实现命令执行工具：在 workspace 边界内执行审批后的命令，捕获 stdout/stderr/exit code，并补充进程级取消。
+3. 增强前端工具卡片和 rich output 展示，让录屏能清楚呈现工具调用、审批和文件变更。
+4. 增加浏览器交互验收，录制前确认 Approve/Reject 按钮、Diff 面板和 run history 的视觉状态。
 5. 确认公开仓库的账户、名称及可公开文件；首次公开推送前复核题目 PDF、日志、密钥和演示材料。
 
 ## 风险与待定项
@@ -73,4 +75,4 @@
 - 尚未做真实模型连通性验证，不能声称可调用真实模型。
 - 公开远程仓库尚未建立；当前只有本地 Git 历史。
 - 演示案例尚未最终确定，排期属于建议。
-- 当前有已验证的 mock run 前后端闭环、写入/编辑工具、多轮 loop、取消、工具超时、审批拦截策略和 diff 元数据/展示构建，但没有完整 approve/resume、命令执行、进程级取消或真实模型能力。
+- 当前有已验证的 mock run 前后端闭环、写入/编辑工具、多轮 loop、取消、工具超时、审批拦截策略、完整 approve/reject/resume 和 diff 元数据/展示构建，但没有命令执行、进程级取消或真实模型能力。

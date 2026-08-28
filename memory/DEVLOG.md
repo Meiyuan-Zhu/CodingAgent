@@ -166,3 +166,16 @@
 - 更新 `HeuristicMockModelClient`：包含 write/create/写入/创建 的 prompt 会请求 `write_file`，用于验证审批拦截路径。
 - 执行 CHANGE-001 验证：后端 `mvn test` 通过 98 tests；前端 `npm run build` 通过；本地 HTTP run `68bb2c0d-b17f-4d5a-8219-d725451f1f68` 最终 `FAILED / APPROVAL_REJECTED`，事件含审批请求和拒绝，不含工具开始事件。
 - 限制：当前不是完整人工审批恢复流程；真实点击 Approve 后恢复执行、命令审批细分和浏览器视觉验收待后续实现。
+
+## 2026-08-28：子任务 10 - 完整审批恢复工作流
+
+- 目标：把上一阶段的“审批拦截”推进为完整 approve/reject/resume 闭环，让可变更工具能在用户批准后继续执行并展示 diff。
+- 新增 `PendingToolApproval`：保存单个挂起工具调用的 run id、round、tool call、审批决策、上下文消息和已使用工具调用数。
+- 扩展 `AgentRunStore`：在 run 旁保存和消费 pending approval，不把开发文档或聊天历史注入 Agent 上下文。
+- 重构 `MockAgentRunner`：遇到需审批工具时保存 continuation、进入 `WAITING_FOR_APPROVAL` 并返回；Approve 后执行已批准工具，将结果回填上下文并进入下一轮模型请求。
+- 扩展 `AgentRunService` 与 `RunController`：新增 approve/reject endpoint；reject 以 `APPROVAL_REJECTED` 结束且不执行工具；cancel 会清理 pending approval。
+- 更新 `RunTaskManager`：允许替换已完成但尚未从 active map 移除的旧 task，降低用户快速点击 Approve 时的竞态风险。
+- 更新 Vue 前端：根据审批事件计算 pending approval，展示工具名、参数、审批原因，以及 Approve and run / Reject 按钮；批准后继续展示同一 run 的工具事件和 diff。
+- 执行 APPROVAL-001 验证：后端 `mvn test` 通过 101 tests；前端 `npm run build` 通过；本地 HTTP run `fd830860-d275-4484-8fbc-249a51142722` 经 approve 后最终 `SUCCEEDED / COMPLETED`，事件含审批、工具执行、diff 和 run finished。
+- 验证创建的 `workspaces/demo/src/mock-note.txt` 已删除，未作为项目改动保留。
+- 限制：pending approval 仍为进程内存；当前只支持串行工具模型下的单个 pending approval；真实模型 API 和命令工具仍未实现。
