@@ -53,6 +53,24 @@ class ModelResponseParserTests {
 	}
 
 	@Test
+	void suppliesDefaultMessageWhenToolCallResponseMessageIsBlank() {
+		ModelResponse response = this.parser.parse("""
+				{
+				  "message": "   ",
+				  "finish_reason": "tool_calls",
+				  "tool_calls": [
+				    {"id":"call-1","name":"list_files","arguments":{"path":"."}}
+				  ]
+				}
+				""");
+
+		assertThat(response.message()).isEqualTo("Model requested tool execution.");
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.TOOL_CALLS);
+		assertThat(response.toolCalls()).singleElement()
+				.satisfies(call -> assertThat(call.name()).isEqualTo("list_files"));
+	}
+
+	@Test
 	void rejectsMissingOrBlankMessage() {
 		assertParseError(() -> this.parser.parse("""
 				{"finish_reason":"stop"}

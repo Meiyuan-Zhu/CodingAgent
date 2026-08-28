@@ -35,12 +35,12 @@ public class ModelResponseParser {
 			throw new ModelParseException("Model response must be a JSON object");
 		}
 
-		String message = requiredText(root, "message");
+		ModelFinishReason finishReason = finishReason(root);
+		List<ToolCall> toolCalls = toolCalls(root);
+		String message = message(root, finishReason, toolCalls);
 		if (message.length() > MAX_MESSAGE_CHARS) {
 			throw new ModelParseException("Model response message is too long");
 		}
-		ModelFinishReason finishReason = finishReason(root);
-		List<ToolCall> toolCalls = toolCalls(root);
 		try {
 			return new ModelResponse(message, finishReason, toolCalls);
 		} catch (IllegalArgumentException ex) {
@@ -63,6 +63,20 @@ public class ModelResponseParser {
 		} catch (IllegalArgumentException ex) {
 			throw new ModelParseException("Unknown model finish_reason: " + rawReason, ex);
 		}
+	}
+
+	private String message(JsonNode root, ModelFinishReason finishReason, List<ToolCall> toolCalls) {
+		JsonNode value = root.get("message");
+		if (value != null && !value.isNull() && !value.isTextual()) {
+			throw new ModelParseException("Model field 'message' must be a string");
+		}
+		if (value != null && value.isTextual() && !value.asText().isBlank()) {
+			return value.asText();
+		}
+		if (finishReason == ModelFinishReason.TOOL_CALLS && !toolCalls.isEmpty()) {
+			return "Model requested tool execution.";
+		}
+		throw new ModelParseException("Model field 'message' must be a non-blank string");
 	}
 
 	private List<ToolCall> toolCalls(JsonNode root) {

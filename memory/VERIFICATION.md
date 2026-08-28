@@ -640,3 +640,11 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 119 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：新增测试确认第二轮 `ModelRequest` 中包含 `Requested tool calls`、`tool_call_id` 和工具名；这验证上下文可追踪性修复，不等同于真实模型 demo 已完成。
+
+## MODEL-002：工具调用响应空 message 降级验证
+
+- 日期：2026-08-28（北京时间）
+- 范围：`ModelResponseParser` 对空 message + 合法 tool_calls 的兼容解析。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 120 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：降级只适用于可执行工具动作合法的响应；最终回答空 message、非字符串 message 和无效 tool_calls 仍按解析错误处理。

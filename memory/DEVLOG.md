@@ -257,3 +257,9 @@
 - 事实：多次 DeepSeek V4 Flash demo run 在读完 README 后返回空 content；排查发现 runner 只把模型 `message` 放入下一轮上下文，未保留上一轮 `tool_calls` 动作。
 - 决策：新增 ADR-0019。模型返回工具调用时，下一轮 assistant transcript 记录用户可读 message 以及工具调用 id、名称和参数摘要；工具观察继续作为单独消息回填。
 - 验证：后端 `mvn test` 通过，119 tests, 0 failures, 0 errors；新增断言覆盖第二轮 ModelRequest 包含上一轮工具动作 transcript。
+
+## 2026-08-28：工具调用响应空 message 降级
+
+- 事实：真实 run `82b73d41-6eae-4b85-a92b-219462d13c2c` 在 transcript 修复后进入 `MODEL_PARSE_ERROR`，错误为 `Model field 'message' must be a non-blank string`，说明 provider content 已非空，但 JSON 协议里的展示 message 为空。
+- 决策：新增 ADR-0020。仅当 `finish_reason=tool_calls` 且 `tool_calls` 合法非空时，为空/缺失 message 补默认展示文案；最终回答或无工具动作的空 message 仍失败。
+- 验证：后端 `mvn test` 通过，120 tests, 0 failures, 0 errors。

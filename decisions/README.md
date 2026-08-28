@@ -23,6 +23,7 @@
 | [ADR-0017](0017-real-model-demo-loop-budget.md) | 真实模型 demo 的单工具轮次策略与预算调整 | accepted | 默认预算调整为 8 轮/16 工具调用，模型提示要求一次最多一个工具；真实 demo 修复闭环待验证 |
 | [ADR-0018](0018-empty-model-content-retry.md) | OpenAI-compatible 空 content 响应重试 | accepted | content 为空/缺失时最多追加协议修复提醒并重试一次；真实 demo 修复闭环待验证 |
 | [ADR-0019](0019-agent-transcript-tool-call-context.md) | Agent transcript 中保留模型工具动作 | accepted | 下一轮模型上下文包含上一轮工具调用摘要；真实 demo 修复闭环待验证 |
+| [ADR-0020](0020-blank-tool-message-normalization.md) | 工具调用响应的空 message 降级 | accepted | tool_calls 合法时为空 message 补默认展示文案；真实 demo 修复闭环待验证 |
 
 ## 规则
 

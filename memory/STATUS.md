@@ -76,7 +76,7 @@
 
 ## 风险与待定项
 
-- DeepSeek V4 Flash 已完成真实只读端到端验证；demo 修复 run 暴露 provider 空 content 与工具动作 transcript 缺失，已完成预算/单工具轮次/安全诊断、空 content 带提醒单次重试和工具动作上下文回填；真实写入审批、取消、超时和命令任务尚未验证。
+- DeepSeek V4 Flash 已完成真实只读端到端验证；demo 修复 run 暴露 provider 空 content、工具动作 transcript 缺失和工具调用空 message，已完成预算/单工具轮次/安全诊断、空 content 带提醒单次重试、工具动作上下文回填和工具调用空 message 降级；真实写入审批、取消、超时和命令任务尚未验证。
 - 公开远程仓库尚未建立；当前只有本地 Git 历史。
 - 演示案例已初步确定为 Python pricing bugfix；真实模型修复闭环尚未验证。
 - 当前有已验证的 mock run 前后端闭环、写入/编辑工具、命令执行工具、多轮 loop、取消、工具超时、审批拦截策略、完整 approve/reject/resume、diff 元数据/展示构建、工具卡片/命令输出 UI、OpenAI-compatible 模型适配器，以及一次 DeepSeek V4 Flash 真实只读端到端 run；但没有完整进程树级取消、真实 demo 修复模型 run 或真实写入审批模型 run 验证。
