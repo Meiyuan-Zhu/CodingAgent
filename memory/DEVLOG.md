@@ -304,3 +304,12 @@
 - 决策：新增 ADR-0024。后端事件协议保持审计语义，前端新增 `run/timeline.ts` 投影层，将事件转换为对话消息、工具卡、审批卡、Inspector 和 Terminal 视图。
 - 实现：拆分 `ProjectSidebar`、`ChatTimeline`、`ApprovalCard`、`ToolCallCard`、`InspectorPane`、`BottomTerminal`、`ComposerBox`，`App.vue` 改为编排状态和 API 调用。
 - 验证：`frontend/` 执行 `npm run build` 通过；浏览器打开 dev server 目视检查三栏 + 底部 terminal，并触发一次 run 到 `run_command` 审批点，确认权限审批卡、文件 Inspector 和命令 terminal 可见。
+
+## 2026-08-28：工作台面板收起与拖拽调整
+
+- 目标：根据用户对 Codex 界面的对比反馈，把右侧 Inspector 和底部 Terminal 从固定区域改为可收起、可展开、可拖拽伸缩的工作台面板。
+- 实现：`App.vue` 新增 `inspectorOpen`、`inspectorWidth`、`terminalOpen`、`terminalHeight` 和统一拖拽状态；右侧 Inspector 选中文件、diff、command 时自动展开；出现 `run_command` 时底部 Terminal 自动展开。
+- 实现：`InspectorPane` 增加隐藏按钮和面板开合 props；`BottomTerminal` 增加展开/收起按钮，收起时保留紧凑标题栏；`ChatTimeline` 增加新消息自动滚动到底部。
+- 样式：新增右侧竖向 resize handle、底部横向 resize handle、右侧折叠后的 reopen pill，并压缩工具卡片视觉密度，让对话区更接近 Codex 的轻量工作流。
+- 验证：`frontend/` 执行 `npm run build` 通过。
+- 限制：本次只做前端构建验证，尚未做浏览器拖拽和完整审批后终态目视验收；Terminal 仍显示命令完成后的聚合 stdout/stderr，不是进程级实时字符流。

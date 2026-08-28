@@ -883,3 +883,201 @@ button:disabled {
     flex-direction: column;
   }
 }
+
+/* Adjustable Codex-like workbench panels */
+.codex-workbench {
+  position: relative;
+  transition: grid-template-columns 140ms ease, grid-template-rows 140ms ease;
+}
+
+.codex-workbench.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.codex-workbench.is-resizing * {
+  user-select: none;
+}
+
+.workspace-column {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.inspector-pane {
+  grid-column: 3;
+  grid-row: 1;
+  overflow: hidden;
+}
+
+.inspector-pane.closed {
+  border-left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottom-terminal {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  overflow: hidden;
+}
+
+.bottom-terminal.closed {
+  grid-template-rows: 44px 0;
+}
+
+.bottom-terminal.closed > header {
+  min-height: 44px;
+  padding-block: 6px;
+}
+
+.terminal-empty {
+  margin: 0;
+  padding: 14px 18px;
+}
+
+.inspector-resize-handle {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: stretch;
+  justify-self: start;
+  z-index: 20;
+  width: 10px;
+  margin-left: -5px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.inspector-resize-handle:hover,
+.terminal-resize-handle:hover {
+  background: rgba(56, 139, 253, 0.12);
+}
+
+.terminal-resize-handle {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  align-self: start;
+  z-index: 20;
+  height: 10px;
+  margin-top: -5px;
+  cursor: row-resize;
+  background: transparent;
+}
+
+.inspector-reopen {
+  position: absolute;
+  top: 82px;
+  right: 10px;
+  z-index: 30;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: #57606a;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  writing-mode: vertical-rl;
+  box-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+}
+
+.inspector-header-actions,
+.terminal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-icon-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d0d7de;
+  border-radius: 10px;
+  color: #57606a;
+  background: #ffffff;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.panel-icon-button:hover {
+  border-color: #9aa4b2;
+  color: #24292f;
+  background: #f6f8fa;
+}
+
+.inspector-header {
+  align-items: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.inspector-header .section-label {
+  margin: 0;
+}
+
+.inspector-tabs {
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+}
+
+.tool-call-card {
+  width: min(620px, 100%);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: none;
+}
+
+.tool-call-card header {
+  gap: 8px;
+}
+
+.tool-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.tool-primary {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.tool-facts,
+.command-peek {
+  margin-top: 6px;
+}
+
+.message-row.compact-row {
+  gap: 8px;
+}
+
+.message-row.compact-row .assistant-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.approval-card {
+  max-width: min(680px, 100%);
+}
+
+@media (max-width: 1180px) {
+  .codex-workbench {
+    grid-template-columns: 250px minmax(0, 1fr) 0px !important;
+  }
+
+  .inspector-resize-handle,
+  .inspector-reopen,
+  .inspector-pane {
+    display: none;
+  }
+
+  .bottom-terminal {
+    grid-column: 2;
+  }
+
+  .terminal-resize-handle {
+    grid-column: 2;
+  }
+}

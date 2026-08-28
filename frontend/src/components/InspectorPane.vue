@@ -13,6 +13,7 @@ import {
 import type { RunResponse } from '../api/runs'
 
 const props = defineProps<{
+  open: boolean
   selection: InspectorSelection
   events: RunEvent[]
   toolCards: ToolCard[]
@@ -22,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [selection: InspectorSelection]
+  toggle: []
 }>()
 
 const title = computed(() => inspectorTitle(props.selection, props.toolCards))
@@ -44,11 +46,14 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
 </script>
 
 <template>
-  <aside class="inspector-pane" aria-label="Inspector">
+  <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Inspector">
     <header class="inspector-header">
       <p class="section-label">Inspector</p>
       <h2>{{ title }}</h2>
-      <span class="backend-chip">backend {{ props.healthStatus }}</span>
+      <div class="inspector-header-actions">
+        <span class="backend-chip">backend {{ props.healthStatus }}</span>
+        <button class="panel-icon-button" type="button" aria-label="Hide inspector" @click="emit('toggle')">〉</button>
+      </div>
     </header>
 
     <nav class="inspector-tabs" aria-label="Inspector tabs">

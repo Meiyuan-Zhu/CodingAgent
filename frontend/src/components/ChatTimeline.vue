@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
 import ApprovalCard from './ApprovalCard.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import type { ApprovalView, TimelineItem } from '../run/timeline'
@@ -16,10 +17,18 @@ const emit = defineEmits<{
   approve: []
   reject: []
 }>()
+
+const timelineElement = ref<HTMLElement | null>(null)
+
+watch(() => props.items.length, async () => {
+  await nextTick()
+  if (!timelineElement.value) return
+  timelineElement.value.scrollTop = timelineElement.value.scrollHeight
+})
 </script>
 
 <template>
-  <section class="chat-timeline" aria-label="Agent conversation">
+  <section ref="timelineElement" class="chat-timeline" aria-label="Agent conversation">
     <article v-if="props.items.length === 0" class="empty-thread">
       <div class="assistant-avatar">CA</div>
       <div>

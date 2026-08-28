@@ -28,6 +28,16 @@ const runHistory = ref<RunResponse[]>([])
 const events = ref<RunEvent[]>([])
 const eventSource = ref<EventSource | null>(null)
 const inspectorSelection = ref<InspectorSelection>({ kind: 'welcome' })
+const inspectorOpen = ref(true)
+const inspectorWidth = ref(420)
+const terminalOpen = ref(false)
+const terminalHeight = ref(260)
+const resizingPanel = ref<'inspector' | 'terminal' | null>(null)
+
+const layoutStyle = computed(() => ({
+  gridTemplateColumns: `300px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
+  gridTemplateRows: `minmax(0, 1fr) ${terminalOpen.value ? `${terminalHeight.value}px` : '44px'}`,
+}))
 
 const healthStatus = computed(() => {
   if (loadingHealth.value) return 'checking'
@@ -48,6 +58,14 @@ const timelineItems = computed(() => buildTimelineItems(events.value, activeProm
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
 const terminal = computed(() => latestTerminal(toolCards.value))
 
+watch(terminal, (next) => {
+  if (next) terminalOpen.value = true
+})
+
+watch(inspectorSelection, (next) => {
+  if (next.kind !== 'welcome') inspectorOpen.value = true
+})
+
 watch(toolCards, (cards) => {
   const current = inspectorSelection.value
   const selectedToolExists = current.kind === 'tool' || current.kind === 'diff' || current.kind === 'command'
@@ -59,6 +77,9 @@ watch(toolCards, (cards) => {
 }, { deep: true })
 
 onMounted(async () => {
+  window.addEventListener('mousemove', handlePanelResize)
+  window.addEventListener('mouseup', stopPanelResize)
+
   try {
     health.value = await fetchHealth()
   } catch (caught) {
@@ -70,6 +91,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   closeEventStream()
+  window.removeEventListener('mousemove', handlePanelResize)
+  window.removeEventListener('mouseup', stopPanelResize)
 })
 
 async function submitRun() {
@@ -142,11 +165,41 @@ async function rejectPendingTool() {
   }
 }
 
+function startInspectorResize() {
+  if (!inspectorOpen.value) inspectorOpen.value = true
+  resizingPanel.value = 'inspector'
+}
+
+function startTerminalResize() {
+  if (!terminalOpen.value) terminalOpen.value = true
+  resizingPanel.value = 'terminal'
+}
+
+function handlePanelResize(event: MouseEvent) {
+  if (!resizingPanel.value) return
+  if (resizingPanel.value === 'inspector') {
+    const nextWidth = window.innerWidth - event.clientX
+    inspectorWidth.value = clamp(nextWidth, 320, Math.min(720, window.innerWidth - 760))
+    return
+  }
+  const nextHeight = window.innerHeight - event.clientY
+  terminalHeight.value = clamp(nextHeight, 160, Math.min(520, window.innerHeight - 260))
+}
+
+function stopPanelResize() {
+  resizingPanel.value = null
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
 function selectTool(toolCallId: string) {
   const card = toolCards.value.find((item) => item.id === toolCallId)
   if (!card) return
   if (card.name === 'run_command') {
     inspectorSelection.value = { kind: 'command', toolCallId }
+    terminalOpen.value = true
   } else if (card.result && typeof card.result.unifiedDiff === 'string') {
     inspectorSelection.value = { kind: 'diff', toolCallId }
   } else {
@@ -274,7 +327,7 @@ function closeEventStream() {
 </script>
 
 <template>
-  <main class="codex-workbench">
+  <main class="codex-workbench" :class="{ 'is-resizing': resizingPanel !== null, 'inspector-is-closed': !inspectorOpen, 'terminal-is-closed': !terminalOpen }" :style="layoutStyle">
     <ProjectSidebar
       :active-run-id="activeRun?.id ?? null"
       :runs="runHistory"
@@ -317,15 +370,21 @@ function closeEventStream() {
       />
     </section>
 
+    <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="Show inspector" @click="inspectorOpen = true">Inspector</button>
+    <div v-if="inspectorOpen" class="inspector-resize-handle" role="separator" aria-orientation="vertical" title="Drag to resize inspector" @mousedown.prevent="startInspectorResize"></div>
+
     <InspectorPane
+      :open="inspectorOpen"
       :selection="inspectorSelection"
       :events="events"
       :tool-cards="toolCards"
       :active-run="activeRun"
       :health-status="healthStatus"
       @select="inspectorSelection = $event"
+      @toggle="inspectorOpen = !inspectorOpen"
     />
 
-    <BottomTerminal :terminal="terminal" />
+    <div class="terminal-resize-handle" role="separator" aria-orientation="horizontal" title="Drag to resize terminal" @mousedown.prevent="startTerminalResize"></div>
+    <BottomTerminal :open="terminalOpen" :terminal="terminal" @toggle="terminalOpen = !terminalOpen" />
   </main>
 </template>

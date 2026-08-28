@@ -721,3 +721,12 @@
 - 交互检查：在浏览器点击 Run 后，界面渐进展示 assistant 消息、工具卡片和 `run_command` 权限审批卡；右侧显示已发现文件，底部 Terminal 显示待审批命令。
 - 限制：该阶段使用已有 SSE 事件实现消息级渐进渲染，不是 provider token-level streaming；浏览器检查中未批准命令，未验证完整前端审批后终态。
 - 目视证据：本地临时截图 `tmp/codex-like-ui-check.png`，不纳入提交。
+
+## UI-005 可调工作台面板构建验证
+
+- 时间：2026-08-28 21:24 CST。
+- 命令：`cd frontend && npm run build`。
+- 范围：Vue 工作台布局、Inspector 开合 props、Terminal 开合 props、拖拽状态的 TypeScript 编译和生产构建。
+- 结果：通过，`vue-tsc -b` 和 Vite production build 成功。
+- 覆盖：确认前端新增的可收起/可展开面板状态、组件事件和模板绑定通过类型检查与打包。
+- 限制：未做浏览器实际拖拽验收；未验证完整真实模型 run 的审批后 UI 终态。
