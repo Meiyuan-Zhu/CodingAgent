@@ -12,7 +12,7 @@
 
 ## 决策
 
-OpenAI-compatible 适配器对“HTTP 2xx 且 content 为空/缺失”的响应最多自动重试一次。重试仍使用同一个请求体，不修改用户 prompt、工具定义或上下文。第二次仍为空时保留第一次错误并终止为模型错误。
+OpenAI-compatible 适配器对“HTTP 2xx 且 content 为空/缺失”的响应最多自动重试一次。重试会在原上下文末尾追加一条极短的协议修复提醒，说明上一条 provider 响应为空，并要求重新输出一个非空 JSON 协议对象；不修改原始用户 prompt、工具定义或已有工具观察。第二次仍为空时保留第一次错误并终止为模型错误。
 
 不对以下情况重试：
 
@@ -24,10 +24,10 @@ OpenAI-compatible 适配器对“HTTP 2xx 且 content 为空/缺失”的响应�
 ## 理由
 
 - 空 content 没有可执行语义，不能进入 Agent loop。
-- 一次重试可以吸收 provider 偶发空回复，代价可控。
+- 一次带提醒的重试可以吸收 provider 偶发或确定性空回复，代价可控。
 - 不重试协议解析失败，避免把模型格式错误伪装成网络抖动。
 
 ## 验证
 
-- 待执行：后端 `mvn test` 覆盖一次空 content 后成功的重试路径。
+- 已执行：后端 `mvn test` 覆盖一次空 content 后追加协议修复提醒并成功的重试路径。
 - 待执行：真实 DeepSeek V4 Flash demo 修复闭环。

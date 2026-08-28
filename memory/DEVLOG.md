@@ -249,5 +249,5 @@
 ## 2026-08-28：OpenAI-compatible 空 content 响应重试
 
 - 事实：真实 demo run `e186f02c-94f1-4c67-949d-6401d4295568` 在第三轮失败，错误形状为 `finish_reason=stop, message_fields=[role, content]`，说明 provider 返回了空 content；run 未进入写入审批，demo workspace 未被修改。
-- 决策：新增 ADR-0018，仅对 HTTP 2xx 且 `choices[0].message.content` 为空/缺失的响应最多重试一次。
+- 决策：新增 ADR-0018，仅对 HTTP 2xx 且 `choices[0].message.content` 为空/缺失的响应追加一条协议修复提醒，并最多重试一次。
 - 验证：后端 `mvn test` 通过，119 tests, 0 failures, 0 errors。

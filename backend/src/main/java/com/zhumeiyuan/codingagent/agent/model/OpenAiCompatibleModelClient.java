@@ -42,6 +42,9 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			Use only the tools listed below. The application, not you, executes tools and enforces approvals.
 			""";
 
+	private static final String EMPTY_CONTENT_RETRY_MESSAGE = "Previous provider response was empty. "
+			+ "Reply again with exactly one non-empty JSON object following the required local agent schema.";
+
 	private final AgentModelProperties properties;
 	private final ModelResponseParser parser;
 	private final ObjectMapper objectMapper;
@@ -67,10 +70,11 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		Objects.requireNonNull(request, "request");
 		validateProperties();
 		String apiKey = apiKey();
-		ModelHttpRequest httpRequest = new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
-				requestBody(request), this.properties.getTimeout());
 		EmptyModelContentException firstEmptyContent = null;
 		for (int attempt = 1; attempt <= 2; attempt++) {
+			ModelRequest effectiveRequest = attempt == 1 ? request : requestWithEmptyContentReminder(request);
+			ModelHttpRequest httpRequest = new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
+					requestBody(effectiveRequest), this.properties.getTimeout());
 			ModelHttpResponse response = this.transport.send(httpRequest);
 			if (response.statusCode() < 200 || response.statusCode() >= 300) {
 				throw new ModelClientException("Model provider returned HTTP " + response.statusCode());
@@ -122,6 +126,12 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 	private URI chatCompletionsUri() {
 		String baseUrl = trimTrailingSlash(this.properties.getBaseUrl());
 		return URI.create(baseUrl + "/chat/completions");
+	}
+
+	private ModelRequest requestWithEmptyContentReminder(ModelRequest request) {
+		List<ModelMessage> messages = new ArrayList<>(request.messages());
+		messages.add(ModelMessage.user(EMPTY_CONTENT_RETRY_MESSAGE));
+		return new ModelRequest(messages, request.tools());
 	}
 
 	private String requestBody(ModelRequest request) {
@@ -197,6 +207,7 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		}
 		return trimmed;
 	}
+
 	private static class EmptyModelContentException extends ModelClientException {
 
 		EmptyModelContentException(String message) {

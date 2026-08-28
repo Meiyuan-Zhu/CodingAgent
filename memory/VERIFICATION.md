@@ -631,4 +631,4 @@
 - 范围：OpenAI-compatible provider 在 HTTP 2xx 但 `choices[0].message.content` 为空时的单次重试。
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 119 tests, 0 failures, 0 errors, 0 skipped。
-- 说明：新增测试覆盖第一次空 content、第二次返回有效 JSON 协议内容的路径；不对 HTTP 错误、非 JSON、协议解析失败进行重试。
+- 说明：新增测试覆盖第一次空 content、第二次请求追加协议修复提醒并返回有效 JSON 协议内容的路径；不对 HTTP 错误、非 JSON、协议解析失败进行重试。

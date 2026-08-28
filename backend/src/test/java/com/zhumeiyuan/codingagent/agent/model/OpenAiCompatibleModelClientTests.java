@@ -88,6 +88,8 @@ class OpenAiCompatibleModelClientTests {
 
 		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
 		assertThat(transport.requestCount()).isEqualTo(2);
+		assertThat(transport.requests().get(0).body()).doesNotContain("Previous provider response was empty");
+		assertThat(transport.requests().get(1).body()).contains("Previous provider response was empty");
 	}
 
 	@Test
@@ -127,6 +129,8 @@ class OpenAiCompatibleModelClientTests {
 
 		private ModelHttpRequest request;
 
+		private final List<ModelHttpRequest> requests = new java.util.ArrayList<>();
+
 		private int requestCount;
 
 		CapturingTransport(ModelHttpResponse response) {
@@ -144,9 +148,14 @@ class OpenAiCompatibleModelClientTests {
 		@Override
 		public ModelHttpResponse send(ModelHttpRequest request) {
 			this.request = request;
+			this.requests.add(request);
 			ModelHttpResponse response = this.responses.get(Math.min(this.requestCount, this.responses.size() - 1));
 			this.requestCount++;
 			return response;
+		}
+
+		List<ModelHttpRequest> requests() {
+			return this.requests;
 		}
 
 		int requestCount() {
