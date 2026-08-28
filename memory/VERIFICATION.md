@@ -590,5 +590,5 @@
   - 一次前端 patch 和 CSS 写入命令使用了错误工作目录，导致脚本未修改目标文件；随后从仓库根目录重新执行并验证。
 - 安全记录：本验证只访问本地 `localhost`，使用 mock 模型和固定命令 `/bin/echo mock command`；未调用真实模型，未读取或发送 API key、题目 PDF、`.zshrc` 或私有 workspace。
 - 关联：ADR-0004、ADR-0008、ADR-0014、ADR-0016。
-- 代码版本/运行 ID：本阶段提交后补充；浏览器 run 短 id `ec6cabf0`。
+- 代码版本/运行 ID：`f8e5fa1 feat: show command tool cards in workbench`；浏览器 run 短 id `ec6cabf0`。
 - 限制：不证明真实 DeepSeek 命令审批 run；未做多浏览器、多视口或移动端视觉验收。
