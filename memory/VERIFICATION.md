@@ -499,5 +499,5 @@
 - 未执行：真实 DeepSeek 端到端 run 未执行。尝试发起本地 run 验证时，安全审查指出该请求会把 workspace 查询、工具定义和后续工具结果发送给 DeepSeek 外部服务；用户尚未明确授权这些数据出境，因此停止验证。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均未阻止验证。
 - 关联：ADR-0015。
-- 代码版本/运行 ID：本阶段提交后补充。
+- 代码版本/运行 ID：`60aeba7 feat: add openai compatible model adapter`。
 - 限制：替身 HTTP 测试证明适配器请求/解析边界，不证明 DeepSeek 真实服务已可用；启动成功不证明真实模型返回可被项目解析。

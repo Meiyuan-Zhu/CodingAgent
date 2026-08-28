@@ -56,7 +56,7 @@ agent.model.api-key-env=DEEPSEEK_API_KEY
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/JavaHttpModelTransport.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/ModelConfiguration.java`
 - 验证记录：[MODELAPI-001](../memory/VERIFICATION.md#modelapi-001openai-compatible-deepseek-adapter-测试)
-- 关联提交/运行：本阶段提交后补充。
+- 关联提交/运行：`60aeba7 feat: add openai compatible model adapter`。
 
 ## 何时重新考虑
 
