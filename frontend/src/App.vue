@@ -1,26 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import BottomTerminal from './components/BottomTerminal.vue'
+import ChatTimeline from './components/ChatTimeline.vue'
+import ComposerBox from './components/ComposerBox.vue'
+import InspectorPane from './components/InspectorPane.vue'
+import ProjectSidebar from './components/ProjectSidebar.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
-import { approveToolCall, cancelRun, createRun, fetchRun, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
-import {
-  approvalReason,
-  buildToolCards,
-  commandCwd,
-  commandLine,
-  commandResult,
-  compactArguments,
-  formatArguments,
-  formatDuration,
-  formatOccurredAt,
-  outputText,
-  toolStatusLabel,
-} from './run/toolCards'
+import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
+import { buildToolCards } from './run/toolCards'
+import { buildTimelineItems, latestTerminal, pendingApprovalView, type InspectorSelection } from './run/timeline'
+
+const workspacePath = '/Users/zhumeiyuan/Desktop/CodingAgent'
+const defaultPrompt = 'Fix the failing Python pricing tests in the demo workspace, then run the unittest command to verify the fix'
+const terminalStatuses = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED'])
 
 const health = ref<HealthResponse | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
-const detailTab = ref<'files' | 'command' | 'diff' | 'checks'>('files')
-const taskDraft = ref('Fix the failing Python pricing tests in the demo workspace, then run the unittest command to verify the fix')
+const loadingHealth = ref(true)
+const healthError = ref<string | null>(null)
+const taskDraft = ref(defaultPrompt)
 const submitting = ref(false)
 const cancelling = ref(false)
 const resolvingApproval = ref(false)
@@ -30,131 +27,156 @@ const activePrompt = ref('')
 const runHistory = ref<RunResponse[]>([])
 const events = ref<RunEvent[]>([])
 const eventSource = ref<EventSource | null>(null)
+const inspectorSelection = ref<InspectorSelection>({ kind: 'welcome' })
 
-const toolCards = computed(() => buildToolCards(events.value))
-
-const hasToolCards = computed(() => toolCards.value.length > 0)
-
-const latestCommandCard = computed(() => {
-  return [...toolCards.value].reverse().find((card) => card.name === 'run_command') ?? null
-})
-
-const files = computed(() => {
-  for (const event of [...events.value].reverse()) {
-    if (event.type !== 'TOOL_CALL_FINISHED') continue
-    if (event.payload.name !== 'list_files') continue
-    const content = typeof event.payload.content === 'string' ? event.payload.content : ''
-    try {
-      const parsed = JSON.parse(content) as { files?: Array<{ path?: string }> }
-      const paths = parsed.files?.map((file) => file.path).filter(Boolean) as string[] | undefined
-      if (paths?.length) return paths
-    } catch {
-      return []
-    }
-  }
-  return ['workspaces/demo/README.md', 'workspaces/demo/src/hello.txt']
-})
-
-
-const diffs = computed(() => {
-  const parsedDiffs: Array<{ path: string; diff: string }> = []
-  for (const event of events.value) {
-    if (event.type !== 'TOOL_CALL_FINISHED') continue
-    const content = typeof event.payload.content === 'string' ? event.payload.content : ''
-    if (!content) continue
-    try {
-      const parsed = JSON.parse(content) as { path?: string; unifiedDiff?: string }
-      if (parsed.unifiedDiff) {
-        parsedDiffs.push({ path: parsed.path ?? String(event.payload.name ?? 'workspace change'), diff: parsed.unifiedDiff })
-      }
-    } catch {
-      // Non-JSON tool output is still shown in the event timeline.
-    }
-  }
-  return parsedDiffs
-})
-
-const checks = computed(() => [
-  { name: 'Backend agent runner', result: 'wired' },
-  { name: 'Tool registry', result: 'wired' },
-  { name: 'SSE run events', result: activeRun.value ? activeRun.value.status.toLowerCase() : 'ready' },
-  { name: 'Approval flow', result: pendingApproval.value ? 'waiting' : 'ready' },
-])
-
-const statusLabel = computed(() => {
-  if (loading.value) return 'checking'
-  if (error.value) return 'offline'
+const healthStatus = computed(() => {
+  if (loadingHealth.value) return 'checking'
+  if (healthError.value) return 'offline'
   return health.value?.status ?? 'unknown'
 })
 
-const terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED']
+const canSubmit = computed(() => {
+  return !submitting.value && !loadingHealth.value && !healthError.value && taskDraft.value.trim().length > 0
+})
 
-const pendingApproval = computed(() => {
-  const resolvedIds = new Set(
-    events.value
-      .filter((event) => event.type === 'APPROVAL_RESOLVED')
-      .map((event) => String(event.payload.toolCallId ?? '')),
-  )
+const canCancel = computed(() => {
+  return !cancelling.value && !!activeRun.value && !terminalStatuses.has(activeRun.value.status)
+})
 
-  for (const event of [...events.value].reverse()) {
-    if (event.type !== 'APPROVAL_REQUIRED') continue
-    const toolCallId = String(event.payload.toolCallId ?? '')
-    if (!toolCallId || resolvedIds.has(toolCallId)) continue
-    return {
-      toolCallId,
-      name: String(event.payload.name ?? 'tool'),
-      arguments: event.payload.arguments,
-      reason: approvalReason(event),
-    }
+const toolCards = computed(() => buildToolCards(events.value))
+const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, activeRun.value))
+const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
+const terminal = computed(() => latestTerminal(toolCards.value))
+
+watch(toolCards, (cards) => {
+  const current = inspectorSelection.value
+  const selectedToolExists = current.kind === 'tool' || current.kind === 'diff' || current.kind === 'command'
+    ? cards.some((card) => card.id === current.toolCallId)
+    : true
+  if (!selectedToolExists) {
+    inspectorSelection.value = { kind: 'welcome' }
   }
-  return null
-})
-
-const runButtonDisabled = computed(() => {
-  return submitting.value || loading.value || !!error.value || taskDraft.value.trim().length === 0
-})
-
-const cancelButtonDisabled = computed(() => {
-  return cancelling.value || !activeRun.value || terminalStatuses.includes(activeRun.value.status)
-})
-
-const approvalButtonDisabled = computed(() => {
-  return resolvingApproval.value || !activeRun.value || !pendingApproval.value
-})
+}, { deep: true })
 
 onMounted(async () => {
   try {
     health.value = await fetchHealth()
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : 'Unknown error'
+    healthError.value = caught instanceof Error ? caught.message : 'Unknown backend error'
   } finally {
-    loading.value = false
+    loadingHealth.value = false
   }
 })
 
 onUnmounted(() => {
-  eventSource.value?.close()
+  closeEventStream()
 })
 
 async function submitRun() {
-  if (runButtonDisabled.value) return
+  if (!canSubmit.value) return
   submitting.value = true
   runError.value = null
   events.value = []
-  eventSource.value?.close()
-  const prompt = taskDraft.value.trim()
+  inspectorSelection.value = { kind: 'welcome' }
+  closeEventStream()
 
+  const prompt = taskDraft.value.trim()
   try {
     const run = await createRun(prompt)
     activeRun.value = run
     activePrompt.value = prompt
-    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+    upsertRun(run)
     connectEventStream(run.id)
   } catch (caught) {
     runError.value = caught instanceof Error ? caught.message : 'Failed to create run'
   } finally {
     submitting.value = false
   }
+}
+
+async function cancelActiveRun() {
+  if (!canCancel.value || !activeRun.value) return
+  cancelling.value = true
+  runError.value = null
+  try {
+    const run = await cancelRun(activeRun.value.id)
+    activeRun.value = run
+    upsertRun(run)
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to cancel run'
+  } finally {
+    cancelling.value = false
+  }
+}
+
+async function approvePendingTool() {
+  if (!activeRun.value || !pendingApproval.value || resolvingApproval.value) return
+  resolvingApproval.value = true
+  runError.value = null
+  try {
+    const run = await approveToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    activeRun.value = run
+    upsertRun(run)
+    inspectorSelection.value = pendingApproval.value.name === 'run_command'
+      ? { kind: 'command', toolCallId: pendingApproval.value.toolCallId }
+      : { kind: 'diff', toolCallId: pendingApproval.value.toolCallId }
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to approve tool call'
+  } finally {
+    resolvingApproval.value = false
+  }
+}
+
+async function rejectPendingTool() {
+  if (!activeRun.value || !pendingApproval.value || resolvingApproval.value) return
+  resolvingApproval.value = true
+  runError.value = null
+  try {
+    const run = await rejectToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    activeRun.value = run
+    upsertRun(run)
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to reject tool call'
+  } finally {
+    resolvingApproval.value = false
+  }
+}
+
+function selectTool(toolCallId: string) {
+  const card = toolCards.value.find((item) => item.id === toolCallId)
+  if (!card) return
+  if (card.name === 'run_command') {
+    inspectorSelection.value = { kind: 'command', toolCallId }
+  } else if (card.result && typeof card.result.unifiedDiff === 'string') {
+    inspectorSelection.value = { kind: 'diff', toolCallId }
+  } else {
+    inspectorSelection.value = { kind: 'tool', toolCallId }
+  }
+}
+
+async function selectRun(run: RunResponse) {
+  closeEventStream()
+  activeRun.value = run
+  activePrompt.value = ''
+  runError.value = null
+  inspectorSelection.value = { kind: 'welcome' }
+  upsertRun(run)
+  try {
+    events.value = await fetchRunEvents(run.id)
+  } catch (caught) {
+    events.value = []
+    runError.value = caught instanceof Error ? caught.message : 'Failed to load run events'
+  }
+}
+
+function resetComposer() {
+  activeRun.value = null
+  activePrompt.value = ''
+  events.value = []
+  runError.value = null
+  taskDraft.value = defaultPrompt
+  inspectorSelection.value = { kind: 'welcome' }
+  closeEventStream()
 }
 
 function connectEventStream(runId: string) {
@@ -179,6 +201,7 @@ function connectEventStream(runId: string) {
     source.addEventListener(eventType, (message) => {
       const event = JSON.parse((message as MessageEvent).data) as RunEvent
       upsertEvent(event)
+      reflectRunStatus(event)
       if (event.type === 'RUN_FINISHED') {
         refreshRun(runId)
         source.close()
@@ -188,7 +211,7 @@ function connectEventStream(runId: string) {
 
   source.onerror = () => {
     source.close()
-    if (!activeRun.value?.status || !terminalStatuses.includes(activeRun.value.status)) {
+    if (!activeRun.value?.status || !terminalStatuses.has(activeRun.value.status)) {
       runError.value = 'Event stream closed before the run reached a terminal state.'
       refreshRun(runId)
     }
@@ -201,344 +224,108 @@ function upsertEvent(event: RunEvent) {
     events.value.splice(index, 1, event)
   } else {
     events.value.push(event)
-    events.value.sort((a, b) => a.sequence - b.sequence)
+    events.value.sort((left, right) => left.sequence - right.sequence)
   }
 }
 
-async function approvePendingTool() {
-  if (approvalButtonDisabled.value || !activeRun.value || !pendingApproval.value) return
-  resolvingApproval.value = true
-  runError.value = null
-  try {
-    const run = await approveToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
-    activeRun.value = run
-    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
-  } catch (caught) {
-    runError.value = caught instanceof Error ? caught.message : 'Failed to approve tool call'
-  } finally {
-    resolvingApproval.value = false
-  }
-}
 
-async function rejectPendingTool() {
-  if (approvalButtonDisabled.value || !activeRun.value || !pendingApproval.value) return
-  resolvingApproval.value = true
-  runError.value = null
-  try {
-    const run = await rejectToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
-    activeRun.value = run
-    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
-  } catch (caught) {
-    runError.value = caught instanceof Error ? caught.message : 'Failed to reject tool call'
-  } finally {
-    resolvingApproval.value = false
+function reflectRunStatus(event: RunEvent) {
+  if (!activeRun.value) return
+  const statusByEvent: Record<string, string | undefined> = {
+    RUN_STARTED: 'RUNNING',
+    RUN_CANCELLING: 'CANCELLING',
+    APPROVAL_REQUIRED: 'WAITING_FOR_APPROVAL',
+    APPROVAL_RESOLVED: 'RUNNING',
   }
-}
-
-async function cancelActiveRun() {
-  if (cancelButtonDisabled.value || !activeRun.value) return
-  cancelling.value = true
-  runError.value = null
-  try {
-    const run = await cancelRun(activeRun.value.id)
-    activeRun.value = run
-    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
-  } catch (caught) {
-    runError.value = caught instanceof Error ? caught.message : 'Failed to cancel run'
-  } finally {
-    cancelling.value = false
+  const nextStatus = event.type === 'RUN_FINISHED'
+    ? typeof event.payload.status === 'string' ? event.payload.status : activeRun.value.status
+    : statusByEvent[event.type]
+  if (!nextStatus || activeRun.value.status === nextStatus) return
+  const updated = {
+    ...activeRun.value,
+    status: nextStatus,
+    stopReason: event.type === 'RUN_FINISHED' && typeof event.payload.stopReason === 'string'
+      ? event.payload.stopReason
+      : activeRun.value.stopReason,
+    updatedAt: event.occurredAt,
   }
+  activeRun.value = updated
+  upsertRun(updated)
 }
 
 async function refreshRun(runId: string) {
   try {
     const run = await fetchRun(runId)
     activeRun.value = run
-    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+    upsertRun(run)
   } catch {
-    // Keep the already displayed events if a status refresh fails.
+    // Keep the visible conversation if status refresh fails.
   }
 }
 
-function eventKind(type: string) {
-  if (type.startsWith('TOOL')) return 'tool'
-  if (type.startsWith('APPROVAL')) return 'approval'
-  if (type.startsWith('MODEL')) return 'model'
-  if (type.startsWith('RUN')) return 'run'
-  return 'user'
+function upsertRun(run: RunResponse) {
+  runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
 }
 
-function eventTitle(event: RunEvent) {
-  const titles: Record<string, string> = {
-    RUN_CREATED: 'Run created',
-    USER_MESSAGE_ACCEPTED: 'User message accepted',
-    RUN_STARTED: 'Agent runner started',
-    RUN_CANCELLING: 'Run cancelling',
-    APPROVAL_REQUIRED: `Approval required: ${String(event.payload.name ?? '')}`,
-    APPROVAL_RESOLVED: 'Approval resolved',
-    MODEL_REQUESTED: 'Model requested',
-    MODEL_MESSAGE_RECEIVED: 'Assistant message',
-    TOOL_CALL_REQUESTED: `Tool requested: ${String(event.payload.name ?? '')}`,
-    TOOL_CALL_STARTED: `Tool started: ${String(event.payload.name ?? '')}`,
-    TOOL_CALL_FINISHED: `Tool finished: ${String(event.payload.name ?? '')}`,
-    RUN_FINISHED: 'Run finished',
-  }
-  return titles[event.type] ?? event.type
-}
-
-function eventDetail(event: RunEvent) {
-  if (typeof event.payload.content === 'string') {
-    return truncate(event.payload.content, 420)
-  }
-  if (typeof event.payload.prompt === 'string') {
-    return truncate(event.payload.prompt, 420)
-  }
-  return truncate(JSON.stringify(event.payload), 420)
-}
-
-function truncate(value: string, limit: number) {
-  return value.length > limit ? `${value.slice(0, limit)}...` : value
+function closeEventStream() {
+  eventSource.value?.close()
+  eventSource.value = null
 }
 </script>
 
 <template>
-  <main class="app-shell">
-    <aside class="rail" aria-label="Runs">
-      <header class="brand">
-        <div class="brand-mark">CA</div>
+  <main class="codex-workbench">
+    <ProjectSidebar
+      :active-run-id="activeRun?.id ?? null"
+      :runs="runHistory"
+      :workspace-path="workspacePath"
+      @new-task="resetComposer"
+      @select-run="selectRun"
+    />
+
+    <section class="workspace-column" aria-label="Conversation workspace">
+      <header class="workspace-header">
         <div>
-          <p class="eyebrow">Coding Agent</p>
-          <h1>Workbench</h1>
+          <p class="section-label">Local workspace</p>
+          <h1>{{ workspacePath }}</h1>
+        </div>
+        <div class="run-health">
+          <span class="health-pill" :class="`health-${healthStatus}`">{{ healthStatus }}</span>
+          <span v-if="activeRun" class="run-chip">{{ activeRun.status.toLowerCase() }}</span>
         </div>
       </header>
 
-      <nav class="run-list" aria-label="Run history">
-        <button
-          v-for="run in runHistory"
-          :key="run.id"
-          class="run-item"
-          :class="{ active: activeRun?.id === run.id }"
-          type="button"
-        >
-          <span>{{ run.id.slice(0, 8) }}</span>
-          <small>{{ run.status.toLowerCase() }}</small>
-        </button>
-        <p v-if="runHistory.length === 0" class="empty-state">No runs yet.</p>
-      </nav>
-    </aside>
+      <ChatTimeline
+        :items="timelineItems"
+        :pending-approval="pendingApproval"
+        :selected-tool-call-id="inspectorSelection.kind === 'tool' || inspectorSelection.kind === 'diff' || inspectorSelection.kind === 'command' ? inspectorSelection.toolCallId : null"
+        :resolving-approval="resolvingApproval"
+        :run-error="runError"
+        @select-tool="selectTool"
+        @approve="approvePendingTool"
+        @reject="rejectPendingTool"
+      />
 
-    <section class="main-pane" aria-label="Task workspace">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Local workspace</p>
-          <h2>/Users/zhumeiyuan/Desktop/CodingAgent</h2>
-        </div>
-        <span class="status-pill" :class="{ ready: health?.status === 'ok', pending: loading, error }">
-          {{ statusLabel }}
-        </span>
-      </header>
-
-      <section class="thread">
-        <article v-if="!activeRun" class="message assistant-message">
-          <p class="message-role">Assistant</p>
-          <p>
-            This workbench is wired to the backend agent runner. Submit a task to create a run, stream
-            SSE events, request approval for workspace changes, and inspect resulting diffs.
-          </p>
-        </article>
-
-        <article v-if="activeRun" class="message user-message">
-          <p class="message-role">User</p>
-          <p>{{ activePrompt }}</p>
-        </article>
-
-        <article v-if="activeRun" class="message assistant-message">
-          <p class="message-role">Assistant</p>
-          <p>
-            Watch the run move through model thinking, tool proposal, approval, execution, and observation.
-            Command tools show stdout, stderr, exit code, and duration after approval.
-          </p>
-        </article>
-
-        <section v-if="hasToolCards" class="tool-card-stack" aria-label="Tool calls">
-          <article v-for="card in toolCards" :key="card.id" class="tool-card" :class="[`tool-${card.status}`, { 'command-card': card.name === 'run_command' }]">
-            <header class="tool-card-header">
-              <div>
-                <p class="eyebrow">Tool call</p>
-                <h3>{{ card.name }}</h3>
-              </div>
-              <span class="tool-status" :class="`tool-status-${card.status}`">{{ toolStatusLabel(card.status) }}</span>
-            </header>
-
-            <p class="tool-summary">{{ compactArguments(card.arguments) }}</p>
-
-            <div class="tool-meta-grid">
-              <div>
-                <span>Call ID</span>
-                <strong>{{ card.id }}</strong>
-              </div>
-              <div>
-                <span>Requested</span>
-                <strong>{{ formatOccurredAt(card.requestedAt) }}</strong>
-              </div>
-              <div>
-                <span>Started</span>
-                <strong>{{ formatOccurredAt(card.startedAt) }}</strong>
-              </div>
-              <div>
-                <span>Finished</span>
-                <strong>{{ formatOccurredAt(card.finishedAt) }}</strong>
-              </div>
-            </div>
-
-            <div v-if="card.name === 'run_command'" class="command-output">
-              <div class="command-line">
-                <span>$</span>
-                <code>{{ commandLine(card) }}</code>
-              </div>
-              <div class="command-facts">
-                <span>cwd: {{ commandCwd(card) }}</span>
-                <span>exit: {{ commandResult(card)?.exitCode ?? '—' }}</span>
-                <span>duration: {{ formatDuration(commandResult(card)?.durationMillis) }}</span>
-              </div>
-              <div class="terminal-block">
-                <div class="terminal-title">stdout <small v-if="commandResult(card)?.stdoutTruncated">truncated</small></div>
-                <pre>{{ outputText(commandResult(card)?.stdout) }}</pre>
-              </div>
-              <div class="terminal-block stderr-block">
-                <div class="terminal-title">stderr <small v-if="commandResult(card)?.stderrTruncated">truncated</small></div>
-                <pre>{{ outputText(commandResult(card)?.stderr) }}</pre>
-              </div>
-            </div>
-
-            <details v-else class="tool-details">
-              <summary>Arguments and result</summary>
-              <pre>{{ formatArguments(card.arguments) }}</pre>
-              <pre v-if="card.rawContent">{{ card.rawContent }}</pre>
-            </details>
-
-            <p v-if="card.reason && card.status === 'waiting'" class="approval-note">{{ card.reason }}</p>
-            <p v-if="card.error" class="error-text">{{ card.error }}</p>
-          </article>
-        </section>
-
-        <ol class="timeline" aria-label="Run events">
-          <li v-for="item in events" :key="item.eventId">
-            <span class="event-kind">{{ eventKind(item.type) }}</span>
-            <div>
-              <strong>{{ eventTitle(item) }}</strong>
-              <p>{{ eventDetail(item) }}</p>
-            </div>
-          </li>
-        </ol>
-
-        <section v-if="pendingApproval" class="approval-panel" aria-label="Pending tool approval">
-          <p class="eyebrow">Approval required</p>
-          <h3>{{ pendingApproval.name }}</h3>
-          <p>{{ pendingApproval.reason }}</p>
-          <pre>{{ JSON.stringify(pendingApproval.arguments, null, 2) }}</pre>
-          <div class="approval-actions">
-            <button type="button" :disabled="approvalButtonDisabled" @click="approvePendingTool">
-              {{ resolvingApproval ? 'Resolving' : 'Approve and run' }}
-            </button>
-            <button class="secondary-action danger-action" type="button" :disabled="approvalButtonDisabled" @click="rejectPendingTool">
-              Reject
-            </button>
-          </div>
-        </section>
-
-        <p v-if="runError" class="error-text">{{ runError }}</p>
-
-        <section class="health-panel" aria-label="Backend health">
-          <p v-if="loading">Checking backend...</p>
-          <p v-else-if="error" class="error-text">{{ error }}</p>
-          <dl v-else-if="health" class="health-grid">
-            <div>
-              <dt>Service</dt>
-              <dd>{{ health.service }}</dd>
-            </div>
-            <div>
-              <dt>Java</dt>
-              <dd>{{ health.javaVersion }}</dd>
-            </div>
-            <div>
-              <dt>Server time</dt>
-              <dd>{{ new Date(health.serverTime).toLocaleString() }}</dd>
-            </div>
-          </dl>
-        </section>
-      </section>
-
-      <form class="composer" aria-label="Task composer" @submit.prevent="submitRun">
-        <textarea v-model="taskDraft" aria-label="Task input" placeholder="Ask the agent to change this workspace" rows="2" />
-        <div class="composer-actions">
-          <button type="submit" :disabled="runButtonDisabled">
-            {{ submitting ? 'Starting' : 'Run' }}
-          </button>
-          <button class="secondary-action" type="button" :disabled="cancelButtonDisabled" @click="cancelActiveRun">
-            {{ cancelling ? 'Cancelling' : 'Cancel' }}
-          </button>
-        </div>
-      </form>
+      <ComposerBox
+        v-model="taskDraft"
+        :disabled="!canSubmit"
+        :submitting="submitting"
+        :cancelling="cancelling"
+        :can-cancel="canCancel"
+        @submit="submitRun"
+        @cancel="cancelActiveRun"
+      />
     </section>
 
-    <aside class="detail-pane" aria-label="Workspace details">
-      <div class="tabs" role="tablist" aria-label="Detail tabs">
-        <button :class="{ active: detailTab === 'files' }" type="button" @click="detailTab = 'files'">
-          Files
-        </button>
-        <button :class="{ active: detailTab === 'command' }" type="button" @click="detailTab = 'command'">
-          Command
-        </button>
-        <button :class="{ active: detailTab === 'diff' }" type="button" @click="detailTab = 'diff'">
-          Diff
-        </button>
-        <button :class="{ active: detailTab === 'checks' }" type="button" @click="detailTab = 'checks'">
-          Checks
-        </button>
-      </div>
+    <InspectorPane
+      :selection="inspectorSelection"
+      :events="events"
+      :tool-cards="toolCards"
+      :active-run="activeRun"
+      :health-status="healthStatus"
+      @select="inspectorSelection = $event"
+    />
 
-      <section v-if="detailTab === 'files'" class="tab-body">
-        <button v-for="file in files" :key="file" class="file-row" type="button">
-          {{ file }}
-        </button>
-      </section>
-
-      <section v-else-if="detailTab === 'command'" class="tab-body command-tab">
-        <article v-if="latestCommandCard" class="command-inspector">
-          <p class="eyebrow">Latest command</p>
-          <h3>{{ commandLine(latestCommandCard) }}</h3>
-          <div class="command-facts stacked">
-            <span>status: {{ toolStatusLabel(latestCommandCard.status) }}</span>
-            <span>cwd: {{ commandCwd(latestCommandCard) }}</span>
-            <span>exit: {{ commandResult(latestCommandCard)?.exitCode ?? '—' }}</span>
-          </div>
-          <div class="terminal-block">
-            <div class="terminal-title">stdout</div>
-            <pre>{{ outputText(commandResult(latestCommandCard)?.stdout) }}</pre>
-          </div>
-          <div class="terminal-block stderr-block">
-            <div class="terminal-title">stderr</div>
-            <pre>{{ outputText(commandResult(latestCommandCard)?.stderr) }}</pre>
-          </div>
-        </article>
-        <p v-else class="empty-state">No command has been proposed in this run yet.</p>
-      </section>
-
-      <section v-else-if="detailTab === 'diff'" class="tab-body diff-body">
-        <article v-for="diff in diffs" :key="diff.path" class="diff-card">
-          <strong>{{ diff.path }}</strong>
-          <pre>{{ diff.diff }}</pre>
-        </article>
-        <p v-if="diffs.length === 0" class="empty-state">No file changes in this run yet.</p>
-      </section>
-
-      <section v-else class="tab-body">
-        <div v-for="check in checks" :key="check.name" class="check-row">
-          <span>{{ check.name }}</span>
-          <strong>{{ check.result }}</strong>
-        </div>
-      </section>
-    </aside>
+    <BottomTerminal :terminal="terminal" />
   </main>
 </template>

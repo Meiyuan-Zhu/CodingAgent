@@ -27,6 +27,7 @@
 | [ADR-0021](0021-model-json-envelope-extraction.md) | 模型 JSON 外壳容错提取 | accepted | 解析器可从 Markdown/prose 外壳中提取第一个 JSON object；真实 demo 修复闭环待验证 |
 | [ADR-0022](0022-model-protocol-repair-retry.md) | 模型协议修复重试 | accepted | 对空 content、不可提取 JSON、不可降级空 message 最多追加协议修复提醒并重试一次；真实 demo 修复闭环待验证 |
 | [ADR-0023](0023-native-tool-calling-protocol.md) | OpenAI-compatible 原生 tool calling 协议 | accepted | native tools 请求/响应、结构化 tool message、JSON content fallback 和 DeepSeek V4 Flash 真实只读 run 已验证 |
+| [ADR-0024](0024-codex-like-workbench-ui-projection.md) | Codex-like 工作台 UI 与事件投影层 | accepted | 前端三栏 + 底部 terminal、Timeline/Inspector 投影层已实现并通过 build/目视检查 |
 
 ## 规则
 

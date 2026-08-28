@@ -45,6 +45,17 @@ export async function fetchRun(runId: string): Promise<RunResponse> {
   return response.json() as Promise<RunResponse>
 }
 
+
+export async function fetchRunEvents(runId: string): Promise<RunEvent[]> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/events`)
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<RunEvent[]>
+}
+
 async function errorMessage(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { message?: string }

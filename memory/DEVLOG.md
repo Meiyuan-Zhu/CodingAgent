@@ -297,3 +297,10 @@
 - 事实：DeepSeek V4 Flash 在 native tool calling 模式下完成真实修复 run `d2f4ab1e-5f4c-4458-9248-c38383aa31fa`：读文件、定位折扣符号错误、提出 `replace_text`、审批后改一行、提出 `run_command`、审批后运行测试并最终总结。
 - 验证：Agent 内部 `run_command` exitCode 0，4 个 unittest 全部 OK；随后外部直接执行同一 unittest，也通过 4 tests, 0 failures, 0 errors。
 - 注意：这次成功基于 ADR-0023 的原生 `tools` / `tool_calls` 协议，和此前 JSON content 协议下 V4 Flash 不稳定的结果应分开解释。
+
+## 2026-08-28：Codex-like 前端工作台重构
+
+- 事实：用户指出旧界面过度暴露原始事件 JSON，缺少 Codex-like 对话体验、权限审批、右侧文件/diff 面板和底部 terminal。
+- 决策：新增 ADR-0024。后端事件协议保持审计语义，前端新增 `run/timeline.ts` 投影层，将事件转换为对话消息、工具卡、审批卡、Inspector 和 Terminal 视图。
+- 实现：拆分 `ProjectSidebar`、`ChatTimeline`、`ApprovalCard`、`ToolCallCard`、`InspectorPane`、`BottomTerminal`、`ComposerBox`，`App.vue` 改为编排状态和 API 调用。
+- 验证：`frontend/` 执行 `npm run build` 通过；浏览器打开 dev server 目视检查三栏 + 底部 terminal，并触发一次 run 到 `run_command` 审批点，确认权限审批卡、文件 Inspector 和命令 terminal 可见。

@@ -711,3 +711,13 @@
 - 外部复核结果：通过，4 tests, 0 failures, 0 errors。
 - Run 结果：`SUCCEEDED` / `COMPLETED`。
 - 限制：当前 `workspaces/demo/src/price_calculator.py` 保留真实模型修复后的未提交修改；如需重新录制从失败到修复，需要再次恢复 failing baseline。
+
+## UI-004 Codex-like 工作台布局与事件投影验证
+
+- 时间：2026-08-28 21:02 CST。
+- 命令：`cd frontend && npm run build`。
+- 结果：通过，Vite production build 成功。
+- 浏览器检查：启动 Vite dev server，实际端口为 `http://localhost:5174/`；页面展示左侧 Project/Runs、中间 Chat Timeline、右侧 Inspector、底部 Terminal。
+- 交互检查：在浏览器点击 Run 后，界面渐进展示 assistant 消息、工具卡片和 `run_command` 权限审批卡；右侧显示已发现文件，底部 Terminal 显示待审批命令。
+- 限制：该阶段使用已有 SSE 事件实现消息级渐进渲染，不是 provider token-level streaming；浏览器检查中未批准命令，未验证完整前端审批后终态。
+- 目视证据：本地临时截图 `tmp/codex-like-ui-check.png`，不纳入提交。
