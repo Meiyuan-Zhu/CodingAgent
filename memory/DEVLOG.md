@@ -275,3 +275,11 @@
 - 事实：真实模型多轮 demo 暴露出空 content、非 JSON、不可降级空 message 等 provider/模型格式漂移；这些失败发生在执行任何新工具动作之前。
 - 决策：新增 ADR-0022。OpenAI-compatible 适配器对可恢复协议问题追加一条协议修复提醒并最多重试一次；工具结构错误、参数错误、未知 finish reason、HTTP 错误、工具/审批/预算错误不重试。
 - 验证：后端 `mvn test` 通过，122 tests, 0 failures, 0 errors；新增测试覆盖空 message 协议修复重试。
+
+## 2026-08-28：真实 demo 修复闭环验证
+
+- DeepSeek V4 Flash 尝试结果：多次真实 run 能完成部分只读步骤，但在读 README 或读源码后出现 provider 空 content、空 message、非 JSON 或无法提取 JSON 的响应；最后一次强约束 run `5016a759-aa62-44f9-86e7-dbc5dcc8180b` 成功读取测试与源码，但在应提出 `replace_text` 的轮次以 `MODEL_PARSE_ERROR` 失败。结论：DeepSeek V4 Flash 当前不适合作为录屏主模型。
+- DeepSeek `deepseek-chat` 强指令 demo 成功：run `546c7fe9-8b05-447b-a25d-87c0ad7dd601` 由真实模型提出 `replace_text`，人工检查并批准后修改 `src/price_calculator.py`；随后真实模型提出 `run_command`，人工检查并批准后运行 unittest。
+- 工具链路证据：`replace_text` 只替换一行，将 `discounted = base * (1 + discount_percent / 100)` 改为 `discounted = base * (1 - discount_percent / 100)`；`run_command` 命令为 `python3 -m unittest discover -s tests -v`，cwd 为 `.`，exit code 为 0。
+- 验证：Agent 工具输出显示 4 个 unittest 全部 OK；随后在 `workspaces/demo` 外部直接执行同一 unittest，也通过 4 tests, 0 failures, 0 errors。
+- 注意：当前 `workspaces/demo/src/price_calculator.py` 保留真实模型修复后的未提交修改，便于检查 diff；如果要录制“从失败到修复”的完整演示，需要先恢复 demo failing baseline。

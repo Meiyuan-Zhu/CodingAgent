@@ -664,3 +664,16 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 122 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：重试发生在模型边界，尚未执行工具动作；工具结构错误、HTTP 错误、审批、预算和工具执行错误不重试。
+
+## REALDEMO-001：真实模型 demo 修复闭环
+
+- 日期：2026-08-28（北京时间）
+- 范围：真实模型调用、本地工具调用、写入审批、命令审批、命令输出回填、最终总结。
+- V4 Flash 结果：未通过。最后一次强约束 run `5016a759-aa62-44f9-86e7-dbc5dcc8180b` 成功读取 `tests/test_price_calculator.py` 和 `src/price_calculator.py`，但在应提出代码修改时以 `MODEL_PARSE_ERROR: Model response is not valid JSON` 失败。
+- 成功模型：DeepSeek `deepseek-chat`，run `546c7fe9-8b05-447b-a25d-87c0ad7dd601`。
+- 审批 1：`replace_text`，toolCallId `fix_discount_bug`，path `src/price_calculator.py`，只替换折扣计算一行。
+- 审批 2：`run_command`，toolCallId `run_tests_after_fix`，command `python3 -m unittest discover -s tests -v`，cwd `.`。
+- Agent 工具结果：`run_command` exitCode 0；stderr 显示 4 个测试 `ok`，`Ran 4 tests ... OK`。
+- 外部复核命令：`cd workspaces/demo && python3 -m unittest discover -s tests -v`
+- 外部复核结果：通过。4 tests, 0 failures, 0 errors。
+- 限制：成功 run 使用强指令提示直接要求 first action 为 `replace_text`，用于验证真实闭环链路；自然语言自主定位 bug 的 DeepSeek 系列 run 尚未稳定通过。
