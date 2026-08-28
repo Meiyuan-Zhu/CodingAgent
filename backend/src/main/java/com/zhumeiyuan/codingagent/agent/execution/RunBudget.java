@@ -26,6 +26,6 @@ public record RunBudget(int maxRounds, int maxToolCalls, int maxContextMessages,
 	}
 
 	public static RunBudget defaults() {
-		return new RunBudget(4, 12, 30, Duration.ofSeconds(5));
+		return new RunBudget(8, 16, 30, Duration.ofSeconds(5));
 	}
 }

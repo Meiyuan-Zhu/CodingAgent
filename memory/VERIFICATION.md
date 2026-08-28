@@ -616,3 +616,11 @@
 - 关联：ADR-0004、ADR-0006、ADR-0014、ADR-0016。
 - 代码版本/运行 ID：`d66e3f6 feat: add failing pricing demo workspace`。
 - 限制：本条只证明 demo 任务基线按预期失败；不证明真实模型已经修复或命令工具已在真实模型 run 中执行。
+
+## MODELAPI-002：真实模型 demo 前置 loop 策略调整回归
+
+- 日期：2026-08-28（北京时间）
+- 范围：`RunBudget` 默认预算、OpenAI-compatible 模型系统提示、provider 缺少 content 时的安全诊断。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 118 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：这验证了预算/提示/诊断调整没有破坏现有后端逻辑；不证明真实模型 demo 修复闭环已成功。

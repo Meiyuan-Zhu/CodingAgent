@@ -238,3 +238,10 @@
 - 更新 `.gitignore` 忽略 `__pycache__/` 与 `*.py[cod]`，避免 demo 测试运行后产生的 Python 缓存误入库。
 - 执行 DEMO-001 验证：在 `workspaces/demo` 运行 unittest，4 个测试中 2 个按预期失败，失败点集中在折扣计算；`cd frontend && npm run build` 通过。
 - 限制：这是故意失败的 demo 基线，不代表主项目构建失败；真实 DeepSeek 修复、写入审批和命令验证尚未执行。
+
+## 2026-08-28：真实模型 demo 首次运行与 loop 策略调整
+
+- 事实：授权后的 DeepSeek V4 Flash demo 修复首次运行已创建 run `34f13ac1-a277-41fe-94fa-c0ef15e045f1`，模型完成 `list_files`、`read_file README.md`、`list_files src`、`list_files tests` 等只读步骤；随后 provider 响应缺少 `choices[0].message.content`，run 以 `MODEL_ERROR` 结束，未进入写入审批，未修改 demo workspace。
+- 调整：新增 ADR-0017，将默认预算从 4 轮/12 工具调用调整到 8 轮/16 工具调用；OpenAI-compatible 系统提示要求真实模型一次最多调用一个工具，并补充 `run_command` argv 示例。
+- 排障：provider 缺少 content 时只记录安全响应形状（`finish_reason` 和 message 字段名），不记录完整原始响应。
+- 验证：后端 `mvn test` 通过，118 tests, 0 failures, 0 errors。

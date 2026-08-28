@@ -34,7 +34,10 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			}
 
 			The message field is required and must never be empty.
-			If you need workspace information or a file change, call one of the available tools.
+			If you need workspace information, a file change, or command output, call one of the available tools.
+			Call at most one tool at a time, then wait for the tool observation before deciding the next step.
+			For code edits, prefer replace_text when changing a small known snippet.
+			For commands, use run_command with an argv array and no shell syntax, for example {"command":["python3","-m","unittest","discover","-s","tests","-v"],"cwd":"."}.
 			If no tool is needed, set finish_reason to "stop", omit tool_calls, and put your final user-facing answer in message.
 			Use only the tools listed below. The application, not you, executes tools and enforces approvals.
 			""";
@@ -150,14 +153,23 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 	private String extractMessageContent(String rawBody) {
 		try {
 			JsonNode root = this.objectMapper.readTree(rawBody);
-			JsonNode content = root.path("choices").path(0).path("message").path("content");
+			JsonNode choice = root.path("choices").path(0);
+			JsonNode message = choice.path("message");
+			JsonNode content = message.path("content");
 			if (!content.isTextual() || content.asText().isBlank()) {
-				throw new ModelClientException("Model provider response does not contain choices[0].message.content");
+				throw new ModelClientException("Model provider response does not contain choices[0].message.content ("
+						+ responseShape(choice, message) + ")");
 			}
 			return content.asText();
 		} catch (JsonProcessingException ex) {
 			throw new ModelClientException("Model provider response is not valid JSON", ex);
 		}
+	}
+
+	private String responseShape(JsonNode choice, JsonNode message) {
+		List<String> fields = new ArrayList<>();
+		message.fieldNames().forEachRemaining(fields::add);
+		return "finish_reason=" + choice.path("finish_reason").asText("missing") + ", message_fields=" + fields;
 	}
 
 	private boolean isBlank(String value) {

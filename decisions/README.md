@@ -14,12 +14,13 @@
 | [ADR-0008](0008-run-api-sse-mock-runner.md) | Run API、SSE 事件流与 mock runner | accepted | 后端 run 创建/查询/事件回看/SSE 和前端 Run 交互已验证 |
 | [ADR-0009](0009-workspace-write-edit-tools.md) | Workspace 写入与文本编辑工具 | accepted | `write_file`、`replace_text`、hash 冲突检测和注册表接入已验证 |
 | [ADR-0010](0010-model-boundary-response-parser.md) | 模型适配边界与响应解析器 | accepted | 模型请求/响应边界、JSON 解析、mock 客户端接入和解析失败终止已验证；真实 API 接入由 ADR-0015 补充 |
-| [ADR-0011](0011-agent-loop-budget.md) | 多轮 Agent loop 与运行预算 | accepted | 多轮模型/工具循环、轮次上限、工具调用上限和上下文消息窗口已验证；真实 DeepSeek 只读 run 由 ADR-0015 补充验证 |
+| [ADR-0011](0011-agent-loop-budget.md) | 多轮 Agent loop 与运行预算 | superseded | 多轮模型/工具循环、轮次上限、工具调用上限和上下文消息窗口已验证；默认预算和真实模型单工具轮次策略由 ADR-0017 部分取代 |
 | [ADR-0012](0012-run-cancellation-timeout-lifecycle.md) | Run 取消、超时与后台任务生命周期 | accepted | 取消 API、后台任务句柄、工具超时和前端 Cancel 入口已验证；命令进程级取消未实现 |
 | [ADR-0013](0013-approval-policy-diff-display.md) | 审批策略与 diff/变更展示 | superseded | 可变更工具审批策略、审批事件、写入/替换 diff 元数据和前端 Diff 面板已验证；审批恢复限制被 ADR-0014 取代 |
 | [ADR-0014](0014-approval-resume-workflow.md) | 审批后的 Agent 恢复执行工作流 | accepted | Approve/Reject API、pending approval continuation、前端审批按钮和审批后 diff 闭环已验证 |
 | [ADR-0015](0015-openai-compatible-deepseek-model-adapter.md) | OpenAI-compatible DeepSeek 模型适配器 | accepted | DeepSeek V4 Flash 配置、HTTP 客户端、环境变量密钥读取、替身 HTTP 测试和授权后的真实只读 run 已验证 |
 | [ADR-0016](0016-workspace-command-tool.md) | Workspace 命令执行工具 | accepted | `run_command` 已接入工具注册表、审批策略和 mock HTTP 审批闭环；真实模型命令 run 尚未验证 |
+| [ADR-0017](0017-real-model-demo-loop-budget.md) | 真实模型 demo 的单工具轮次策略与预算调整 | accepted | 默认预算调整为 8 轮/16 工具调用，模型提示要求一次最多一个工具；真实 demo 修复闭环待验证 |
 
 ## 规则
 

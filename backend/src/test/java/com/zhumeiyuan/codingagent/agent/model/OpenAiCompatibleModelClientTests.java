@@ -84,7 +84,8 @@ class OpenAiCompatibleModelClientTests {
 
 		assertThatThrownBy(() -> client.complete(new ModelRequest(List.of(ModelMessage.user("hi")), List.of())))
 				.isInstanceOf(ModelClientException.class)
-				.hasMessageContaining("choices[0].message.content");
+				.hasMessageContaining("choices[0].message.content")
+				.hasMessageContaining("message_fields");
 	}
 
 	private String completionResponse(String content) throws Exception {
