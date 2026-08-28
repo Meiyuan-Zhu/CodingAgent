@@ -22,6 +22,7 @@ import com.zhumeiyuan.codingagent.agent.model.ModelResponse;
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEvent;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
+import com.zhumeiyuan.codingagent.agent.run.RunStatus;
 import com.zhumeiyuan.codingagent.agent.run.StopReason;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.run.ToolResult;
@@ -243,7 +244,7 @@ class MockAgentRunnerTests {
 	}
 
 	@Test
-	void mutationToolRequiresApprovalAndIsNotExecuted() {
+	void mutationToolWaitsForApprovalAndIsNotExecuted() {
 		AgentRunStore store = new AgentRunStore();
 		AgentRun run = store.create(this.clock);
 		AtomicBoolean toolExecuted = new AtomicBoolean(false);
@@ -261,11 +262,12 @@ class MockAgentRunnerTests {
 		runner.run(run.id(), "write a file");
 
 		assertThat(toolExecuted).isFalse();
-		assertThat(store.get(run.id()).status().name()).isEqualTo("FAILED");
-		assertThat(store.get(run.id()).stopReason()).isEqualTo(StopReason.APPROVAL_REJECTED);
+		assertThat(store.get(run.id()).status()).isEqualTo(RunStatus.WAITING_FOR_APPROVAL);
+		assertThat(store.get(run.id()).stopReason()).isNull();
 		assertThat(store.listEvents(run.id(), -1)).extracting(RunEvent::type)
-				.contains(RunEventType.APPROVAL_REQUIRED, RunEventType.APPROVAL_RESOLVED, RunEventType.RUN_FINISHED)
-				.doesNotContain(RunEventType.TOOL_CALL_STARTED);
+				.contains(RunEventType.APPROVAL_REQUIRED)
+				.doesNotContain(RunEventType.APPROVAL_RESOLVED, RunEventType.RUN_FINISHED,
+						RunEventType.TOOL_CALL_STARTED);
 	}
 
 	private ToolRegistry registryReturningSuccess() {

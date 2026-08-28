@@ -49,6 +49,16 @@ class RunController {
 		return RunResponse.from(this.agentRunService.cancelRun(RunId.from(runId)));
 	}
 
+	@PostMapping("/{runId}/approvals/{toolCallId}/approve")
+	RunResponse approveToolCall(@PathVariable String runId, @PathVariable String toolCallId) {
+		return RunResponse.from(this.agentRunService.approveToolCall(RunId.from(runId), toolCallId));
+	}
+
+	@PostMapping("/{runId}/approvals/{toolCallId}/reject")
+	RunResponse rejectToolCall(@PathVariable String runId, @PathVariable String toolCallId) {
+		return RunResponse.from(this.agentRunService.rejectToolCall(RunId.from(runId), toolCallId));
+	}
+
 	@GetMapping("/{runId}/events")
 	List<RunEvent> listRunEvents(@PathVariable String runId,
 			@RequestParam(name = "after", defaultValue = "-1") long afterSequence) {

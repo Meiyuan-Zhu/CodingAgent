@@ -9,6 +9,8 @@ import java.util.function.UnaryOperator;
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEvent;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
+import com.zhumeiyuan.codingagent.agent.run.RunStatus;
+import com.zhumeiyuan.codingagent.agent.run.StopReason;
 import com.zhumeiyuan.codingagent.agent.run.RunId;
 
 public class AgentRunService {
@@ -51,7 +53,39 @@ public class AgentRunService {
 		}
 		emit(runId, RunEventType.RUN_CANCELLING, Map.of("reason", "user_requested"));
 		boolean interruptRequested = this.runTaskManager.cancel(runId);
+		this.store.clearPendingApproval(runId);
 		return completeCancellation(runId, interruptRequested);
+	}
+
+	public AgentRun approveToolCall(RunId runId, String toolCallId) {
+		PendingToolApproval approval = consumeWaitingApproval(runId, toolCallId);
+		this.store.transition(runId, run -> run.resumeAfterApproval(this.clock));
+		emit(runId, RunEventType.APPROVAL_RESOLVED, Map.of(
+				"round", approval.round(),
+				"toolCallId", approval.toolCall().id(),
+				"name", approval.toolCall().name(),
+				"approved", true,
+				"reason", "user_approved"));
+		this.runTaskManager.start(runId, () -> this.mockAgentRunner.resumeAfterApproval(approval));
+		return getRun(runId);
+	}
+
+	public AgentRun rejectToolCall(RunId runId, String toolCallId) {
+		PendingToolApproval approval = consumeWaitingApproval(runId, toolCallId);
+		emit(runId, RunEventType.APPROVAL_RESOLVED, Map.of(
+				"round", approval.round(),
+				"toolCallId", approval.toolCall().id(),
+				"name", approval.toolCall().name(),
+				"approved", false,
+				"reason", "user_rejected"));
+		this.store.transition(runId, run -> run.fail(StopReason.APPROVAL_REJECTED,
+				"User rejected tool call: " + approval.toolCall().name(), this.clock));
+		AgentRun rejected = getRun(runId);
+		emit(runId, RunEventType.RUN_FINISHED, Map.of(
+				"status", rejected.status().name(),
+				"stopReason", rejected.stopReason().name(),
+				"errorMessage", rejected.errorMessage()));
+		return getRun(runId);
 	}
 
 	public AgentRun getRun(RunId runId) {
@@ -70,6 +104,14 @@ public class AgentRunService {
 		RunEvent event = this.store.appendEvent(runId, type, payload, this.clock);
 		this.runEventStream.publish(event, getRun(runId).status().isTerminal());
 		return event;
+	}
+
+	private PendingToolApproval consumeWaitingApproval(RunId runId, String toolCallId) {
+		AgentRun run = getRun(runId);
+		if (run.status() != RunStatus.WAITING_FOR_APPROVAL) {
+			throw new IllegalArgumentException("Run is not waiting for approval");
+		}
+		return this.store.consumePendingApproval(runId, toolCallId);
 	}
 
 	private AgentRun completeCancellation(RunId runId, boolean interruptRequested) {

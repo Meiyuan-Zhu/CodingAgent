@@ -39,6 +39,19 @@ public class AgentRunStore {
 		return stored(runId).appendEvent(type, payload, clock);
 	}
 
+	public void savePendingApproval(PendingToolApproval approval) {
+		Objects.requireNonNull(approval, "approval");
+		stored(approval.runId()).savePendingApproval(approval);
+	}
+
+	public PendingToolApproval consumePendingApproval(RunId runId, String toolCallId) {
+		return stored(runId).consumePendingApproval(toolCallId);
+	}
+
+	public void clearPendingApproval(RunId runId) {
+		stored(runId).clearPendingApproval();
+	}
+
 	public List<RunEvent> listEvents(RunId runId, long afterSequence) {
 		return stored(runId).eventsAfter(afterSequence);
 	}
@@ -55,6 +68,7 @@ public class AgentRunStore {
 	private static final class StoredRun {
 
 		private AgentRun run;
+		private PendingToolApproval pendingApproval;
 		private final List<RunEvent> events = new ArrayList<>();
 
 		private StoredRun(AgentRun run) {
@@ -75,6 +89,31 @@ public class AgentRunStore {
 			this.run = envelope.run();
 			this.events.add(envelope.event());
 			return envelope.event();
+		}
+
+		private synchronized void savePendingApproval(PendingToolApproval approval) {
+			if (this.pendingApproval != null) {
+				throw new IllegalStateException("Run already has a pending approval");
+			}
+			this.pendingApproval = approval;
+		}
+
+		private synchronized PendingToolApproval consumePendingApproval(String toolCallId) {
+			Objects.requireNonNull(toolCallId, "toolCallId");
+			if (this.pendingApproval == null) {
+				throw new IllegalArgumentException("Run has no pending approval");
+			}
+			if (!this.pendingApproval.toolCall().id().equals(toolCallId)) {
+				throw new IllegalArgumentException("Pending approval is for tool call "
+						+ this.pendingApproval.toolCall().id());
+			}
+			PendingToolApproval approval = this.pendingApproval;
+			this.pendingApproval = null;
+			return approval;
+		}
+
+		private synchronized void clearPendingApproval() {
+			this.pendingApproval = null;
 		}
 
 		private synchronized List<RunEvent> eventsAfter(long afterSequence) {

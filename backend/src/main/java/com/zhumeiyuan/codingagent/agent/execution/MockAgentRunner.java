@@ -81,67 +81,7 @@ public class MockAgentRunner {
 			List<ModelMessage> messages = new ArrayList<>();
 			messages.add(ModelMessage.system(SYSTEM_PROMPT));
 			messages.add(ModelMessage.user(prompt));
-			int toolCallsUsed = 0;
-
-			for (int round = 1; round <= this.runBudget.maxRounds(); round++) {
-				if (stopIfCancellationRequested(runId)) {
-					return;
-				}
-				List<ModelMessage> context = contextWindow(messages);
-				List<String> toolNames = this.toolRegistry.definitions().stream().map(ToolDefinition::name).toList();
-				emit(runId, RunEventType.MODEL_REQUESTED, Map.of(
-						"provider", "mock",
-						"round", round,
-						"availableTools", toolNames,
-						"contextMessages", context.size(),
-						"toolCallsUsed", toolCallsUsed));
-
-				ModelResponse response = this.modelClient.complete(new ModelRequest(context, this.toolRegistry.definitions()));
-				if (stopIfCancellationRequested(runId)) {
-					return;
-				}
-				emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of(
-						"mock", true,
-						"round", round,
-						"content", response.message(),
-						"finishReason", response.finishReason().name()));
-				messages.add(ModelMessage.assistant(response.message()));
-
-				if (response.finishReason() == ModelFinishReason.STOP) {
-					finishSuccessfully(runId, round, toolCallsUsed);
-					return;
-				}
-				if (response.finishReason() == ModelFinishReason.LENGTH) {
-					fail(runId, StopReason.TOKEN_BUDGET_LIMIT, "Model response stopped because of length limit");
-					return;
-				}
-
-				List<ToolCall> calls = response.toolCalls();
-				if (toolCallsUsed + calls.size() > this.runBudget.maxToolCalls()) {
-					fail(runId, StopReason.TOOL_CALL_LIMIT,
-							"Run exceeded tool call limit of " + this.runBudget.maxToolCalls());
-					return;
-				}
-
-				for (ToolCall call : calls) {
-					if (stopIfCancellationRequested(runId)) {
-						return;
-					}
-					ToolResult result = executeTool(runId, round, call);
-					if (result == null || isTerminal(runId)) {
-						return;
-					}
-					toolCallsUsed++;
-					messages.add(ModelMessage.tool(toolObservation(call, result)));
-					if (!result.success()) {
-						StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
-						fail(runId, stopReason, result.content());
-						return;
-					}
-				}
-			}
-
-			fail(runId, StopReason.ROUND_LIMIT, "Run exceeded round limit of " + this.runBudget.maxRounds());
+			continueRunLoop(runId, messages, 1, 0);
 		} catch (ModelParseException ex) {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
@@ -149,6 +89,98 @@ public class MockAgentRunner {
 				fail(runId, StopReason.INTERNAL_ERROR, "Mock runner failed");
 			}
 		}
+	}
+
+	public void resumeAfterApproval(PendingToolApproval approval) {
+		Objects.requireNonNull(approval, "approval");
+		RunId runId = approval.runId();
+		try {
+			if (stopIfCancellationRequested(runId)) {
+				return;
+			}
+			ToolCall call = approval.toolCall();
+			ToolResult result = executeApprovedTool(runId, approval.round(), call);
+			if (result == null || isTerminal(runId)) {
+				return;
+			}
+			int toolCallsUsed = approval.toolCallsUsed() + 1;
+			List<ModelMessage> messages = new ArrayList<>(approval.messages());
+			messages.add(ModelMessage.tool(toolObservation(call, result)));
+			if (!result.success()) {
+				StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
+				fail(runId, stopReason, result.content());
+				return;
+			}
+			continueRunLoop(runId, messages, approval.round() + 1, toolCallsUsed);
+		} catch (ModelParseException ex) {
+			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
+		} catch (RuntimeException ex) {
+			if (!stopIfCancellationRequested(runId)) {
+				fail(runId, StopReason.INTERNAL_ERROR, "Mock runner failed");
+			}
+		}
+	}
+
+	private void continueRunLoop(RunId runId, List<ModelMessage> messages, int firstRound, int toolCallsUsed) {
+		for (int round = firstRound; round <= this.runBudget.maxRounds(); round++) {
+			if (stopIfCancellationRequested(runId)) {
+				return;
+			}
+			List<ModelMessage> context = contextWindow(messages);
+			List<String> toolNames = this.toolRegistry.definitions().stream().map(ToolDefinition::name).toList();
+			emit(runId, RunEventType.MODEL_REQUESTED, Map.of(
+					"provider", "mock",
+					"round", round,
+					"availableTools", toolNames,
+					"contextMessages", context.size(),
+					"toolCallsUsed", toolCallsUsed));
+
+			ModelResponse response = this.modelClient.complete(new ModelRequest(context, this.toolRegistry.definitions()));
+			if (stopIfCancellationRequested(runId)) {
+				return;
+			}
+			emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of(
+					"mock", true,
+					"round", round,
+					"content", response.message(),
+					"finishReason", response.finishReason().name()));
+			messages.add(ModelMessage.assistant(response.message()));
+
+			if (response.finishReason() == ModelFinishReason.STOP) {
+				finishSuccessfully(runId, round, toolCallsUsed);
+				return;
+			}
+			if (response.finishReason() == ModelFinishReason.LENGTH) {
+				fail(runId, StopReason.TOKEN_BUDGET_LIMIT, "Model response stopped because of length limit");
+				return;
+			}
+
+			List<ToolCall> calls = response.toolCalls();
+			if (toolCallsUsed + calls.size() > this.runBudget.maxToolCalls()) {
+				fail(runId, StopReason.TOOL_CALL_LIMIT,
+						"Run exceeded tool call limit of " + this.runBudget.maxToolCalls());
+				return;
+			}
+
+			for (ToolCall call : calls) {
+				if (stopIfCancellationRequested(runId)) {
+					return;
+				}
+				ToolResult result = executeTool(runId, round, call, messages, toolCallsUsed);
+				if (result == null || isTerminal(runId)) {
+					return;
+				}
+				toolCallsUsed++;
+				messages.add(ModelMessage.tool(toolObservation(call, result)));
+				if (!result.success()) {
+					StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
+					fail(runId, stopReason, result.content());
+					return;
+				}
+			}
+		}
+
+		fail(runId, StopReason.ROUND_LIMIT, "Run exceeded round limit of " + this.runBudget.maxRounds());
 	}
 
 	private List<ModelMessage> contextWindow(List<ModelMessage> messages) {
@@ -166,7 +198,7 @@ public class MockAgentRunner {
 		return List.copyOf(window);
 	}
 
-	private ToolResult executeTool(RunId runId, int round, ToolCall call) {
+	private ToolResult executeTool(RunId runId, int round, ToolCall call, List<ModelMessage> messages, int toolCallsUsed) {
 		ToolApprovalDecision approval = this.toolApprovalPolicy.decide(call);
 		emit(runId, RunEventType.TOOL_CALL_REQUESTED, Map.of(
 				"round", round,
@@ -175,9 +207,13 @@ public class MockAgentRunner {
 				"arguments", call.arguments(),
 				"approval", approvalPayload(approval)));
 		if (approval.requiresUserApproval()) {
-			requestApproval(runId, round, call, approval);
+			requestApproval(runId, round, call, approval, messages, toolCallsUsed);
 			return null;
 		}
+		return executeApprovedTool(runId, round, call);
+	}
+
+	private ToolResult executeApprovedTool(RunId runId, int round, ToolCall call) {
 		emit(runId, RunEventType.TOOL_CALL_STARTED, Map.of("round", round, "toolCallId", call.id(), "name", call.name()));
 		ToolResult result = executeToolWithTimeout(runId, call);
 		if (result == null || isTerminal(runId)) {
@@ -193,7 +229,9 @@ public class MockAgentRunner {
 		return result;
 	}
 
-	private void requestApproval(RunId runId, int round, ToolCall call, ToolApprovalDecision approval) {
+	private void requestApproval(RunId runId, int round, ToolCall call, ToolApprovalDecision approval,
+			List<ModelMessage> messages, int toolCallsUsed) {
+		this.store.savePendingApproval(new PendingToolApproval(runId, round, call, approval, messages, toolCallsUsed));
 		this.store.transition(runId, run -> run.waitForApproval(this.clock));
 		emit(runId, RunEventType.APPROVAL_REQUIRED, Map.of(
 				"round", round,
@@ -201,14 +239,6 @@ public class MockAgentRunner {
 				"name", call.name(),
 				"arguments", call.arguments(),
 				"approval", approvalPayload(approval)));
-		emit(runId, RunEventType.APPROVAL_RESOLVED, Map.of(
-				"round", round,
-				"toolCallId", call.id(),
-				"name", call.name(),
-				"approved", false,
-				"reason", "approval_resume_api_not_implemented"));
-		fail(runId, StopReason.APPROVAL_REJECTED,
-				"Tool requires user approval before execution: " + call.name());
 	}
 
 	private Map<String, Object> approvalPayload(ToolApprovalDecision approval) {

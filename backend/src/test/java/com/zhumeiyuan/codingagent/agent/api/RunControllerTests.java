@@ -80,6 +80,23 @@ class RunControllerTests {
 				.andExpect(jsonPath("$.id").value(runId));
 	}
 
+
+	@Test
+	void rejectApprovalEndpointReturnsFailedRun() throws Exception {
+		MvcResult createResult = this.mvc.perform(post("/api/runs")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"prompt\":\"please write a note\"}"))
+				.andExpect(status().isAccepted())
+				.andReturn();
+		String runId = this.objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
+		waitForStatus(runId, "WAITING_FOR_APPROVAL");
+
+		this.mvc.perform(post("/api/runs/{runId}/approvals/{toolCallId}/reject", runId, "mock-call-1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("FAILED"))
+				.andExpect(jsonPath("$.stopReason").value("APPROVAL_REJECTED"));
+	}
+
 	@Test
 	void eventStreamEndpointStartsAsyncResponse() throws Exception {
 		MvcResult createResult = this.mvc.perform(post("/api/runs")
@@ -91,5 +108,19 @@ class RunControllerTests {
 
 		this.mvc.perform(get("/api/runs/{runId}/events/stream", runId).accept(MediaType.TEXT_EVENT_STREAM))
 				.andExpect(request().asyncStarted());
+	}
+
+	private void waitForStatus(String runId, String expectedStatus) throws Exception {
+		for (int index = 0; index < 40; index++) {
+			MvcResult result = this.mvc.perform(get("/api/runs/{runId}", runId))
+					.andExpect(status().isOk())
+					.andReturn();
+			String status = this.objectMapper.readTree(result.getResponse().getContentAsString()).get("status").asText();
+			if (expectedStatus.equals(status)) {
+				return;
+			}
+			Thread.sleep(25);
+		}
+		throw new AssertionError("Run did not reach status " + expectedStatus);
 	}
 }

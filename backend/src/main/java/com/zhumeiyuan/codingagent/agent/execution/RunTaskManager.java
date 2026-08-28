@@ -25,8 +25,15 @@ public class RunTaskManager {
 			task.run();
 			return null;
 		});
-		Future<?> previous = this.activeTasks.putIfAbsent(runId, futureTask);
-		if (previous != null) {
+		while (true) {
+			Future<?> previous = this.activeTasks.putIfAbsent(runId, futureTask);
+			if (previous == null) {
+				break;
+			}
+			if (previous.isDone()) {
+				this.activeTasks.remove(runId, previous);
+				continue;
+			}
 			throw new IllegalStateException("Run already has an active task: " + runId.value());
 		}
 		this.executor.execute(() -> {

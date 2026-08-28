@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchHealth, type HealthResponse } from './api/health'
-import { cancelRun, createRun, fetchRun, type RunEvent, type RunResponse } from './api/runs'
+import { approveToolCall, cancelRun, createRun, fetchRun, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
 
 const health = ref<HealthResponse | null>(null)
 const loading = ref(true)
@@ -10,6 +10,7 @@ const detailTab = ref<'files' | 'diff' | 'checks'>('files')
 const taskDraft = ref('List files in the demo workspace')
 const submitting = ref(false)
 const cancelling = ref(false)
+const resolvingApproval = ref(false)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
@@ -56,6 +57,7 @@ const checks = computed(() => [
   { name: 'Backend mock runner', result: 'wired' },
   { name: 'Tool registry', result: 'wired' },
   { name: 'SSE run events', result: activeRun.value ? activeRun.value.status.toLowerCase() : 'ready' },
+  { name: 'Approval flow', result: pendingApproval.value ? 'waiting' : 'ready' },
 ])
 
 const statusLabel = computed(() => {
@@ -66,12 +68,37 @@ const statusLabel = computed(() => {
 
 const terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED']
 
+const pendingApproval = computed(() => {
+  const resolvedIds = new Set(
+    events.value
+      .filter((event) => event.type === 'APPROVAL_RESOLVED')
+      .map((event) => String(event.payload.toolCallId ?? '')),
+  )
+
+  for (const event of [...events.value].reverse()) {
+    if (event.type !== 'APPROVAL_REQUIRED') continue
+    const toolCallId = String(event.payload.toolCallId ?? '')
+    if (!toolCallId || resolvedIds.has(toolCallId)) continue
+    return {
+      toolCallId,
+      name: String(event.payload.name ?? 'tool'),
+      arguments: event.payload.arguments,
+      reason: approvalReason(event),
+    }
+  }
+  return null
+})
+
 const runButtonDisabled = computed(() => {
   return submitting.value || loading.value || !!error.value || taskDraft.value.trim().length === 0
 })
 
 const cancelButtonDisabled = computed(() => {
   return cancelling.value || !activeRun.value || terminalStatuses.includes(activeRun.value.status)
+})
+
+const approvalButtonDisabled = computed(() => {
+  return resolvingApproval.value || !activeRun.value || activeRun.value.status !== 'WAITING_FOR_APPROVAL' || !pendingApproval.value
 })
 
 onMounted(async () => {
@@ -157,6 +184,36 @@ function upsertEvent(event: RunEvent) {
   }
 }
 
+async function approvePendingTool() {
+  if (approvalButtonDisabled.value || !activeRun.value || !pendingApproval.value) return
+  resolvingApproval.value = true
+  runError.value = null
+  try {
+    const run = await approveToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    activeRun.value = run
+    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to approve tool call'
+  } finally {
+    resolvingApproval.value = false
+  }
+}
+
+async function rejectPendingTool() {
+  if (approvalButtonDisabled.value || !activeRun.value || !pendingApproval.value) return
+  resolvingApproval.value = true
+  runError.value = null
+  try {
+    const run = await rejectToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    activeRun.value = run
+    runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : 'Failed to reject tool call'
+  } finally {
+    resolvingApproval.value = false
+  }
+}
+
 async function cancelActiveRun() {
   if (cancelButtonDisabled.value || !activeRun.value) return
   cancelling.value = true
@@ -206,6 +263,11 @@ function eventTitle(event: RunEvent) {
     RUN_FINISHED: 'Run finished',
   }
   return titles[event.type] ?? event.type
+}
+
+function approvalReason(event: RunEvent) {
+  const approval = event.payload.approval as { reason?: unknown } | undefined
+  return typeof approval?.reason === 'string' ? approval.reason : 'This tool requires approval before it can run.'
 }
 
 function eventDetail(event: RunEvent) {
@@ -264,8 +326,8 @@ function truncate(value: string, limit: number) {
         <article v-if="!activeRun" class="message assistant-message">
           <p class="message-role">Assistant</p>
           <p>
-            This workbench is now wired to the backend mock runner. Submit a task to create a real
-            run, stream SSE events, and execute read-only workspace tools through the registry.
+            This workbench is wired to the backend mock runner. Submit a task to create a run, stream
+            SSE events, request approval for workspace changes, and inspect resulting diffs.
           </p>
         </article>
 
@@ -291,6 +353,21 @@ function truncate(value: string, limit: number) {
             </div>
           </li>
         </ol>
+
+        <section v-if="pendingApproval" class="approval-panel" aria-label="Pending tool approval">
+          <p class="eyebrow">Approval required</p>
+          <h3>{{ pendingApproval.name }}</h3>
+          <p>{{ pendingApproval.reason }}</p>
+          <pre>{{ JSON.stringify(pendingApproval.arguments, null, 2) }}</pre>
+          <div class="approval-actions">
+            <button type="button" :disabled="approvalButtonDisabled" @click="approvePendingTool">
+              {{ resolvingApproval ? 'Resolving' : 'Approve and run' }}
+            </button>
+            <button class="secondary-action danger-action" type="button" :disabled="approvalButtonDisabled" @click="rejectPendingTool">
+              Reject
+            </button>
+          </div>
+        </section>
 
         <p v-if="runError" class="error-text">{{ runError }}</p>
 

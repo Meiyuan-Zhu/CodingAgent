@@ -66,3 +66,29 @@ export async function cancelRun(runId: string): Promise<RunResponse> {
 
   return response.json() as Promise<RunResponse>
 }
+
+export async function approveToolCall(runId: string, toolCallId: string): Promise<RunResponse> {
+  const response = await fetch(
+    `/api/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(toolCallId)}/approve`,
+    { method: 'POST' },
+  )
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<RunResponse>
+}
+
+export async function rejectToolCall(runId: string, toolCallId: string): Promise<RunResponse> {
+  const response = await fetch(
+    `/api/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(toolCallId)}/reject`,
+    { method: 'POST' },
+  )
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<RunResponse>
+}
