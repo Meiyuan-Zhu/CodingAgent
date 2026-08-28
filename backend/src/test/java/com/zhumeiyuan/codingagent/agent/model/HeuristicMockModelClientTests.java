@@ -48,6 +48,16 @@ class HeuristicMockModelClientTests {
 	}
 
 	@Test
+	void choosesRunCommandToolForCommandPrompt() {
+		ModelResponse response = this.client.complete(request("please run tests"));
+
+		assertThat(response.toolCalls()).singleElement().satisfies(call -> {
+			assertThat(call.name()).isEqualTo("run_command");
+			assertThat(call.arguments()).containsKey("command");
+		});
+	}
+
+	@Test
 	void defaultsToListFiles() {
 		ModelResponse response = this.client.complete(request("inspect the workspace"));
 

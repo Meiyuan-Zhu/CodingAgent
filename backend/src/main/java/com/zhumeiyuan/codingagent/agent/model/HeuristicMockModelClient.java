@@ -48,6 +48,11 @@ public class HeuristicMockModelClient implements ModelClient {
 			return response("Mock model asks to search workspace text.", "search_text",
 					"{\"query\":\"agent\",\"max_matches\":10}");
 		}
+		if (lowerPrompt.contains("test") || lowerPrompt.contains("command") || lowerPrompt.contains("build")
+				|| userPrompt.contains("命令") || userPrompt.contains("测试") || userPrompt.contains("构建")) {
+			return response("Mock model asks to run a workspace command.", "run_command",
+					"{\"command\":[\"/bin/echo\",\"mock command\"],\"cwd\":\".\"}");
+		}
 		return response("Mock model asks to inspect workspace files.", "list_files",
 				"{\"path\":\".\",\"max_entries\":50}");
 	}

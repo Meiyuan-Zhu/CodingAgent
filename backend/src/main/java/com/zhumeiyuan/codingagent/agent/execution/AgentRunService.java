@@ -115,12 +115,10 @@ public class AgentRunService {
 	}
 
 	private AgentRun completeCancellation(RunId runId, boolean interruptRequested) {
-		AgentRun current = getRun(runId);
-		if (current.status().isTerminal()) {
-			return current;
+		AgentRun cancelled = this.store.transition(runId, run -> run.status().isTerminal() ? run : run.cancel(this.clock));
+		if (cancelled.status() != RunStatus.CANCELLED) {
+			return cancelled;
 		}
-		this.store.transition(runId, run -> run.cancel(this.clock));
-		AgentRun cancelled = getRun(runId);
 		emit(runId, RunEventType.RUN_FINISHED, Map.of(
 				"status", cancelled.status().name(),
 				"stopReason", cancelled.stopReason().name(),

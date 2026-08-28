@@ -1,8 +1,10 @@
 package com.zhumeiyuan.codingagent.agent.tool;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,6 +35,17 @@ class ToolArgumentReaderTests {
 
 		assertThatCode(() -> empty.requiredText("content")).doesNotThrowAnyException();
 		assertToolError(() -> wrongType.requiredText("content"), ToolExecutionErrorCode.INVALID_ARGUMENTS);
+	}
+
+	@Test
+	void requiredStringListCopiesValidStringsAndRejectsBadItems() {
+		ToolArgumentReader valid = new ToolArgumentReader("demo_tool", Map.of("command", List.of("mvn", "test")));
+		ToolArgumentReader blank = new ToolArgumentReader("demo_tool", Map.of("command", List.of("mvn", " ")));
+		ToolArgumentReader wrong = new ToolArgumentReader("demo_tool", Map.of("command", "mvn test"));
+
+		assertThat(valid.requiredStringList("command", 4)).containsExactly("mvn", "test");
+		assertToolError(() -> blank.requiredStringList("command", 4), ToolExecutionErrorCode.INVALID_ARGUMENTS);
+		assertToolError(() -> wrong.requiredStringList("command", 4), ToolExecutionErrorCode.INVALID_ARGUMENTS);
 	}
 
 	@Test

@@ -2,6 +2,7 @@ package com.zhumeiyuan.codingagent.agent.tool.workspace;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.tool.RegisteredTool;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceCommandTools;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceReadTools;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
@@ -34,5 +35,10 @@ class WorkspaceToolConfiguration {
 	@Bean
 	RegisteredTool replaceTextTool(WorkspaceWriteTools workspaceWriteTools, ObjectMapper objectMapper) {
 		return WorkspaceToolFactory.replaceText(workspaceWriteTools, objectMapper);
+	}
+
+	@Bean
+	RegisteredTool runCommandTool(WorkspaceCommandTools workspaceCommandTools, ObjectMapper objectMapper) {
+		return WorkspaceToolFactory.runCommand(workspaceCommandTools, objectMapper);
 	}
 }

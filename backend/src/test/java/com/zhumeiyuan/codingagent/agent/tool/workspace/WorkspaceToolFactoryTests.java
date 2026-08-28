@@ -20,6 +20,7 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolDefinition;
 import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionErrorCode;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspacePathResolver;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceCommandTools;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceReadTools;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
@@ -46,12 +47,14 @@ class WorkspaceToolFactoryTests {
 		WorkspacePathResolver resolver = new WorkspacePathResolver(root);
 		WorkspaceReadTools workspaceReadTools = new WorkspaceReadTools(resolver);
 		WorkspaceWriteTools workspaceWriteTools = new WorkspaceWriteTools(resolver);
+		WorkspaceCommandTools workspaceCommandTools = new WorkspaceCommandTools(resolver, this.clock);
 		this.registry = new ToolRegistry(List.of(
 				WorkspaceToolFactory.listFiles(workspaceReadTools, this.objectMapper),
 				WorkspaceToolFactory.readFile(workspaceReadTools, this.objectMapper),
 				WorkspaceToolFactory.searchText(workspaceReadTools, this.objectMapper),
 				WorkspaceToolFactory.writeFile(workspaceWriteTools, this.objectMapper),
-				WorkspaceToolFactory.replaceText(workspaceWriteTools, this.objectMapper)),
+				WorkspaceToolFactory.replaceText(workspaceWriteTools, this.objectMapper),
+				WorkspaceToolFactory.runCommand(workspaceCommandTools, this.objectMapper)),
 				this.clock);
 	}
 
@@ -60,7 +63,7 @@ class WorkspaceToolFactoryTests {
 		List<ToolDefinition> definitions = this.registry.definitions();
 
 		assertThat(definitions).extracting(ToolDefinition::name)
-				.containsExactly("list_files", "read_file", "replace_text", "search_text", "write_file");
+				.containsExactly("list_files", "read_file", "replace_text", "run_command", "search_text", "write_file");
 		assertThat(definitions.get(1).inputSchema()).containsEntry("additionalProperties", false);
 		assertThat(definitions.get(1).inputSchema()).containsEntry("required", List.of("path"));
 	}
@@ -140,6 +143,18 @@ class WorkspaceToolFactoryTests {
 		assertThat(json.get("path").asText()).isEqualTo("README.md");
 		assertThat(json.get("replacements").asInt()).isEqualTo(1);
 		assertThat(json.get("unifiedDiff").asText()).contains("-hello agent", "+agent");
+	}
+
+	@Test
+	void runCommandToolReturnsExitCodeAndCapturedOutput() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "run_command",
+				Map.of("command", List.of("/bin/echo", "hello"), "cwd", ".", "max_output_chars", 1000)));
+
+		assertThat(result.success()).isTrue();
+		assertThat(result.metadata()).containsEntry("toolName", "run_command").containsEntry("cwd", ".");
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("exitCode").asInt()).isEqualTo(0);
+		assertThat(json.get("stdout").asText()).contains("hello");
 	}
 
 	@Test

@@ -202,3 +202,15 @@
 - 验证 run `eade6508-edad-476f-986c-5d48ef18458a` 成功：DeepSeek V4 Flash 三轮模型循环，调用 `list_files` 和 `read_file`，最终以中文总结结束，状态 `SUCCEEDED / COMPLETED`。
 - 后端测试通过 108 tests。
 - 限制：真实写入审批、取消、超时、命令工具和浏览器 UI 下的 DeepSeek run 尚未验证。
+
+## 2026-08-28：子任务 12 - Workspace 命令执行工具
+
+- 目标：让 Agent 能在 workspace 内通过审批后的 `run_command` 执行本地命令，用于后续测试、构建和诊断类任务。
+- 新增 `WorkspaceCommandTools` 与 `CommandExecutionResult`：使用 argv 数组调用 Java `ProcessBuilder`，不经过 shell；cwd 必须解析到 workspace 内的已存在目录；stdout/stderr 分开捕获并做长度截断；非零退出码作为正常工具观察返回。
+- 命令进程启动前清空继承环境，只保留 `PATH`、`LANG`、可选 `LC_ALL`、`CI=true` 和 `PWD`；第一版不允许模型提供自定义环境变量。
+- 将 `run_command` 接入 `WorkspaceToolFactory`、`WorkspaceToolConfiguration`、`ToolRegistry` 和 Spring 上下文；扩展 `ToolArgumentReader` 校验字符串数组参数。
+- 更新 `HeuristicMockModelClient`：包含 test/command/build/命令/测试/构建 的 prompt 会请求 `run_command`，便于 mock 模式验证审批路径。
+- 继续保留 `run_command` 的用户审批要求，并把审批说明从 shell command 修正为 local command，避免误导实现边界。
+- 修复新增测试暴露的取消竞态：当 runner 和 cancel endpoint 同时尝试结束 run 时，`completeCancellation` 现在对终态保持幂等，不再对已终止 run 做二次状态转换。
+- 执行 COMMAND-001 验证：后端 `mvn test` 通过 118 tests；本地 HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19` 先进入 `WAITING_FOR_APPROVAL`，批准后执行 `/bin/echo mock command` 并最终 `SUCCEEDED / COMPLETED`。
+- 限制：当前不是 OS 级沙箱；只销毁直接子进程，不保证完整进程树清理；清空 HOME 等环境变量可能让依赖本机配置的构建命令失败；真实 DeepSeek 命令 run 尚未验证。

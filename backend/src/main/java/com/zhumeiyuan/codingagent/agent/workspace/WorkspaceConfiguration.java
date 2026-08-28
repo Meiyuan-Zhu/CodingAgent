@@ -22,4 +22,9 @@ class WorkspaceConfiguration {
 	WorkspaceWriteTools workspaceWriteTools(WorkspacePathResolver resolver) {
 		return new WorkspaceWriteTools(resolver);
 	}
+
+	@Bean
+	WorkspaceCommandTools workspaceCommandTools(WorkspacePathResolver resolver, java.time.Clock clock) {
+		return new WorkspaceCommandTools(resolver, clock);
+	}
 }

@@ -17,6 +17,7 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolExecutionResult;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceAccessCode;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceAccessException;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceReadTools;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceCommandTools;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
 public final class WorkspaceToolFactory {
@@ -130,6 +131,30 @@ public final class WorkspaceToolFactory {
 				});
 	}
 
+	public static RegisteredTool runCommand(WorkspaceCommandTools workspaceCommandTools, ObjectMapper objectMapper) {
+		String toolName = "run_command";
+		return new RegisteredTool(
+				new ToolDefinition(toolName,
+						"Run an approved command in a directory inside the configured workspace. The command is an argv array and is not executed through a shell.",
+						objectSchema(Map.of(
+								"command", arrayProperty("Command and arguments as an argv array, for example [\"mvn\",\"test\"]. Shell operators like && or | are not interpreted."),
+								"cwd", stringProperty("Working directory relative to the workspace root. Defaults to '.'."),
+								"max_output_chars", integerProperty("Maximum characters captured separately from stdout and stderr.", 1,
+										workspaceCommandTools.maxOutputChars())),
+								List.of("command"))),
+				arguments -> {
+					ToolArgumentReader reader = new ToolArgumentReader(toolName, arguments);
+					reader.rejectUnexpected(Set.of("command", "cwd", "max_output_chars"));
+					List<String> command = reader.requiredStringList("command", 64);
+					String cwd = reader.optionalString("cwd", ".");
+					int maxOutputChars = reader.optionalPositiveInt("max_output_chars",
+							workspaceCommandTools.defaultMaxOutputChars(), workspaceCommandTools.maxOutputChars());
+					return workspaceJson(toolName, objectMapper,
+							() -> workspaceCommandTools.runCommand(command, cwd, maxOutputChars),
+							Map.of("cwd", cwd, "maxOutputChars", maxOutputChars));
+				});
+	}
+
 	private static ToolExecutionResult workspaceJson(String toolName, ObjectMapper objectMapper, Supplier<Object> result,
 			Map<String, Object> metadata) {
 		try {
@@ -165,6 +190,11 @@ public final class WorkspaceToolFactory {
 
 	private static Map<String, Object> stringProperty(String description) {
 		return Map.of("type", "string", "description", description);
+	}
+
+	private static Map<String, Object> arrayProperty(String description) {
+		return Map.of("type", "array", "description", description, "minItems", 1, "maxItems", 64, "items",
+				Map.of("type", "string"));
 	}
 
 	private static Map<String, Object> integerProperty(String description, int minimum, int maximum) {

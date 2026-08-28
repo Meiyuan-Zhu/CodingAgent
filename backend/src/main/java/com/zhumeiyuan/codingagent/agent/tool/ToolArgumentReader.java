@@ -1,5 +1,7 @@
 package com.zhumeiyuan.codingagent.agent.tool;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -51,6 +53,24 @@ public class ToolArgumentReader {
 			throw invalid("Argument '" + name + "' must be a non-blank string");
 		}
 		return stringValue;
+	}
+
+	public List<String> requiredStringList(String name, int maxSize) {
+		Object value = this.arguments.get(name);
+		if (!(value instanceof List<?> listValue) || listValue.isEmpty()) {
+			throw invalid("Argument '" + name + "' must be a non-empty string array");
+		}
+		if (listValue.size() > maxSize) {
+			throw invalid("Argument '" + name + "' must contain at most " + maxSize + " items");
+		}
+		List<String> strings = new ArrayList<>();
+		for (Object item : listValue) {
+			if (!(item instanceof String stringValue) || stringValue.isBlank()) {
+				throw invalid("Argument '" + name + "' must contain only non-blank strings");
+			}
+			strings.add(stringValue);
+		}
+		return List.copyOf(strings);
 	}
 
 	public boolean optionalBoolean(String name, boolean defaultValue) {

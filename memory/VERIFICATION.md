@@ -531,3 +531,38 @@
 - 关联：ADR-0015。
 - 代码版本/运行 ID：`8f3dd6f feat: verify deepseek flash model loop`。
 - 限制：真实写入审批、取消、超时、命令工具和前端浏览器 UI 下的 DeepSeek run 尚未验证；不证明 DeepSeek V4 Pro 或其他 provider 可用。
+
+## COMMAND-001：Workspace 命令执行工具验证
+
+- 日期：2026-08-28。
+- 类型：后端核心单元测试、Spring 上下文测试、本地 HTTP 审批集成测试。
+- 范围：`WorkspaceCommandTools`、`CommandExecutionResult`、`WorkspaceToolFactory` 的 `run_command` 适配、`ToolArgumentReader` 字符串数组校验、`ToolApprovalPolicy`、`HeuristicMockModelClient`、`AgentRunService` 取消幂等修复。
+- 方法：实现命令工具后执行以下检查：
+  - `cd backend && mvn test`。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 启动后端。
+  - 使用本地 HTTP 请求 `POST /api/runs`，prompt 为 `please run tests`，等待 run 到 `WAITING_FOR_APPROVAL`。
+  - 读取事件，确认审批工具为 `run_command`，参数为 `{"command":["/bin/echo","mock command"],"cwd":"."}`。
+  - 调用 `POST /api/runs/{runId}/approvals/{toolCallId}/approve`，再查询 run 状态和事件回看。
+- 结果：通过。
+  - 后端测试：118 tests, 0 failures, 0 errors。
+  - 本地 HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19` 先进入 `WAITING_FOR_APPROVAL`，approve 后最终状态 `SUCCEEDED`，stopReason 为 `COMPLETED`。
+  - `TOOL_CALL_FINISHED` content 包含 `exitCode=0`、`stdout="mock command\n"`、空 `stderr`、`stdoutTruncated=false`、`stderrTruncated=false` 和命令耗时。
+- 覆盖：
+  - `runCommand` 可在 workspace 子目录执行命令并返回 cwd、退出码和 stdout。
+  - 非零退出码作为命令观察返回，不被归为工具失败。
+  - stdout 超过上限时被截断并标记。
+  - `..` cwd 逃逸被拒绝，非目录 cwd 被拒绝。
+  - 空命令、空白命令参数、过多/过长参数被拒绝。
+  - `run_command` 经工具注册表返回 JSON 文本结果。
+  - Spring Boot 上下文能加载六个 workspace 工具：`list_files`、`read_file`、`search_text`、`write_file`、`replace_text`、`run_command`。
+  - Mock 模型可根据命令类 prompt 触发 `run_command`，并走 approve/reject/resume 审批路径。
+  - 取消幂等修复覆盖：终态 run 不会被 `completeCancellation` 二次转换。
+- 修正记录：
+  - 首次增加命令工具测试后，`RunControllerTests.cancelRunEndpointReturnsRunState` 暴露取消与 runner 结束之间的竞态，报错为 `Terminal run cannot transition`；已修复 `AgentRunService.completeCancellation`，对已终态 run 直接返回。
+- 补充最小环境变量测试时，macOS 临时目录在父进程中表现为 `/var/...`，子进程 PWD 为 realpath `/private/var/...`；测试改为比较 `toRealPath()`。
+  - `ToolApprovalPolicy` 中 `run_command` 的说明从 shell command 改为 local command，因为当前实现直接使用 argv 数组和 `ProcessBuilder`，不通过 shell。
+- 安全记录：本验证只执行 `/bin/pwd`、`/bin/echo`、`/usr/bin/false`、`/usr/bin/printf` 等固定测试命令；未调用真实模型；未读取或发送 API key、题目 PDF、`.zshrc` 或私有 workspace。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
+- 关联：ADR-0016。
+- 代码版本/运行 ID：本阶段提交后补充；HTTP run `88cb4eef-61a2-4acc-92af-a0d13eda0d19`。
+- 限制：当前不是 OS 级沙箱；命令 cwd 被限制在 workspace 内，但进程权限仍可访问主机上自身权限允许的路径；命令中断只显式销毁直接子进程，不证明完整进程树取消；真实 DeepSeek 命令审批 run 尚未验证。

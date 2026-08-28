@@ -19,6 +19,7 @@
 | [ADR-0013](0013-approval-policy-diff-display.md) | 审批策略与 diff/变更展示 | superseded | 可变更工具审批策略、审批事件、写入/替换 diff 元数据和前端 Diff 面板已验证；审批恢复限制被 ADR-0014 取代 |
 | [ADR-0014](0014-approval-resume-workflow.md) | 审批后的 Agent 恢复执行工作流 | accepted | Approve/Reject API、pending approval continuation、前端审批按钮和审批后 diff 闭环已验证 |
 | [ADR-0015](0015-openai-compatible-deepseek-model-adapter.md) | OpenAI-compatible DeepSeek 模型适配器 | accepted | DeepSeek V4 Flash 配置、HTTP 客户端、环境变量密钥读取、替身 HTTP 测试和授权后的真实只读 run 已验证 |
+| [ADR-0016](0016-workspace-command-tool.md) | Workspace 命令执行工具 | accepted | `run_command` 已接入工具注册表、审批策略和 mock HTTP 审批闭环；真实模型命令 run 尚未验证 |
 
 ## 规则
 
