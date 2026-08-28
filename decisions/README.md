@@ -26,6 +26,7 @@
 | [ADR-0020](0020-blank-tool-message-normalization.md) | 工具调用响应的空 message 降级 | accepted | tool_calls 合法时为空 message 补默认展示文案；真实 demo 修复闭环待验证 |
 | [ADR-0021](0021-model-json-envelope-extraction.md) | 模型 JSON 外壳容错提取 | accepted | 解析器可从 Markdown/prose 外壳中提取第一个 JSON object；真实 demo 修复闭环待验证 |
 | [ADR-0022](0022-model-protocol-repair-retry.md) | 模型协议修复重试 | accepted | 对空 content、不可提取 JSON、不可降级空 message 最多追加协议修复提醒并重试一次；真实 demo 修复闭环待验证 |
+| [ADR-0023](0023-native-tool-calling-protocol.md) | OpenAI-compatible 原生 tool calling 协议 | accepted | native tools 请求/响应、结构化 tool message、JSON content fallback 和 DeepSeek V4 Flash 真实只读 run 已验证 |
 
 ## 规则
 

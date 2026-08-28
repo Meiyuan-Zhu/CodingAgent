@@ -283,3 +283,10 @@
 - 工具链路证据：`replace_text` 只替换一行，将 `discounted = base * (1 + discount_percent / 100)` 改为 `discounted = base * (1 - discount_percent / 100)`；`run_command` 命令为 `python3 -m unittest discover -s tests -v`，cwd 为 `.`，exit code 为 0。
 - 验证：Agent 工具输出显示 4 个 unittest 全部 OK；随后在 `workspaces/demo` 外部直接执行同一 unittest，也通过 4 tests, 0 failures, 0 errors。
 - 注意：当前 `workspaces/demo/src/price_calculator.py` 保留真实模型修复后的未提交修改，便于检查 diff；如果要录制“从失败到修复”的完整演示，需要先恢复 demo failing baseline。
+
+## 2026-08-28 原生 tool calling 协议接入
+
+- 事实：新增 ADR-0023，OpenAI-compatible 模型适配器默认改为 provider 原生 `tools` / `tool_calls` 协议，并保留 `agent.model.tool-protocol=json-content` 兼容路径。
+- 事实：`ModelMessage` 扩展为结构化消息，assistant 消息可携带上一轮工具调用，tool 消息携带 `tool_call_id`，runner 将工具动作和工具结果以结构化形式回填下一轮上下文。
+- 事实：新增/更新模型适配器测试，覆盖 native tools 请求体、native tool_calls 响应解析、assistant tool_calls 与 tool result 消息序列化，以及 legacy JSON content fallback。
+- 验证：在 `backend/` 执行 `mvn test`，124 个测试通过；DeepSeek V4 Flash 原生 tool calling 只读 run `0edd0f1a-cc84-484e-b436-0888a85a30a5` 成功，模型通过原生 `tool_calls` 调用本地 `list_files` / `read_file` 并最终完成。

@@ -677,3 +677,21 @@
 - 外部复核命令：`cd workspaces/demo && python3 -m unittest discover -s tests -v`
 - 外部复核结果：通过。4 tests, 0 failures, 0 errors。
 - 限制：成功 run 使用强指令提示直接要求 first action 为 `replace_text`，用于验证真实闭环链路；自然语言自主定位 bug 的 DeepSeek 系列 run 尚未稳定通过。
+
+## MODELAPI-005 OpenAI-compatible 原生 tool calling 单元验证
+
+- 时间：2026-08-28 20:08 CST。
+- 命令：`cd backend && mvn test`。
+- 范围：OpenAI-compatible 模型适配器、结构化 `ModelMessage`、runner 上下文回填和既有后端回归。
+- 结果：通过，124 tests passed。
+- 说明：测试覆盖 native `tools` 请求体、native `tool_calls` 响应解析、assistant tool_calls 与 tool result 消息回填、legacy JSON content fallback；这证明本地协议转换逻辑通过替身 HTTP 验证，不等同于真实 DeepSeek native run 已完成。
+
+## REALMODEL-002 DeepSeek V4 Flash 原生 tool calling 只读验证
+
+- 时间：2026-08-28 20:10-20:11 CST。
+- 后端启动：`mvn spring-boot:run`，参数包括 `--server.port=18080 --agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash --agent.model.tool-protocol=native-tools`。
+- Run ID：`0edd0f1a-cc84-484e-b436-0888a85a30a5`。
+- 范围：真实 DeepSeek V4 Flash provider、原生 `tools` / `tool_calls`、本地只读工具执行、工具结果回填、多轮 run 完成。
+- 结果：通过。Run 以 `SUCCEEDED` / `COMPLETED` 结束，`roundsUsed=4`，`toolCallsUsed=7`。
+- 证据：事件流显示模型以原生 tool calling 请求 `list_files`、`read_file`，本地工具返回 workspace 目录、`README.md`、源码和测试文件内容；最终模型输出中文总结。
+- 限制：该验证是只读任务，未覆盖 native 模式下的写入审批和命令审批；模型在部分轮次一次返回多个只读工具调用，说明“每轮最多一个工具”的提示不是 provider 硬约束，本地预算和审批仍需作为最终控制。

@@ -19,6 +19,8 @@ public class AgentModelProperties {
 
 	private double temperature = 0.2;
 
+	private ToolProtocol toolProtocol = ToolProtocol.NATIVE_TOOLS;
+
 	public Provider getProvider() {
 		return this.provider;
 	}
@@ -67,8 +69,21 @@ public class AgentModelProperties {
 		this.temperature = temperature;
 	}
 
+	public ToolProtocol getToolProtocol() {
+		return this.toolProtocol;
+	}
+
+	public void setToolProtocol(ToolProtocol toolProtocol) {
+		this.toolProtocol = toolProtocol == null ? ToolProtocol.NATIVE_TOOLS : toolProtocol;
+	}
+
 	public enum Provider {
 		MOCK,
 		OPENAI_COMPATIBLE
+	}
+
+	public enum ToolProtocol {
+		NATIVE_TOOLS,
+		JSON_CONTENT
 	}
 }

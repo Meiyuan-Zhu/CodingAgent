@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -109,7 +108,7 @@ public class MockAgentRunner {
 			}
 			int toolCallsUsed = approval.toolCallsUsed() + 1;
 			List<ModelMessage> messages = new ArrayList<>(approval.messages());
-			messages.add(ModelMessage.tool(toolObservation(call, result)));
+			messages.add(ModelMessage.tool(call.id(), call.name(), toolObservation(call, result)));
 			if (!result.success()) {
 				StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
 				fail(runId, stopReason, result.content());
@@ -150,7 +149,7 @@ public class MockAgentRunner {
 					"round", round,
 					"content", response.message(),
 					"finishReason", response.finishReason().name()));
-			messages.add(ModelMessage.assistant(assistantTranscript(response)));
+			messages.add(ModelMessage.assistant(response.message(), response.toolCalls()));
 
 			if (response.finishReason() == ModelFinishReason.STOP) {
 				finishSuccessfully(runId, round, toolCallsUsed);
@@ -177,7 +176,7 @@ public class MockAgentRunner {
 					return;
 				}
 				toolCallsUsed++;
-				messages.add(ModelMessage.tool(toolObservation(call, result)));
+				messages.add(ModelMessage.tool(call.id(), call.name(), toolObservation(call, result)));
 				if (!result.success()) {
 					StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
 					fail(runId, stopReason, result.content());
@@ -273,16 +272,6 @@ public class MockAgentRunner {
 					Map.of("toolName", call.name(), "errorCode", ToolExecutionErrorCode.TOOL_RUNTIME_ERROR.name()),
 					this.clock.instant());
 		}
-	}
-
-	private String assistantTranscript(ModelResponse response) {
-		if (response.toolCalls().isEmpty()) {
-			return response.message();
-		}
-		String toolCalls = response.toolCalls().stream()
-				.map(call -> "tool_call_id=" + call.id() + ", name=" + call.name() + ", arguments=" + call.arguments())
-				.collect(Collectors.joining("\n"));
-		return response.message() + "\nRequested tool calls:\n" + toolCalls;
 	}
 
 	private String toolObservation(ToolCall call, ToolResult result) {

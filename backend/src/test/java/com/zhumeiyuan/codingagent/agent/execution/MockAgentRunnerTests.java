@@ -17,6 +17,7 @@ import com.zhumeiyuan.codingagent.agent.model.ModelClient;
 import com.zhumeiyuan.codingagent.agent.model.ModelClientException;
 import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
 import com.zhumeiyuan.codingagent.agent.model.ModelMessage;
+import com.zhumeiyuan.codingagent.agent.model.ModelRole;
 import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
 import com.zhumeiyuan.codingagent.agent.model.ModelRequest;
 import com.zhumeiyuan.codingagent.agent.model.ModelResponse;
@@ -76,11 +77,12 @@ class MockAgentRunnerTests {
 						.containsEntry("roundsUsed", 2)
 						.containsEntry("toolCallsUsed", 1));
 		ModelRequest secondRequest = model.requests().get(1);
-		assertThat(secondRequest.messages()).extracting(ModelMessage::content)
-				.anySatisfy(content -> assertThat(content)
-						.contains("Requested tool calls")
-						.contains("tool_call_id=call-1")
-						.contains("name=list_files"));
+		assertThat(secondRequest.messages()).filteredOn(message -> message.role() == ModelRole.ASSISTANT)
+				.singleElement()
+				.satisfies(message -> assertThat(message.toolCalls()).singleElement().satisfies(call -> {
+					assertThat(call.id()).isEqualTo("call-1");
+					assertThat(call.name()).isEqualTo("list_files");
+				}));
 	}
 
 	@Test
