@@ -592,3 +592,27 @@
 - 关联：ADR-0004、ADR-0008、ADR-0014、ADR-0016。
 - 代码版本/运行 ID：`f8e5fa1 feat: show command tool cards in workbench`；浏览器 run 短 id `ec6cabf0`。
 - 限制：不证明真实 DeepSeek 命令审批 run；未做多浏览器、多视口或移动端视觉验收。
+
+
+## DEMO-001：真实 demo 编程任务基线验证
+
+- 日期：2026-08-28。
+- 类型：demo workspace 基线测试、前端构建检查。
+- 范围：`workspaces/demo/README.md`、`workspaces/demo/src/price_calculator.py`、`workspaces/demo/src/__init__.py`、`workspaces/demo/tests/test_price_calculator.py`、`frontend/src/App.vue`。
+- 方法：
+  - 在 `workspaces/demo` 执行 `python3 -m unittest discover -s tests -v`。
+  - 执行 `cd frontend && npm run build`，确认默认 prompt 调整不破坏前端构建。
+  - 执行 `cd backend && mvn test`，确认新增 demo workspace 文件不影响后端回归。
+  - 执行 `git check-ignore -v workspaces/demo/src/__pycache__/x.pyc workspaces/demo/src/x.pyc`，确认 Python 缓存会被忽略。
+- 结果：符合预期。
+  - Demo unittest 共 4 个测试，2 个通过，2 个失败。
+  - 失败测试为 `test_discount_is_applied_before_tax` 和 `test_full_discount_leaves_only_zero_taxable_amount`。
+  - 失败输出显示当前实现返回 `71.28 != 58.32`、`43.18 != 0.0`，说明折扣被错误地加到了 subtotal 上。
+  - 前端构建通过：`vue-tsc -b` 与 `vite build` 均成功。
+  - 后端回归通过：118 tests, 0 failures, 0 errors。
+  - `.gitignore` 覆盖 Python 缓存：`__pycache__/` 与 `*.py[cod]` 均生效。
+- 设计说明：demo 故意保持失败状态，用于后续真实模型 run 展示“读文件/读测试 → 修改代码 → 审批 diff → 运行命令 → 测试通过 → 总结”的完整链路。
+- 安全记录：demo 使用 Python 标准库 `unittest`，不安装第三方依赖，不访问网络，不读取凭据。
+- 关联：ADR-0004、ADR-0006、ADR-0014、ADR-0016。
+- 代码版本/运行 ID：本阶段提交后补充。
+- 限制：本条只证明 demo 任务基线按预期失败；不证明真实模型已经修复或命令工具已在真实模型 run 中执行。

@@ -226,3 +226,15 @@
 - 修复浏览器验收中发现的审批按钮禁用问题：前端已收到 pending approval 事件时允许点击 Approve/Reject，合法状态仍由后端 approve/reject endpoint 校验。
 - 执行 UI-003 验证：`cd frontend && npm run build` 通过；in-app browser 打开 `http://127.0.0.1:5173/`，默认命令任务进入审批，Approve 后 run 成功，页面显示 `run_command` Finished、`exit: 0`、stdout `mock command`、stderr 空输出，console 无 warning/error 且无横向溢出。
 - 限制：本阶段验证使用 mock 模型和固定 `/bin/echo mock command`；真实 DeepSeek 命令审批 run 尚未验证。
+
+
+## 2026-08-28：真实 demo 编程任务构造
+
+- 目标：为真实模型演示准备一个稳定、无第三方依赖、可读可改可测试的小型编程任务。
+- 将 `workspaces/demo` 从简单文本 workspace 升级为 Python pricing demo：新增 `src/price_calculator.py`、`src/__init__.py` 和 `tests/test_price_calculator.py`。
+- 设计一个明确 bug：`calculate_total` 把折扣百分比加到 subtotal 上，导致 10% discount 和 100% discount 用例失败；正确行为应为折扣先减少税前 subtotal，再计算税。
+- 更新 `workspaces/demo/README.md`，写明 demo task 和验证命令 `python3 -m unittest discover -s tests -v`。
+- 更新前端默认 prompt 为真实 bugfix 任务，便于录屏时直接触发完整流程。
+- 更新 `.gitignore` 忽略 `__pycache__/` 与 `*.py[cod]`，避免 demo 测试运行后产生的 Python 缓存误入库。
+- 执行 DEMO-001 验证：在 `workspaces/demo` 运行 unittest，4 个测试中 2 个按预期失败，失败点集中在折扣计算；`cd frontend && npm run build` 通过。
+- 限制：这是故意失败的 demo 基线，不代表主项目构建失败；真实 DeepSeek 修复、写入审批和命令验证尚未执行。

@@ -17,6 +17,8 @@ coverage/
 !/workspaces/demo/
 !/workspaces/demo/**
 *.log
+__pycache__/
+*.py[cod]
 
 # OS and IDE metadata.
 .DS_Store

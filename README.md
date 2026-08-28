@@ -6,7 +6,7 @@ Personal coding agent project for the recommendation assessment. The repository 
 
 - Frontend: `frontend/`, Vue 3 + TypeScript + Vite.
 - Backend: `backend/`, Java 21 + Spring Boot + Maven.
-- Demo workspace: `workspaces/demo/`.
+- Demo workspace: `workspaces/demo/`, a tiny Python pricing project with an intentional failing test for agent demos.
 - Development records: `memory/`.
 - Architecture decisions: `decisions/`.
 

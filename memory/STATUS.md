@@ -35,7 +35,7 @@
 - 建立 `frontend/` Vue 3 项目和 `backend/` Spring Boot 项目。
 - 建立后端 `GET /api/health` 与前端健康状态展示，用于验证前后端开发连接基础。
 - 已执行应用骨架验证：见 [APP-001](VERIFICATION.md)。
-- 建立 `workspaces/demo/` 示例 workspace。
+- 建立并升级 `workspaces/demo/` 示例 workspace：当前包含一个带故意失败测试的 Python pricing demo，用于真实模型修复演示。
 - 实现后端 `WorkspacePathResolver` 与只读工具 `listFiles`、`readFile`、`searchText`。
 - 实现后端 `ToolRegistry`，将只读 workspace 工具注册为模型后续可调用的工具入口。
 - 实现 `POST /api/runs`、run 状态查询、事件回看和 SSE 订阅；Vue 工作台已接入 mock run 流程。
@@ -47,6 +47,7 @@
 - 实现 `PendingToolApproval`、approve/reject API、审批后恢复执行和前端审批按钮。
 - 实现 `run_command` 命令执行工具，并接入工具注册表、审批策略和 mock run 审批闭环。
 - 增强前端工具卡片和命令输出展示：命令审批、执行状态、stdout/stderr、exit code 和 duration 可在录屏中直接呈现。
+- 构造真实 demo 编程任务：`workspaces/demo` 现在包含一个无第三方依赖的 Python pricing 项目，基线测试故意失败，供 Agent 修复并运行测试。
 
 ## 功能状态
 
@@ -57,19 +58,19 @@
 | 前后端工程骨架及独立启动 | 已验证 | [frontend](../frontend)、[backend](../backend) | [APP-001](VERIFICATION.md) | ADR-0001、ADR-0003；验证覆盖构建和后端健康接口 |
 | 任务接口与 Web 页面 | 已验证 | [frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/run/toolCards.ts](../frontend/src/run/toolCards.ts)、[frontend/src/api/runs.ts](../frontend/src/api/runs.ts)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/api](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/api) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[UI-003](VERIFICATION.md) | 可创建/cancel mock run、显示事件、审批、批准后恢复、diff 和命令输出卡片；仍非真实模型任务界面 |
 | 模型适配器及 Agent 循环 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution) | [CORE-001](VERIFICATION.md)、[RUNAPI-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[LOOP-001](VERIFICATION.md)、[LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[MODELAPI-001](VERIFICATION.md)、[REALMODEL-001](VERIFICATION.md)、[COMMAND-001](VERIFICATION.md) | 模型边界、多轮工具循环、预算、取消、工具超时、审批、OpenAI-compatible DeepSeek 适配器、真实 DeepSeek V4 Flash 只读 run 和 mock 命令审批闭环已验证；真实模型写入/命令 run 未验证 |
-| 文件工具、搜索与编辑 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[COMMAND-001](VERIFICATION.md) | list/read/search/write/replace/run_command 已验证；write/replace 会返回 unified diff；命令返回 stdout/stderr/exit code；可变更工具和命令均需审批 |
+| 文件工具、搜索与编辑 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace)、[workspaces/demo](../workspaces/demo) | [WORKSPACE-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[COMMAND-001](VERIFICATION.md)、[DEMO-001](VERIFICATION.md) | list/read/search/write/replace/run_command 已验证；demo workspace 已升级为带故意失败测试的 Python pricing 任务；write/replace 会返回 unified diff；命令返回 stdout/stderr/exit code；可变更工具和命令均需审批 |
 | 工具注册表与执行入口 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool) | [TOOLREG-001](VERIFICATION.md)、[WRITE-001](VERIFICATION.md)、[MODEL-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[COMMAND-001](VERIFICATION.md) | `list_files`、`read_file`、`search_text`、`write_file`、`replace_text`、`run_command` 已注册；可变更工具和命令经过审批策略和 approve/reject 流程；OpenAI-compatible 模型适配器可读取这些工具定义 |
 | 命令执行、审批、取消 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/WorkspaceCommandTools.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/WorkspaceCommandTools.java)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java)、[frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/run/toolCards.ts](../frontend/src/run/toolCards.ts) | [LIFE-001](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[COMMAND-001](VERIFICATION.md)、[UI-003](VERIFICATION.md) | Run 取消、工具 timeout、可变更工具审批、approve/reject/resume、`run_command` mock HTTP 审批闭环和命令输出卡片已验证；完整进程树级取消和真实模型命令 run 尚未验证 |
 | 对话上下文及运行预算 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java)、[backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java) | [LOOP-001](VERIFICATION.md) | 轮次、工具调用和消息窗口已验证；真实 token 计数和 provider-specific 裁剪未实现 |
 | SSE、工具卡片、Diff、输出 | 已验证 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunEventStream.java)、[frontend/src/App.vue](../frontend/src/App.vue)、[frontend/src/run/toolCards.ts](../frontend/src/run/toolCards.ts) | [RUNAPI-001](VERIFICATION.md)、[UI-002](VERIFICATION.md)、[CHANGE-001](VERIFICATION.md)、[APPROVAL-001](VERIFICATION.md)、[UI-003](VERIFICATION.md) | SSE 基础事件流、审批事件订阅、审批按钮、Diff 面板、工具卡片和命令 stdout/stderr/exit code 展示已验证 |
 | 运行记录与历史回看 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java) | [RUNAPI-001](VERIFICATION.md) | 进程内事件回看已验证；重启后持久化未实现 |
-| 真实模型任务及回归测试 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java) | [MODELAPI-001](VERIFICATION.md)、[REALMODEL-001](VERIFICATION.md) | DeepSeek V4 Flash 真实只读 run 已验证；真实写入审批、取消、超时和命令任务未验证 |
+| 真实模型任务及回归测试 | 进行中 | [backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java)、[workspaces/demo](../workspaces/demo) | [MODELAPI-001](VERIFICATION.md)、[REALMODEL-001](VERIFICATION.md)、[DEMO-001](VERIFICATION.md) | DeepSeek V4 Flash 真实只读 run 已验证；真实编程 demo 已准备；真实写入审批、取消、超时和命令任务未验证 |
 | 提交说明、视频与面试材料 | 未开始 | 尚无 | 尚无 | 依据真实能力编写 |
 
 ## 下一步
 
-1. 补充命令进程树级取消或明确演示命令范围，避免长时间命令残留。
-2. 在用户再次明确授权后，执行一次真实 DeepSeek 命令审批 run，验证真实模型能提出命令、等待审批、执行并总结结果。
+1. 在用户再次明确授权后，执行一次真实 DeepSeek demo 修复 run，验证真实模型能读测试、修改 `price_calculator.py`、等待审批、运行 unittest 并总结结果。
+2. 补充命令进程树级取消或明确演示命令范围，避免长时间命令残留。
 3. 增加完整录屏前浏览器验收，确认读文件、写入 diff、命令输出、Approve/Reject 按钮和 run history 的视觉状态。
 4. 确认公开仓库的账户、名称及可公开文件；首次公开推送前复核题目 PDF、日志、密钥和演示材料。
 
@@ -77,5 +78,5 @@
 
 - DeepSeek V4 Flash 已完成真实只读端到端验证；但真实写入审批、取消、超时和命令任务尚未验证。
 - 公开远程仓库尚未建立；当前只有本地 Git 历史。
-- 演示案例尚未最终确定，排期属于建议。
-- 当前有已验证的 mock run 前后端闭环、写入/编辑工具、命令执行工具、多轮 loop、取消、工具超时、审批拦截策略、完整 approve/reject/resume、diff 元数据/展示构建、工具卡片/命令输出 UI、OpenAI-compatible 模型适配器，以及一次 DeepSeek V4 Flash 真实只读端到端 run；但没有完整进程树级取消、真实命令模型 run 或真实写入审批模型 run 验证。
+- 演示案例已初步确定为 Python pricing bugfix；真实模型修复闭环尚未验证。
+- 当前有已验证的 mock run 前后端闭环、写入/编辑工具、命令执行工具、多轮 loop、取消、工具超时、审批拦截策略、完整 approve/reject/resume、diff 元数据/展示构建、工具卡片/命令输出 UI、OpenAI-compatible 模型适配器，以及一次 DeepSeek V4 Flash 真实只读端到端 run；但没有完整进程树级取消、真实 demo 修复模型 run 或真实写入审批模型 run 验证。
