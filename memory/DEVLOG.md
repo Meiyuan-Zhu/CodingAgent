@@ -179,3 +179,15 @@
 - 执行 APPROVAL-001 验证：后端 `mvn test` 通过 101 tests；前端 `npm run build` 通过；本地 HTTP run `fd830860-d275-4484-8fbc-249a51142722` 经 approve 后最终 `SUCCEEDED / COMPLETED`，事件含审批、工具执行、diff 和 run finished。
 - 验证创建的 `workspaces/demo/src/mock-note.txt` 已删除，未作为项目改动保留。
 - 限制：pending approval 仍为进程内存；当前只支持串行工具模型下的单个 pending approval；真实模型 API 和命令工具仍未实现。
+
+## 2026-08-28：DeepSeek V4 Flash / OpenAI-compatible 模型适配器
+
+- 目标：按用户要求先接入 DeepSeek V4 Flash，但保持默认 mock 模式，避免没有付费 key 时本地开发和测试失败。
+- 新增 `AgentModelProperties`，支持通过配置切换 `mock` 与 `openai-compatible` 模型 provider，默认模型名为 `deepseek-v4-flash`，API key 仅从 `DEEPSEEK_API_KEY` 环境变量读取。
+- 新增 `OpenAiCompatibleModelClient`，通过 Java 21 `HttpClient` 调用 `/chat/completions`，请求中启用 JSON response format，并把项目内部 JSON 响应协议和工具定义注入 system message。
+- 新增 `ModelHttpTransport`、`ModelHttpRequest`、`ModelHttpResponse` 和 `JavaHttpModelTransport`，用于隔离真实 HTTP 调用和单元测试替身。
+- 更新 runner 事件 payload：不再把 provider 写死为 `mock`，由 `ModelClient.providerName()` 报告当前模型来源。
+- 更新前端文案和检查项，从 “mock runner” 改为 “backend agent runner”，避免真实模型模式下的界面描述不一致。
+- 新增 ADR-0015，记录为什么使用 OpenAI-compatible HTTP 适配器而不是 DeepSeek SDK 或写死 DeepSeek。
+- 执行 MODELAPI-001 验证：后端 `mvn test` 通过 106 tests；前端 `npm run build` 通过；真实 DeepSeek 端到端调用因会向外部服务发送 prompt、工具定义和后续工具观察，待用户明确授权后执行。
+- 限制：当前不使用 provider-native tool calls，不做流式 token 输出或 usage 统计；真实 DeepSeek V4 Flash 任务尚未验证成功。

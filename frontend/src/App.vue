@@ -54,7 +54,7 @@ const diffs = computed(() => {
 })
 
 const checks = computed(() => [
-  { name: 'Backend mock runner', result: 'wired' },
+  { name: 'Backend agent runner', result: 'wired' },
   { name: 'Tool registry', result: 'wired' },
   { name: 'SSE run events', result: activeRun.value ? activeRun.value.status.toLowerCase() : 'ready' },
   { name: 'Approval flow', result: pendingApproval.value ? 'waiting' : 'ready' },
@@ -251,11 +251,11 @@ function eventTitle(event: RunEvent) {
   const titles: Record<string, string> = {
     RUN_CREATED: 'Run created',
     USER_MESSAGE_ACCEPTED: 'User message accepted',
-    RUN_STARTED: 'Mock runner started',
+    RUN_STARTED: 'Agent runner started',
     RUN_CANCELLING: 'Run cancelling',
     APPROVAL_REQUIRED: `Approval required: ${String(event.payload.name ?? '')}`,
     APPROVAL_RESOLVED: 'Approval resolved',
-    MODEL_REQUESTED: 'Mock model requested',
+    MODEL_REQUESTED: 'Model requested',
     MODEL_MESSAGE_RECEIVED: 'Assistant message',
     TOOL_CALL_REQUESTED: `Tool requested: ${String(event.payload.name ?? '')}`,
     TOOL_CALL_STARTED: `Tool started: ${String(event.payload.name ?? '')}`,
@@ -326,7 +326,7 @@ function truncate(value: string, limit: number) {
         <article v-if="!activeRun" class="message assistant-message">
           <p class="message-role">Assistant</p>
           <p>
-            This workbench is wired to the backend mock runner. Submit a task to create a run, stream
+            This workbench is wired to the backend agent runner. Submit a task to create a run, stream
             SSE events, request approval for workspace changes, and inspect resulting diffs.
           </p>
         </article>
@@ -339,8 +339,8 @@ function truncate(value: string, limit: number) {
         <article v-if="activeRun" class="message assistant-message">
           <p class="message-role">Assistant</p>
           <p>
-            Running in mock mode. This verifies the local event loop and tool registry without using
-            a real model API key yet.
+            The backend defaults to mock mode for safe development, and can be started with a configured
+            DeepSeek-compatible model adapter for real model runs.
           </p>
         </article>
 

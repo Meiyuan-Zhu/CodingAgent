@@ -26,9 +26,18 @@ cd frontend
 npm run dev
 ```
 
+To try DeepSeek V4 Flash, configure `DEEPSEEK_API_KEY` in your shell environment, then start the backend with:
+
+```bash
+cd backend
+mvn spring-boot:run -Dspring-boot.run.arguments="--agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash"
+```
+
+The key must stay in your shell or local untracked environment. Do not commit it.
+
 The frontend development server proxies `/api` requests to `http://localhost:8080`.
 
-The current workbench can create a mock run, stream backend events through SSE, and execute read-only workspace tools through the backend tool registry. This is a verified local loop, not a real model integration yet.
+The current workbench can create a run, stream backend events through SSE, execute workspace tools through the backend tool registry, request approval for mutating tools, and show resulting diffs. The default model provider is still `mock` for safe local development. A DeepSeek/OpenAI-compatible adapter is implemented but real DeepSeek runs require an API key and explicit approval to send task context to the external model service.
 
 Currently registered model-facing tools:
 
@@ -44,6 +53,9 @@ Useful backend endpoints:
 - `GET /api/runs/{runId}`
 - `GET /api/runs/{runId}/events`
 - `GET /api/runs/{runId}/events/stream`
+- `POST /api/runs/{runId}/cancel`
+- `POST /api/runs/{runId}/approvals/{toolCallId}/approve`
+- `POST /api/runs/{runId}/approvals/{toolCallId}/reject`
 
 ## Checks
 

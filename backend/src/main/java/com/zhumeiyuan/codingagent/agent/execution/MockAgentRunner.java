@@ -76,7 +76,7 @@ public class MockAgentRunner {
 			if (stopIfCancellationRequested(runId)) {
 				return;
 			}
-			emit(runId, RunEventType.RUN_STARTED, Map.of("runner", "mock", "budget", budgetPayload()));
+			emit(runId, RunEventType.RUN_STARTED, Map.of("runner", this.modelClient.providerName(), "budget", budgetPayload()));
 
 			List<ModelMessage> messages = new ArrayList<>();
 			messages.add(ModelMessage.system(SYSTEM_PROMPT));
@@ -86,7 +86,7 @@ public class MockAgentRunner {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
 			if (!stopIfCancellationRequested(runId)) {
-				fail(runId, StopReason.INTERNAL_ERROR, "Mock runner failed");
+				fail(runId, StopReason.INTERNAL_ERROR, "Agent runner failed");
 			}
 		}
 	}
@@ -116,7 +116,7 @@ public class MockAgentRunner {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
 		} catch (RuntimeException ex) {
 			if (!stopIfCancellationRequested(runId)) {
-				fail(runId, StopReason.INTERNAL_ERROR, "Mock runner failed");
+				fail(runId, StopReason.INTERNAL_ERROR, "Agent runner failed");
 			}
 		}
 	}
@@ -129,7 +129,7 @@ public class MockAgentRunner {
 			List<ModelMessage> context = contextWindow(messages);
 			List<String> toolNames = this.toolRegistry.definitions().stream().map(ToolDefinition::name).toList();
 			emit(runId, RunEventType.MODEL_REQUESTED, Map.of(
-					"provider", "mock",
+					"provider", this.modelClient.providerName(),
 					"round", round,
 					"availableTools", toolNames,
 					"contextMessages", context.size(),
@@ -140,7 +140,7 @@ public class MockAgentRunner {
 				return;
 			}
 			emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of(
-					"mock", true,
+					"provider", this.modelClient.providerName(),
 					"round", round,
 					"content", response.message(),
 					"finishReason", response.finishReason().name()));

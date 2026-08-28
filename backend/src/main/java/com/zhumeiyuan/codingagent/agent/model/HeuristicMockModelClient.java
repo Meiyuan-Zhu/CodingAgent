@@ -17,6 +17,11 @@ public class HeuristicMockModelClient implements ModelClient {
 	}
 
 	@Override
+	public String providerName() {
+		return "mock";
+	}
+
+	@Override
 	public ModelResponse complete(ModelRequest request) {
 		Objects.requireNonNull(request, "request");
 		ModelMessage lastMessage = request.messages().get(request.messages().size() - 1);

@@ -480,3 +480,24 @@
 - 关联：ADR-0014。
 - 代码版本/运行 ID：`736aa7e feat: add approval resume workflow`；本条哈希信息由后续文档同步提交补充。
 - 限制：只检查文档结构和状态关键词，不证明应用功能。
+
+## MODELAPI-001：OpenAI-compatible DeepSeek adapter 测试
+
+- 日期：2026-08-28。
+- 类型：后端模型适配器单元测试、Spring 上下文测试、前端构建检查。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`、`backend/src/main/resources/application.properties`、`frontend/src/App.vue`。
+- 方法：
+  - 新增 OpenAI-compatible 模型客户端与配置后执行 `cd backend && mvn test`。
+  - 使用替身 `ModelHttpTransport` 捕获请求体和 headers，模拟 provider 返回 Chat Completions JSON。
+  - 执行 `cd frontend && npm run build`，确认前端文案调整不破坏构建。
+  - 启动 `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=18080 --agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash"`，确认后端可用 DeepSeek 配置启动。
+- 结果：
+  - 后端 `mvn test` 通过。106 tests, 0 failures, 0 errors。
+  - 新增模型适配器测试覆盖：请求发送到 `https://api.deepseek.com/chat/completions`、Authorization header 使用环境变量值、请求 model 为 `deepseek-v4-flash`、启用 `response_format=json_object`、工具定义进入 system message、tool observation 被映射为普通 user message、缺失 API key 明确失败、provider HTTP error 明确失败、provider 响应缺少 content 明确失败。
+  - 前端 `npm run build` 通过，`vue-tsc -b` 与 `vite build` 均成功。
+  - 后端以 `openai-compatible` 和 `deepseek-v4-flash` 配置启动成功，Tomcat started on port 18080。
+- 未执行：真实 DeepSeek 端到端 run 未执行。尝试发起本地 run 验证时，安全审查指出该请求会把 workspace 查询、工具定义和后续工具结果发送给 DeepSeek 外部服务；用户尚未明确授权这些数据出境，因此停止验证。
+- 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；前端构建仍出现 Homebrew shellenv 的 `/bin/ps: Operation not permitted`，均未阻止验证。
+- 关联：ADR-0015。
+- 代码版本/运行 ID：本阶段提交后补充。
+- 限制：替身 HTTP 测试证明适配器请求/解析边界，不证明 DeepSeek 真实服务已可用；启动成功不证明真实模型返回可被项目解析。
