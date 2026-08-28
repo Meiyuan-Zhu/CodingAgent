@@ -21,6 +21,7 @@
 | [ADR-0015](0015-openai-compatible-deepseek-model-adapter.md) | OpenAI-compatible DeepSeek 模型适配器 | accepted | DeepSeek V4 Flash 配置、HTTP 客户端、环境变量密钥读取、替身 HTTP 测试和授权后的真实只读 run 已验证 |
 | [ADR-0016](0016-workspace-command-tool.md) | Workspace 命令执行工具 | accepted | `run_command` 已接入工具注册表、审批策略和 mock HTTP 审批闭环；真实模型命令 run 尚未验证 |
 | [ADR-0017](0017-real-model-demo-loop-budget.md) | 真实模型 demo 的单工具轮次策略与预算调整 | accepted | 默认预算调整为 8 轮/16 工具调用，模型提示要求一次最多一个工具；真实 demo 修复闭环待验证 |
+| [ADR-0018](0018-empty-model-content-retry.md) | OpenAI-compatible 空 content 响应重试 | accepted | content 为空/缺失时最多重试一次；真实 demo 修复闭环待验证 |
 
 ## 规则
 

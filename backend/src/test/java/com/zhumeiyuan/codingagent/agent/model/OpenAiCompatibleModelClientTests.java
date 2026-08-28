@@ -78,6 +78,19 @@ class OpenAiCompatibleModelClientTests {
 	}
 
 	@Test
+	void retriesOnceWhenProviderReturnsEmptyContent() throws Exception {
+		CapturingTransport transport = new CapturingTransport(
+				new ModelHttpResponse(200, completionResponseAllowingEmpty("")),
+				new ModelHttpResponse(200, completionResponse("{\"message\":\"Done\",\"finish_reason\":\"stop\"}")));
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+
+		ModelResponse response = client.complete(new ModelRequest(List.of(ModelMessage.user("hi")), List.of()));
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
+		assertThat(transport.requestCount()).isEqualTo(2);
+	}
+
+	@Test
 	void failsWhenProviderResponseHasNoContent() {
 		OpenAiCompatibleModelClient client = client(new CapturingTransport(new ModelHttpResponse(200, "{}")),
 				env -> "test-key");
@@ -90,6 +103,11 @@ class OpenAiCompatibleModelClientTests {
 
 	private String completionResponse(String content) throws Exception {
 		return this.objectMapper.writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of("content", content)))));
+	}
+
+	private String completionResponseAllowingEmpty(String content) {
+		return "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\""
+				+ content + "\"}}]}";
 	}
 
 	private OpenAiCompatibleModelClient client(ModelHttpTransport transport,
@@ -105,18 +123,34 @@ class OpenAiCompatibleModelClientTests {
 
 	private static class CapturingTransport implements ModelHttpTransport {
 
-		private final ModelHttpResponse response;
+		private final List<ModelHttpResponse> responses;
 
 		private ModelHttpRequest request;
 
+		private int requestCount;
+
 		CapturingTransport(ModelHttpResponse response) {
-			this.response = response;
+			this(List.of(response));
+		}
+
+		CapturingTransport(ModelHttpResponse firstResponse, ModelHttpResponse secondResponse) {
+			this(List.of(firstResponse, secondResponse));
+		}
+
+		CapturingTransport(List<ModelHttpResponse> responses) {
+			this.responses = responses;
 		}
 
 		@Override
 		public ModelHttpResponse send(ModelHttpRequest request) {
 			this.request = request;
-			return this.response;
+			ModelHttpResponse response = this.responses.get(Math.min(this.requestCount, this.responses.size() - 1));
+			this.requestCount++;
+			return response;
+		}
+
+		int requestCount() {
+			return this.requestCount;
 		}
 	}
 }

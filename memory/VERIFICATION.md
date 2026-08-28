@@ -624,3 +624,11 @@
 - 命令：`cd backend && mvn test`
 - 结果：通过。Maven Surefire 报告 118 tests, 0 failures, 0 errors, 0 skipped。
 - 说明：这验证了预算/提示/诊断调整没有破坏现有后端逻辑；不证明真实模型 demo 修复闭环已成功。
+
+## MODELAPI-003：OpenAI-compatible 空 content 重试回归
+
+- 日期：2026-08-28（北京时间）
+- 范围：OpenAI-compatible provider 在 HTTP 2xx 但 `choices[0].message.content` 为空时的单次重试。
+- 命令：`cd backend && mvn test`
+- 结果：通过。Maven Surefire 报告 119 tests, 0 failures, 0 errors, 0 skipped。
+- 说明：新增测试覆盖第一次空 content、第二次返回有效 JSON 协议内容的路径；不对 HTTP 错误、非 JSON、协议解析失败进行重试。

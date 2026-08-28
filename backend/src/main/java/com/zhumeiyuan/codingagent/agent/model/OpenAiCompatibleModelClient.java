@@ -67,12 +67,26 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		Objects.requireNonNull(request, "request");
 		validateProperties();
 		String apiKey = apiKey();
-		ModelHttpResponse response = this.transport.send(new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
-				requestBody(request), this.properties.getTimeout()));
-		if (response.statusCode() < 200 || response.statusCode() >= 300) {
-			throw new ModelClientException("Model provider returned HTTP " + response.statusCode());
+		ModelHttpRequest httpRequest = new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
+				requestBody(request), this.properties.getTimeout());
+		EmptyModelContentException firstEmptyContent = null;
+		for (int attempt = 1; attempt <= 2; attempt++) {
+			ModelHttpResponse response = this.transport.send(httpRequest);
+			if (response.statusCode() < 200 || response.statusCode() >= 300) {
+				throw new ModelClientException("Model provider returned HTTP " + response.statusCode());
+			}
+			try {
+				return this.parser.parse(extractMessageContent(response.body()));
+			} catch (EmptyModelContentException ex) {
+				if (firstEmptyContent == null) {
+					firstEmptyContent = ex;
+				}
+				if (attempt == 2) {
+					throw firstEmptyContent;
+				}
+			}
 		}
-		return this.parser.parse(extractMessageContent(response.body()));
+		throw firstEmptyContent;
 	}
 
 	private void validateProperties() {
@@ -157,7 +171,7 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			JsonNode message = choice.path("message");
 			JsonNode content = message.path("content");
 			if (!content.isTextual() || content.asText().isBlank()) {
-				throw new ModelClientException("Model provider response does not contain choices[0].message.content ("
+				throw new EmptyModelContentException("Model provider response does not contain choices[0].message.content ("
 						+ responseShape(choice, message) + ")");
 			}
 			return content.asText();
@@ -182,5 +196,11 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			trimmed = trimmed.substring(0, trimmed.length() - 1);
 		}
 		return trimmed;
+	}
+	private static class EmptyModelContentException extends ModelClientException {
+
+		EmptyModelContentException(String message) {
+			super(message);
+		}
 	}
 }
