@@ -529,5 +529,5 @@
 - 安全记录：本验证只使用 demo workspace；未读取或发送题目 PDF、`.zshrc` 内容、私有 workspace 或真实 API key。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；不影响验证。
 - 关联：ADR-0015。
-- 代码版本/运行 ID：本阶段提交后补充。
+- 代码版本/运行 ID：`8f3dd6f feat: verify deepseek flash model loop`。
 - 限制：真实写入审批、取消、超时、命令工具和前端浏览器 UI 下的 DeepSeek run 尚未验证；不证明 DeepSeek V4 Pro 或其他 provider 可用。
