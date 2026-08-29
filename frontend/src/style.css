@@ -1932,3 +1932,20 @@ textarea:focus-visible {
   min-height: 0;
   overflow: auto;
 }
+
+
+.stream-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1.15em;
+  margin-left: 3px;
+  vertical-align: -0.18em;
+  border-radius: 999px;
+  background: #24292f;
+  animation: stream-cursor-blink 900ms steps(2, start) infinite;
+}
+
+@keyframes stream-cursor-blink {
+  0%, 42% { opacity: 1; }
+  43%, 100% { opacity: 0; }
+}

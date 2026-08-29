@@ -345,3 +345,9 @@
 - 新增安全 Markdown 渲染组件，不使用 `v-html`，支持标题、列表、代码块、行内代码和加粗；run 完成后 timeline 只保留最后一条 assistant 文本，隐藏中间思考式输出。
 - Composer 支持 Return 发送，Command-Return/Control-Return 保留；run 创建成功后清空输入框，创建失败时恢复草稿。
 - 修正审查面板滚动布局：diff/file preview 的滚动收束在右侧面板内部，避免长代码行把横向滚动条暴露在页面中间。
+
+## 2026-08-29：审批空引用错误与前端流式输出
+
+- 定位截图中的红色错误：批准工具后 SSE 会刷新 pending approval 状态，`approvePendingTool` 随后继续读取 `pendingApproval.value.name`，可能变成 `null.name`。修复为批准/拒绝前先保存 approval 快照。
+- 成功收到 `RUN_FINISHED` 且状态为 `SUCCEEDED` 时主动清理 `runError`，避免旧错误残留在成功 run 下方。
+- `ChatTimeline` 新增基于现有 SSE 模型消息事件的前端流式 reveal：活动 run 中 assistant 内容按小块显示，并提供光标动效；这不是 provider token-level streaming，后者需后端模型客户端另行接入 stream API。

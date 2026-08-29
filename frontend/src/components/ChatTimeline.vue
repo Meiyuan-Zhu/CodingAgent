@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import ActionRow from './ActionRow.vue'
 import ApprovalCard from './ApprovalCard.vue'
 import ChangeSummaryCard from './ChangeSummaryCard.vue'
@@ -22,6 +22,9 @@ const emit = defineEmits<{
 }>()
 
 const timelineElement = ref<HTMLElement | null>(null)
+const displayedAssistantContent = ref<Record<string, string>>({})
+const streamTimers = new Map<string, number>()
+
 const changedCount = computed(() => props.items.filter((item) => item.kind === 'tool' && isChangeTool(item.card) && item.card.status === 'finished').length)
 const firstChangedToolId = computed(() => {
   const item = props.items.find((entry) => entry.kind === 'tool' && isChangeTool(entry.card))
@@ -42,6 +45,61 @@ const changeTotals = computed(() => {
   }
   return { additions, deletions }
 })
+
+
+watch(() => props.items, (items) => {
+  const assistantIds = new Set(items.filter((item) => item.kind === 'assistant').map((item) => item.id))
+  for (const key of Object.keys(displayedAssistantContent.value)) {
+    if (!assistantIds.has(key)) {
+      delete displayedAssistantContent.value[key]
+      stopStreaming(key)
+    }
+  }
+
+  for (const item of items) {
+    if (item.kind !== 'assistant') continue
+    const current = displayedAssistantContent.value[item.id] ?? ''
+    if (current === item.content) continue
+    if (streamTimers.has(item.id)) continue
+    if (!item.streaming) {
+      displayedAssistantContent.value[item.id] = item.content
+      continue
+    }
+    startStreaming(item.id, item.content, current)
+  }
+}, { immediate: true, deep: true })
+
+onUnmounted(() => {
+  for (const id of streamTimers.keys()) stopStreaming(id)
+})
+
+function assistantContent(item: Extract<TimelineItem, { kind: 'assistant' }>) {
+  return displayedAssistantContent.value[item.id] ?? item.content
+}
+
+function startStreaming(id: string, fullContent: string, currentContent: string) {
+  let cursor = Math.min(currentContent.length, fullContent.length)
+  displayedAssistantContent.value[id] = fullContent.slice(0, cursor)
+  const timer = window.setInterval(() => {
+    cursor = Math.min(fullContent.length, cursor + streamChunkSize(fullContent, cursor))
+    displayedAssistantContent.value[id] = fullContent.slice(0, cursor)
+    if (cursor >= fullContent.length) stopStreaming(id)
+  }, 18)
+  streamTimers.set(id, timer)
+}
+
+function stopStreaming(id: string) {
+  const timer = streamTimers.get(id)
+  if (timer !== undefined) window.clearInterval(timer)
+  streamTimers.delete(id)
+}
+
+function streamChunkSize(content: string, cursor: number) {
+  const next = content.slice(cursor, cursor + 12)
+  if (next.startsWith('```')) return 12
+  if (/^[\s\n]+$/.test(next)) return 6
+  return content.length > 600 ? 8 : 3
+}
 
 watch(() => props.items.length, async () => {
   await nextTick()
@@ -73,7 +131,8 @@ watch(() => props.items.length, async () => {
 
       <article v-else-if="item.kind === 'assistant'" class="message-row assistant-row narrative-row">
         <div class="message-bubble assistant-bubble narrative-bubble">
-          <MarkdownBlock :content="item.content" />
+          <MarkdownBlock :content="assistantContent(item)" />
+          <span v-if="item.streaming && assistantContent(item).length < item.content.length" class="stream-cursor" aria-hidden="true"></span>
         </div>
       </article>
 

@@ -50,3 +50,7 @@ Assistant narrative content supports a small safe Markdown subset rendered as Vu
 ## Composer behavior
 
 Return sends the task. Command-Return and Control-Return also send for keyboard familiarity. After a task is accepted, the composer clears so the submitted request is not duplicated in the input area. If run creation fails, the draft is restored for recovery.
+
+## Streaming behavior
+
+Current streaming is UI-level progressive reveal driven by existing run SSE events. Backend model calls still return complete assistant messages per round; provider token-level streaming is a later backend protocol change. The UI should still feel live by showing thinking state, action rows, and animated assistant text when a model message arrives during an active run.

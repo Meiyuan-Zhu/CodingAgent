@@ -129,15 +129,16 @@ async function cancelActiveRun() {
 
 async function approvePendingTool() {
   if (!activeRun.value || !pendingApproval.value || resolvingApproval.value) return
+  const approval = pendingApproval.value
   resolvingApproval.value = true
   runError.value = null
   try {
-    const run = await approveToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    const run = await approveToolCall(activeRun.value.id, approval.toolCallId)
     activeRun.value = run
     upsertRun(run)
-    inspectorSelection.value = pendingApproval.value.name === 'run_command'
-      ? { kind: 'command', toolCallId: pendingApproval.value.toolCallId }
-      : { kind: 'diff', toolCallId: pendingApproval.value.toolCallId }
+    inspectorSelection.value = approval.name === 'run_command'
+      ? { kind: 'command', toolCallId: approval.toolCallId }
+      : { kind: 'diff', toolCallId: approval.toolCallId }
   } catch (caught) {
     runError.value = caught instanceof Error ? caught.message : 'Failed to approve tool call'
   } finally {
@@ -147,10 +148,11 @@ async function approvePendingTool() {
 
 async function rejectPendingTool() {
   if (!activeRun.value || !pendingApproval.value || resolvingApproval.value) return
+  const approval = pendingApproval.value
   resolvingApproval.value = true
   runError.value = null
   try {
-    const run = await rejectToolCall(activeRun.value.id, pendingApproval.value.toolCallId)
+    const run = await rejectToolCall(activeRun.value.id, approval.toolCallId)
     activeRun.value = run
     upsertRun(run)
   } catch (caught) {
@@ -245,6 +247,7 @@ function connectEventStream(runId: string) {
       upsertEvent(event)
       reflectRunStatus(event)
       if (event.type === 'RUN_FINISHED') {
+        if (event.payload.status === 'SUCCEEDED') runError.value = null
         refreshRun(runId)
         source.close()
       }
