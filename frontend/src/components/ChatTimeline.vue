@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import ActionRow from './ActionRow.vue'
 import ApprovalCard from './ApprovalCard.vue'
 import ChangeSummaryCard from './ChangeSummaryCard.vue'
+import MarkdownBlock from './MarkdownBlock.vue'
 import type { ApprovalView, TimelineItem } from '../run/timeline'
 import { isChangeTool } from '../run/display'
 
@@ -72,7 +73,7 @@ watch(() => props.items.length, async () => {
 
       <article v-else-if="item.kind === 'assistant'" class="message-row assistant-row narrative-row">
         <div class="message-bubble assistant-bubble narrative-bubble">
-          <p>{{ item.content }}</p>
+          <MarkdownBlock :content="item.content" />
         </div>
       </article>
 

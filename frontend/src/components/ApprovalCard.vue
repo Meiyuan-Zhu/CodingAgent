@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ApprovalView } from '../run/timeline'
-import { basename, diffStats } from '../run/display'
+import { approvalActionTitle, argumentContent, argumentPath, diffStats } from '../run/display'
 
 const props = defineProps<{
   approval: ApprovalView
@@ -15,12 +15,9 @@ const emit = defineEmits<{
 
 const formattedArguments = computed(() => JSON.stringify(props.approval.arguments ?? {}, null, 2))
 const stats = computed(() => diffStats(props.approval.diff?.diff))
-const targetName = computed(() => basename(props.approval.diff?.path ?? null))
-const title = computed(() => {
-  if (props.approval.command) return 'Agent 想运行命令'
-  if (props.approval.diff) return `Agent 想编辑 ${targetName.value}`
-  return `Agent 请求使用 ${props.approval.name}`
-})
+const targetPath = computed(() => props.approval.diff?.path ?? argumentPath(props.approval.arguments))
+const contentPreview = computed(() => argumentContent(props.approval.arguments))
+const title = computed(() => approvalActionTitle(props.approval.name, props.approval.arguments, targetPath.value))
 </script>
 
 <template>
@@ -40,14 +37,26 @@ const title = computed(() => {
 
     <section v-if="props.approval.diff" class="approval-diff-preview">
       <div>
-        <p class="mini-label">Proposed change</p>
+        <p class="mini-label">拟修改文件</p>
         <strong>{{ props.approval.diff.path }}</strong>
       </div>
       <span class="change-stats"><b>+{{ stats.additions }}</b> <i>-{{ stats.deletions }}</i></span>
     </section>
 
-    <details v-if="!props.approval.command && !props.approval.diff" class="raw-details">
-      <summary>查看参数</summary>
+    <section v-else-if="targetPath" class="approval-diff-preview">
+      <div>
+        <p class="mini-label">拟写入文件</p>
+        <strong>{{ targetPath }}</strong>
+      </div>
+    </section>
+
+    <section v-if="contentPreview" class="approval-content-preview">
+      <p class="mini-label">拟写入内容</p>
+      <pre>{{ contentPreview }}</pre>
+    </section>
+
+    <details v-if="!props.approval.command && !targetPath && !contentPreview" class="raw-details">
+      <summary>查看详情</summary>
       <pre>{{ formattedArguments }}</pre>
     </details>
 

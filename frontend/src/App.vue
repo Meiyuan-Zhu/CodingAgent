@@ -96,6 +96,7 @@ async function submitRun() {
   closeEventStream()
 
   const prompt = taskDraft.value.trim()
+  taskDraft.value = ''
   try {
     const run = await createRun(prompt)
     activeRun.value = run
@@ -104,6 +105,7 @@ async function submitRun() {
     upsertRun(run)
     connectEventStream(run.id)
   } catch (caught) {
+    taskDraft.value = prompt
     runError.value = caught instanceof Error ? caught.message : 'Failed to create run'
   } finally {
     submitting.value = false

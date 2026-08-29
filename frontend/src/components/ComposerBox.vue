@@ -22,6 +22,7 @@ const emit = defineEmits<{
       class="resize-none"
       placeholder="Ask the agent to inspect, edit, and verify this workspace"
       rows="3"
+      @keydown.enter.exact.prevent="emit('submit')"
       @keydown.meta.enter.prevent="emit('submit')"
       @keydown.ctrl.enter.prevent="emit('submit')"
     />

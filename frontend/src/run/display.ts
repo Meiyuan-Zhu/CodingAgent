@@ -76,3 +76,23 @@ export function statusTone(status: ToolCard['status']) {
   if (status === 'running') return 'live'
   return 'muted'
 }
+
+export function argumentPath(argumentsValue: unknown) {
+  const args = argumentsValue as Record<string, unknown> | null
+  return typeof args?.path === 'string' && args.path ? args.path : null
+}
+
+export function argumentContent(argumentsValue: unknown) {
+  const args = argumentsValue as Record<string, unknown> | null
+  return typeof args?.content === 'string' ? args.content : null
+}
+
+export function approvalActionTitle(toolName: string, argumentsValue: unknown, fallbackPath: string | null = null) {
+  const path = fallbackPath ?? argumentPath(argumentsValue)
+  const target = basename(path)
+  if (toolName === 'write_file') return `申请写入 ${target}`
+  if (toolName === 'replace_text') return `申请修改 ${target}`
+  if (toolName === 'run_command') return '申请运行命令'
+  if (toolName === 'read_file') return `申请读取 ${target}`
+  return `申请执行 ${toolName}`
+}

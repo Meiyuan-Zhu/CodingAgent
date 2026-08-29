@@ -338,3 +338,10 @@
 - 将工具事件从 raw card 映射为 Codex-like 轻量动作行和文件变更摘要卡：隐藏空的 tool-call 模型消息，运行中无可见内容时显示“正在思考”，run 结束不再展示 rounds/tools 等内部元数据。
 - 重做右侧 Workspace 面板：保留“审查/文件”，审查面板以行号和增删色块显示 diff；文件面板以文件列表和行号预览展示已读取内容。
 - 修复设计审计发现的假 affordance 与 form/textarea 约束：项目行不再是无动作按钮，composer 使用 `novalidate`，textarea 明确不可拖拽。
+
+## 2026-08-29：审批、Markdown 与审查面板可用性修正
+
+- 根据用户对真实 Codex 交互的截图反馈，修正审批卡文案：`write_file` / `replace_text` 不再以工具名为主标题，而是展示“申请写入/修改具体文件”，并在可用时直接展示拟写入内容预览。
+- 新增安全 Markdown 渲染组件，不使用 `v-html`，支持标题、列表、代码块、行内代码和加粗；run 完成后 timeline 只保留最后一条 assistant 文本，隐藏中间思考式输出。
+- Composer 支持 Return 发送，Command-Return/Control-Return 保留；run 创建成功后清空输入框，创建失败时恢复草稿。
+- 修正审查面板滚动布局：diff/file preview 的滚动收束在右侧面板内部，避免长代码行把横向滚动条暴露在页面中间。

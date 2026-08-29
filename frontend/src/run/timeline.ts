@@ -107,32 +107,35 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
     })
   }
 
-  let hasVisibleAssistantMessage = false
+  const isActive = !!activeRun && !terminalStatuses.has(activeRun.status)
+  const visibleAssistantEvents = events
+    .filter((event) => event.type === 'MODEL_MESSAGE_RECEIVED')
+    .map((event) => ({ event, content: humanModelContent(event) }))
+    .filter((entry) => entry.content.length > 0)
+  const assistantEntries = isActive ? visibleAssistantEvents : visibleAssistantEvents.slice(-1)
+
+  for (const { event, content } of assistantEntries) {
+    items.push({
+      id: event.eventId,
+      kind: 'assistant',
+      title: modelTitle(event),
+      content,
+      occurredAt: event.occurredAt,
+      streaming: isActive,
+    })
+  }
+
   for (const event of events) {
-    if (event.type === 'MODEL_MESSAGE_RECEIVED') {
-      const content = humanModelContent(event)
-      if (!content) continue
-      hasVisibleAssistantMessage = true
-      items.push({
-        id: event.eventId,
-        kind: 'assistant',
-        title: modelTitle(event),
-        content,
-        occurredAt: event.occurredAt,
-        streaming: !activeRun || !terminalStatuses.has(activeRun.status),
-      })
-    }
-    if (event.type === 'RUN_FINISHED') {
-      const status = String(event.payload.status ?? activeRun?.status ?? 'finished')
-      items.push({
-        id: event.eventId,
-        kind: 'run',
-        title: status === 'SUCCEEDED' ? '已完成' : '已停止',
-        content: runFinishedContent(event),
-        occurredAt: event.occurredAt,
-        status,
-      })
-    }
+    if (event.type !== 'RUN_FINISHED') continue
+    const status = String(event.payload.status ?? activeRun?.status ?? 'finished')
+    items.push({
+      id: event.eventId,
+      kind: 'run',
+      title: status === 'SUCCEEDED' ? '已完成' : '已停止',
+      content: runFinishedContent(event),
+      occurredAt: event.occurredAt,
+      status,
+    })
   }
 
   const toolCards = buildToolCards(events)
@@ -149,9 +152,8 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
     } as TimelineItem)
   }
 
-  const isActive = !!activeRun && !terminalStatuses.has(activeRun.status)
   const hasStarted = events.some((event) => event.type === 'RUN_STARTED' || event.type === 'MODEL_REQUESTED')
-  if (isActive && hasStarted && !hasVisibleAssistantMessage && toolCards.length === 0) {
+  if (isActive && hasStarted && visibleAssistantEvents.length === 0 && toolCards.length === 0) {
     items.push({
       id: 'thinking-active',
       kind: 'thinking',

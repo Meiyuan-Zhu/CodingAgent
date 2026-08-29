@@ -758,3 +758,14 @@
 - 命令：`rg -n "(?:window\.)?(?:alert|confirm|prompt)\s*\(|href=\"#\"|v-html|innerHTML|cursor:\s*pointer|resize:\s*vertical" frontend/src DESIGN.md || true`。结果：仅命中全局 `button { cursor: pointer; }`，未发现 native dialog、假链接、`v-html`、`innerHTML` 或 textarea vertical resize。
 - 浏览器检查：打开 `http://localhost:5173/`，确认右侧 tabs 为“审查/文件”、无 `.bottom-terminal` DOM、composer textarea `resize: none`、控制台 warning/error 为空。
 - 未覆盖：未在本次验证中真实点击 Run 执行 DeepSeek 任务，因此 Approve/Reject 后的完整真实模型终态目视验收仍需在录屏前补。
+
+## UI-009 — 审批、Markdown 与审查滚动修正验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`frontend/src/components/ApprovalCard.vue`、`MarkdownBlock.vue`、`ChatTimeline.vue`、`ComposerBox.vue`、`InspectorPane.vue`、`frontend/src/run/display.ts`、`frontend/src/run/timeline.ts`、`frontend/src/style.css`、`DESIGN.md`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict`。结果：通过，0 findings。
+- 命令：`git diff --check`。结果：通过。
+- 反模式搜索：未发现 native dialog、假链接、`v-html`、`innerHTML`、textarea vertical resize；仅命中全局原生 button cursor 样式。
+- 浏览器空状态检查：打开 `http://localhost:5173/`，确认 console warning/error 为空、composer textarea `resize: none`、页面无横向溢出。
+- 未覆盖：本次未新建真实模型 run，因此审批卡真实待批准状态、Markdown 终态和右侧 diff 终态仍需录屏前做一次动态目视验收。

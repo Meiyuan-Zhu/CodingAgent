@@ -42,3 +42,11 @@ Runtime CSS variables and component styles in `frontend/src/style.css` are curre
 ## Accessibility and localization
 
 Primary user-facing labels on the workbench use concise Chinese where the user compares against Codex Chinese UI: 审查、文件、正在思考、正在运行、已运行、已编辑. Buttons use native button semantics and visible focus states.
+
+## Markdown rendering and final answer behavior
+
+Assistant narrative content supports a small safe Markdown subset rendered as Vue nodes, not raw HTML. During an active run, progress messages can appear as lightweight narrative. After the run finishes, intermediate assistant narration is collapsed and only the final assistant answer remains in the main transcript, with tool/action evidence preserved as action rows and review cards.
+
+## Composer behavior
+
+Return sends the task. Command-Return and Control-Return also send for keyboard familiarity. After a task is accepted, the composer clears so the submitted request is not duplicated in the input area. If run creation fails, the draft is restored for recovery.
