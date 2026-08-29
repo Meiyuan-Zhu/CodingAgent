@@ -53,6 +53,9 @@ const canCancel = computed(() => {
 const toolCards = computed(() => buildToolCards(events.value))
 const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, activeRun.value))
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
+const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? 'Coding task' : 'CodingAgent')
+const workspaceSubtitle = computed(() => activeRun.value ? workspacePath : 'Local workspace')
+const runStatusLabel = computed(() => activeRun.value ? statusLabel(activeRun.value.status) : '')
 
 watch(inspectorSelection, (next) => {
   if (next.kind !== 'welcome') inspectorOpen.value = true
@@ -312,6 +315,19 @@ function upsertRun(run: RunResponse) {
   runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
 }
 
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    CREATED: '已创建',
+    RUNNING: '运行中',
+    WAITING_FOR_APPROVAL: '等待批准',
+    CANCELLING: '取消中',
+    CANCELLED: '已取消',
+    FAILED: '失败',
+    SUCCEEDED: '已完成',
+  }
+  return labels[status] ?? status.toLowerCase()
+}
+
 function titleFromEvents(runEvents: RunEvent[]) {
   const event = runEvents.find((item) => item.type === 'USER_MESSAGE_ACCEPTED')
   return typeof event?.payload.prompt === 'string' ? titleFromPrompt(event.payload.prompt) : ''
@@ -340,13 +356,16 @@ function closeEventStream() {
 
     <section class="workspace-column" aria-label="Conversation workspace">
       <header class="workspace-header">
-        <div>
-          <p class="section-label">Local workspace</p>
-          <h1>{{ workspacePath }}</h1>
+        <div class="workspace-titlebar">
+          <span class="workspace-folder" aria-hidden="true"></span>
+          <div>
+            <h1>{{ workspaceTitle }}</h1>
+            <p class="workspace-subtitle">{{ workspaceSubtitle }}</p>
+          </div>
         </div>
         <div class="run-health">
           <span class="health-pill" :class="`health-${healthStatus}`">{{ healthStatus }}</span>
-          <span v-if="activeRun" class="run-chip">{{ activeRun.status.toLowerCase() }}</span>
+          <span v-if="activeRun" class="run-chip">{{ runStatusLabel }}</span>
         </div>
       </header>
 
@@ -372,7 +391,7 @@ function closeEventStream() {
       />
     </section>
 
-    <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="Show inspector" @click="inspectorOpen = true">Inspector</button>
+    <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="展开审查面板" @click="inspectorOpen = true">审查</button>
     <div v-if="inspectorOpen" class="inspector-resize-handle" role="separator" aria-orientation="vertical" title="Drag to resize inspector" @mousedown.prevent="startInspectorResize"></div>
 
     <InspectorPane

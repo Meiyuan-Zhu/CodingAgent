@@ -20,7 +20,7 @@ const emit = defineEmits<{
       v-model="model"
       aria-label="Task input"
       class="resize-none"
-      placeholder="Ask the agent to inspect, edit, and verify this workspace"
+      placeholder="描述你希望 Agent 完成的修改、检查或验证"
       rows="3"
       @keydown.enter.exact.prevent="emit('submit')"
       @keydown.meta.enter.prevent="emit('submit')"
@@ -28,15 +28,15 @@ const emit = defineEmits<{
     />
     <footer class="composer-footer">
       <div class="composer-hints">
-        <span>Local workspace</span>
-        <span>Tools need approval for edits and commands</span>
+        <span>本地 workspace</span>
+        <span>编辑和命令需要批准</span>
       </div>
       <div class="composer-actions">
         <button class="ghost-button" type="button" :disabled="!props.canCancel" @click="emit('cancel')">
-          {{ props.cancelling ? 'Cancelling' : 'Cancel' }}
+          {{ props.cancelling ? '取消中' : '取消' }}
         </button>
         <button class="send-button" type="submit" :disabled="props.disabled">
-          {{ props.submitting ? 'Starting' : 'Run' }}
+          {{ props.submitting ? '启动中' : '运行' }}
         </button>
       </div>
     </footer>

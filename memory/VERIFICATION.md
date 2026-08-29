@@ -781,3 +781,13 @@
 - 命令：`git diff --check`。结果：通过。
 - 浏览器空状态检查：打开 `http://localhost:5173/`，确认初始页面无 `.run-error`、console warning/error 为空、页面无横向溢出。
 - 限制：本次未触发真实模型 run；流式 reveal 基于前端收到的完整模型消息事件，不是 provider token-level streaming。
+
+## UI-011 — Codex-like 前端视觉 polish 验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`frontend/src/App.vue`、`frontend/src/components/ComposerBox.vue`、`frontend/src/components/ProjectSidebar.vue`、`frontend/src/components/InspectorPane.vue`、`frontend/src/style.css`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict`。结果：通过，0 findings。
+- 命令：`git diff --check`。结果：通过。
+- 覆盖：确认本轮 UI polish 通过类型检查、生产构建、严格设计审计和 diff 空白检查。
+- 限制：本环境未成功加载 Playwright 做自动截图；仍建议你在 `http://127.0.0.1:5173/` 手动刷新查看动态界面，尤其是真实审批后的审查面板和最终回答。

@@ -351,3 +351,11 @@
 - 定位截图中的红色错误：批准工具后 SSE 会刷新 pending approval 状态，`approvePendingTool` 随后继续读取 `pendingApproval.value.name`，可能变成 `null.name`。修复为批准/拒绝前先保存 approval 快照。
 - 成功收到 `RUN_FINISHED` 且状态为 `SUCCEEDED` 时主动清理 `runError`，避免旧错误残留在成功 run 下方。
 - `ChatTimeline` 新增基于现有 SSE 模型消息事件的前端流式 reveal：活动 run 中 assistant 内容按小块显示，并提供光标动效；这不是 provider token-level streaming，后者需后端模型客户端另行接入 stream API。
+
+## 2026-08-29：Codex-like 前端视觉 polish
+
+- 根据用户继续要求和 `$gpt-taste` 约束，做一轮工作台视觉审查和 polish；本次不引入新前端依赖，避免为局部视觉优化增加构建风险。
+- 顶部从“LOCAL WORKSPACE + 路径”改为任务标题优先，workspace path 降级为副标题，状态 chip 改为中文任务状态。
+- 左侧栏压缩为更接近 Codex 的任务导航：按钮和分组文案中文化，run 状态本地化，并修正长标题/状态导致的横向溢出风险。
+- 中央对话区降低卡片边框和阴影噪音，用户消息改为浅灰气泡，composer 收窄居中并中文化 placeholder、hint 和按钮。
+- 右侧审查/文件面板去掉管理后台式卡片感，diff/file 预览改为面板内换行和行号布局，避免长代码行把横向滚动条带到页面中部。

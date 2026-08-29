@@ -82,7 +82,7 @@ function diffLineTone(line: string) {
   <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Workspace panel">
     <header class="inspector-header">
       <div>
-        <p class="section-label">Workspace</p>
+        <p class="section-label">面板</p>
         <h2>{{ title }}</h2>
       </div>
       <button class="panel-icon-button" type="button" aria-label="收起右侧面板" @click="emit('toggle')">〉</button>
@@ -118,7 +118,7 @@ function diffLineTone(line: string) {
 
       <template v-else-if="props.selection.kind === 'command'">
         <article v-if="selectedTool" class="inspector-card command-inspector">
-          <p class="mini-label">Command</p>
+          <p class="mini-label">命令</p>
           <h3>{{ commandLine(selectedTool) }}</h3>
           <dl class="fact-list">
             <div><dt>cwd</dt><dd>{{ commandCwd(selectedTool) }}</dd></div>
@@ -132,7 +132,7 @@ function diffLineTone(line: string) {
 
       <template v-else-if="props.selection.kind === 'tool'">
         <article v-if="selectedTool" class="inspector-card">
-          <p class="mini-label">Tool details</p>
+          <p class="mini-label">工具详情</p>
           <h3>{{ selectedTool.name }}</h3>
           <pre>{{ formatArguments(selectedTool.arguments) }}</pre>
           <pre v-if="selectedTool.rawContent">{{ selectedTool.rawContent }}</pre>
