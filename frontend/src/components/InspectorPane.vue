@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { RunEvent } from '../api/runs'
-import { commandCwd, commandLine, commandResult, formatArguments, outputText, toolStatusLabel, type ToolCard } from '../run/toolCards'
+import { commandCwd, commandLine, commandResult, formatArguments, outputText, type ToolCard } from '../run/toolCards'
+import { basename, diffStats } from '../run/display'
 import {
   diffPreview,
   filePreview,
@@ -9,6 +10,7 @@ import {
   inspectorTitle,
   type InspectorSelection,
 } from '../run/timeline'
+
 const props = defineProps<{
   open: boolean
   selection: InspectorSelection
@@ -29,7 +31,10 @@ const selectedTool = computed(() => {
   return props.toolCards.find((card) => card.id === selection.toolCallId) ?? null
 })
 const selectedDiff = computed(() => selectedTool.value ? diffPreview(selectedTool.value) : null)
+const selectedDiffStats = computed(() => diffStats(selectedDiff.value?.diff))
+const selectedDiffLines = computed(() => splitDiff(selectedDiff.value?.diff ?? ''))
 const selectedFile = computed(() => props.selection.kind === 'file' ? filePreview(props.events, props.selection.path) : null)
+const selectedFileLines = computed(() => (selectedFile.value?.content ?? '').split('\n'))
 const selectedCommand = computed(() => selectedTool.value?.name === 'run_command' ? commandResult(selectedTool.value) : null)
 const firstDiffTool = computed(() => props.toolCards.find((card) => diffPreview(card)) ?? null)
 const latestCommandTool = computed(() => [...props.toolCards].reverse().find((card) => card.name === 'run_command') ?? null)
@@ -55,16 +60,32 @@ function isReviewSelection(selection: InspectorSelection) {
 function isToolSelection(selection: InspectorSelection): selection is Extract<InspectorSelection, { toolCallId: string }> {
   return selection.kind === 'tool' || selection.kind === 'diff' || selection.kind === 'command'
 }
+
+function splitDiff(diff: string) {
+  return diff.split('\n').filter((line) => line.length > 0).map((text, index) => ({
+    id: `${index}-${text}`,
+    text,
+    tone: diffLineTone(text),
+  }))
+}
+
+function diffLineTone(line: string) {
+  if (line.startsWith('+++') || line.startsWith('---')) return 'file'
+  if (line.startsWith('@@')) return 'hunk'
+  if (line.startsWith('+')) return 'add'
+  if (line.startsWith('-')) return 'remove'
+  return 'context'
+}
 </script>
 
 <template>
-  <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Inspector">
+  <aside class="inspector-pane" :class="{ closed: !props.open }" aria-label="Workspace panel">
     <header class="inspector-header">
       <div>
         <p class="section-label">Workspace</p>
         <h2>{{ title }}</h2>
       </div>
-      <button class="panel-icon-button" type="button" aria-label="Hide inspector" @click="emit('toggle')">〉</button>
+      <button class="panel-icon-button" type="button" aria-label="收起右侧面板" @click="emit('toggle')">〉</button>
     </header>
 
     <nav class="inspector-tabs compact-tabs" aria-label="Workspace panel tabs">
@@ -73,26 +94,26 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
     </nav>
 
     <section class="inspector-body">
-      <template v-if="props.selection.kind === 'tool'">
-        <article v-if="selectedTool" class="inspector-card">
-          <p class="mini-label">Tool call</p>
-          <h3>{{ selectedTool.name }}</h3>
-          <dl class="fact-list">
-            <div><dt>Status</dt><dd>{{ toolStatusLabel(selectedTool.status) }}</dd></div>
-            <div><dt>Call ID</dt><dd>{{ selectedTool.id }}</dd></div>
-          </dl>
-          <pre>{{ formatArguments(selectedTool.arguments) }}</pre>
-          <pre v-if="selectedTool.rawContent">{{ selectedTool.rawContent }}</pre>
+      <template v-if="props.selection.kind === 'diff'">
+        <article v-if="selectedDiff" class="review-surface">
+          <header class="review-toolbar">
+            <span>上一轮</span>
+            <b>+{{ selectedDiffStats.additions }}</b>
+            <i>-{{ selectedDiffStats.deletions }}</i>
+          </header>
+          <section class="review-file-header">
+            <span class="file-language">C</span>
+            <strong>{{ selectedDiff.path }}</strong>
+            <em>+{{ selectedDiffStats.additions }} -{{ selectedDiffStats.deletions }}</em>
+          </section>
+          <ol class="diff-lines" aria-label="Unified diff">
+            <li v-for="(line, index) in selectedDiffLines" :key="line.id" :class="`diff-${line.tone}`">
+              <span>{{ index + 1 }}</span>
+              <code>{{ line.text }}</code>
+            </li>
+          </ol>
         </article>
-      </template>
-
-      <template v-else-if="props.selection.kind === 'diff'">
-        <article v-if="selectedDiff" class="inspector-card diff-inspector">
-          <p class="mini-label">Proposed change</p>
-          <h3>{{ selectedDiff.path }}</h3>
-          <pre>{{ selectedDiff.diff }}</pre>
-        </article>
-        <p v-else class="empty-copy">No diff yet. Changes will appear here after the agent proposes an edit.</p>
+        <p v-else class="empty-copy panel-empty">Agent 提出文件变更后，diff 会出现在这里。</p>
       </template>
 
       <template v-else-if="props.selection.kind === 'command'">
@@ -106,19 +127,39 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
           <section class="terminal-output"><strong>stdout</strong><pre>{{ outputText(selectedCommand?.stdout) }}</pre></section>
           <section class="terminal-output stderr"><strong>stderr</strong><pre>{{ outputText(selectedCommand?.stderr) }}</pre></section>
         </article>
-        <p v-else class="empty-copy">No command selected.</p>
+        <p v-else class="empty-copy panel-empty">暂无命令记录。</p>
+      </template>
+
+      <template v-else-if="props.selection.kind === 'tool'">
+        <article v-if="selectedTool" class="inspector-card">
+          <p class="mini-label">Tool details</p>
+          <h3>{{ selectedTool.name }}</h3>
+          <pre>{{ formatArguments(selectedTool.arguments) }}</pre>
+          <pre v-if="selectedTool.rawContent">{{ selectedTool.rawContent }}</pre>
+        </article>
+        <p v-else class="empty-copy panel-empty">暂无可审查的工具记录。</p>
       </template>
 
       <template v-else-if="props.selection.kind === 'file'">
-        <article class="inspector-card file-preview">
-          <p class="mini-label">File</p>
-          <h3>{{ props.selection.path }}</h3>
-          <p v-if="selectedFile?.sizeBytes !== null" class="file-meta">{{ selectedFile?.sizeBytes }} bytes</p>
-          <pre v-if="selectedFile?.content">{{ selectedFile.content }}</pre>
-          <p v-else class="empty-copy">This file was discovered, but its content has not been read yet.</p>
+        <article class="review-surface file-review">
+          <header class="review-toolbar">
+            <span>文件</span>
+            <strong>{{ basename(props.selection.path) }}</strong>
+          </header>
+          <section class="review-file-header">
+            <span class="file-language">txt</span>
+            <strong>{{ props.selection.path }}</strong>
+            <em v-if="selectedFile?.sizeBytes !== null">{{ selectedFile?.sizeBytes }} bytes</em>
+          </section>
+          <ol v-if="selectedFile?.content" class="file-lines" aria-label="File preview">
+            <li v-for="(line, index) in selectedFileLines" :key="`${index}-${line}`">
+              <span>{{ index + 1 }}</span>
+              <code>{{ line || ' ' }}</code>
+            </li>
+          </ol>
+          <p v-else class="empty-copy panel-empty">文件已被发现，但内容还没有被读取。</p>
         </article>
       </template>
-
 
       <template v-else>
         <section class="file-list">
@@ -127,7 +168,7 @@ function isToolSelection(selection: InspectorSelection): selection is Extract<In
             <strong>{{ file.path }}</strong>
             <small v-if="file.sizeBytes !== null">{{ file.sizeBytes }} bytes</small>
           </button>
-          <p v-if="files.length === 0" class="empty-copy">Files will appear here after the agent inspects the workspace.</p>
+          <p v-if="files.length === 0" class="empty-copy panel-empty">Agent 查看 workspace 后，文件会出现在这里。</p>
         </section>
       </template>
     </section>

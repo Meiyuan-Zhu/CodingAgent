@@ -26,6 +26,12 @@ export type TimelineItem =
     }
   | {
       id: string
+      kind: 'thinking'
+      content: string
+      occurredAt: string | null
+    }
+  | {
+      id: string
       kind: 'tool'
       title: string
       summary: string
@@ -101,13 +107,17 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
     })
   }
 
+  let hasVisibleAssistantMessage = false
   for (const event of events) {
     if (event.type === 'MODEL_MESSAGE_RECEIVED') {
+      const content = humanModelContent(event)
+      if (!content) continue
+      hasVisibleAssistantMessage = true
       items.push({
         id: event.eventId,
         kind: 'assistant',
         title: modelTitle(event),
-        content: humanModelContent(event),
+        content,
         occurredAt: event.occurredAt,
         streaming: !activeRun || !terminalStatuses.has(activeRun.status),
       })
@@ -117,7 +127,7 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
       items.push({
         id: event.eventId,
         kind: 'run',
-        title: status === 'SUCCEEDED' ? 'Run completed' : 'Run stopped',
+        title: status === 'SUCCEEDED' ? '已完成' : '已停止',
         content: runFinishedContent(event),
         occurredAt: event.occurredAt,
         status,
@@ -125,7 +135,8 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
     }
   }
 
-  for (const card of buildToolCards(events)) {
+  const toolCards = buildToolCards(events)
+  for (const card of toolCards) {
     const approvalPending = card.status === 'waiting'
     items.push({
       id: `tool-${card.id}`,
@@ -136,6 +147,17 @@ export function buildTimelineItems(events: RunEvent[], activePrompt: string, act
       card,
       ...(approvalPending ? { reason: card.reason ?? 'This action needs your permission before it runs.' } : {}),
     } as TimelineItem)
+  }
+
+  const isActive = !!activeRun && !terminalStatuses.has(activeRun.status)
+  const hasStarted = events.some((event) => event.type === 'RUN_STARTED' || event.type === 'MODEL_REQUESTED')
+  if (isActive && hasStarted && !hasVisibleAssistantMessage && toolCards.length === 0) {
+    items.push({
+      id: 'thinking-active',
+      kind: 'thinking',
+      content: '正在思考',
+      occurredAt: events.find((event) => event.type === 'RUN_STARTED')?.occurredAt ?? activeRun.createdAt,
+    })
   }
 
   return items.sort((left, right) => timeValue(left.occurredAt) - timeValue(right.occurredAt))
@@ -160,11 +182,10 @@ export function approvalView(card: ToolCard): ApprovalView {
   }
 }
 
-export function inspectorTitle(selection: InspectorSelection, toolCards: ToolCard[]) {
-  if (selection.kind === 'tool' || selection.kind === 'diff' || selection.kind === 'command') {
-    const card = toolCards.find((item) => item.id === selection.toolCallId)
-    return card ? card.name : 'Inspector'
-  }
+export function inspectorTitle(selection: InspectorSelection, _toolCards: ToolCard[]) {
+  if (selection.kind === 'diff') return '审查'
+  if (selection.kind === 'command') return '命令'
+  if (selection.kind === 'tool') return '审查'
   if (selection.kind === 'file') return selection.path
   return 'Workspace'
 }
@@ -228,15 +249,19 @@ function modelTitle(event: RunEvent) {
 
 function humanModelContent(event: RunEvent) {
   const content = typeof event.payload.content === 'string' ? event.payload.content.trim() : ''
-  return content || 'The model requested a tool.'
+  if (!content) return ''
+  if (/^model requested tool execution\.?$/i.test(content)) return ''
+  if (/^the model requested a tool\.?$/i.test(content)) return ''
+  return content
 }
 
 function runFinishedContent(event: RunEvent) {
-  const status = String(event.payload.status ?? 'finished').toLowerCase()
-  const stopReason = String(event.payload.stopReason ?? 'unknown').toLowerCase()
-  const rounds = event.payload.roundsUsed
-  const tools = event.payload.toolCallsUsed
-  return `Status: ${status}. Stop reason: ${stopReason}. Rounds: ${rounds ?? '—'}, tools: ${tools ?? '—'}.`
+  const status = String(event.payload.status ?? 'finished')
+  const stopReason = String(event.payload.stopReason ?? '').toLowerCase()
+  if (status === 'SUCCEEDED') return '任务已完成。变更和验证结果可在审查面板中查看。'
+  if (status === 'CANCELLED') return '任务已取消。'
+  if (stopReason) return `任务停止：${stopReason}`
+  return '任务已停止。'
 }
 
 function approvalTitle(card: ToolCard) {
@@ -265,10 +290,10 @@ function toolSummary(card: ToolCard) {
 }
 
 function riskCopy(toolName: string) {
-  if (toolName === 'run_command') return 'This will run a local process inside the configured workspace.'
-  if (toolName === 'replace_text') return 'This will modify a workspace file. Review the diff before approving.'
-  if (toolName === 'write_file') return 'This will create or overwrite a workspace file. Review the content before approving.'
-  return 'This action requires explicit user approval before it can continue.'
+  if (toolName === 'run_command') return 'Agent 想在本地 workspace 内运行命令。批准前请确认命令和工作目录。'
+  if (toolName === 'replace_text') return 'Agent 想修改 workspace 文件。批准前请先查看 diff。'
+  if (toolName === 'write_file') return 'Agent 想创建或覆盖 workspace 文件。批准前请先查看拟写入内容。'
+  return '这个动作需要你明确批准后才会继续。'
 }
 
 function timeValue(value: string | null) {

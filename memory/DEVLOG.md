@@ -331,3 +331,10 @@
 - 样式：压缩 workspace header、empty thread、composer、Inspector tab 和文件卡片的 padding/radius/shadow，让初始界面更接近 Codex 的清爽工作台。
 - 验证：`frontend/` 执行 `npm run build` 通过；in-app browser 刷新 `http://localhost:5173/` 后确认左栏为 260px、右侧两个入口约 34px 高、Inspector 无 backend chip、底部 terminal DOM 不存在、console 无 warning/error。
 - 限制：本次仍是空状态目视验收，尚未录制或验收完整真实模型修复闭环的动态界面。
+
+## 2026-08-29
+
+- 使用 Frontend Design Premium / frontend-design 约束重整前端工作台语义展示：新增 `DESIGN.md` 记录 Codex-like 本地工作台视觉与交互约定。
+- 将工具事件从 raw card 映射为 Codex-like 轻量动作行和文件变更摘要卡：隐藏空的 tool-call 模型消息，运行中无可见内容时显示“正在思考”，run 结束不再展示 rounds/tools 等内部元数据。
+- 重做右侧 Workspace 面板：保留“审查/文件”，审查面板以行号和增删色块显示 diff；文件面板以文件列表和行号预览展示已读取内容。
+- 修复设计审计发现的假 affordance 与 form/textarea 约束：项目行不再是无动作按钮，composer 使用 `novalidate`，textarea 明确不可拖拽。

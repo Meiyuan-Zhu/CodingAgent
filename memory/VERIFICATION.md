@@ -748,3 +748,13 @@
 - 浏览器检查：in-app browser 打开并刷新 `http://localhost:5173/`。
 - 检查结果：左侧栏 computed width 为 260px；右侧审查/文件入口高度约 34px；右侧 Inspector 不再显示 backend chip；底部 `.bottom-terminal` DOM 不存在；浏览器 console 无 warning/error。
 - 限制：只覆盖空状态页面和基础布局，不覆盖完整审批后终态。
+
+## UI-008 — Codex-like 语义叙事 UI 优化验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`DESIGN.md`、`frontend/src/run/display.ts`、`frontend/src/run/timeline.ts`、`frontend/src/components/ActionRow.vue`、`ChangeSummaryCard.vue`、`ApprovalCard.vue`、`ChatTimeline.vue`、`InspectorPane.vue`、`ProjectSidebar.vue`、`ComposerBox.vue`、`frontend/src/style.css`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict`。结果：通过，0 findings。
+- 命令：`rg -n "(?:window\.)?(?:alert|confirm|prompt)\s*\(|href=\"#\"|v-html|innerHTML|cursor:\s*pointer|resize:\s*vertical" frontend/src DESIGN.md || true`。结果：仅命中全局 `button { cursor: pointer; }`，未发现 native dialog、假链接、`v-html`、`innerHTML` 或 textarea vertical resize。
+- 浏览器检查：打开 `http://localhost:5173/`，确认右侧 tabs 为“审查/文件”、无 `.bottom-terminal` DOM、composer textarea `resize: none`、控制台 warning/error 为空。
+- 未覆盖：未在本次验证中真实点击 Run 执行 DeepSeek 任务，因此 Approve/Reject 后的完整真实模型终态目视验收仍需在录屏前补。

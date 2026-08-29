@@ -15,10 +15,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <form class="composer-box" aria-label="Task composer" @submit.prevent="emit('submit')">
+  <form class="composer-box" aria-label="Task composer" novalidate @submit.prevent="emit('submit')">
     <textarea
       v-model="model"
       aria-label="Task input"
+      class="resize-none"
       placeholder="Ask the agent to inspect, edit, and verify this workspace"
       rows="3"
       @keydown.meta.enter.prevent="emit('submit')"

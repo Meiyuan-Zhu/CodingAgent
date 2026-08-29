@@ -4,6 +4,7 @@ import type { RunResponse } from '../api/runs'
 const props = defineProps<{
   activeRunId: string | null
   runs: RunResponse[]
+  runTitles: Record<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -13,6 +14,10 @@ const emit = defineEmits<{
 
 function shortId(id: string) {
   return id.slice(0, 8)
+}
+
+function titleFor(run: RunResponse) {
+  return props.runTitles[run.id] || shortId(run.id)
 }
 </script>
 
@@ -32,12 +37,12 @@ function shortId(id: string) {
 
     <section class="sidebar-section">
       <p class="section-label">Project</p>
-      <button class="project-row active" type="button">
+      <div class="project-row active">
         <span class="folder-icon">▱</span>
         <span>
           <strong>CodingAgent</strong>
         </span>
-      </button>
+      </div>
     </section>
 
     <section class="sidebar-section runs-section">
@@ -51,7 +56,7 @@ function shortId(id: string) {
         @click="emit('selectRun', run)"
       >
         <span>
-          <strong>{{ shortId(run.id) }}</strong>
+          <strong>{{ titleFor(run) }}</strong>
           <small>{{ new Date(run.createdAt).toLocaleTimeString() }}</small>
         </span>
         <em :class="`run-status-${run.status.toLowerCase()}`">{{ run.status.toLowerCase() }}</em>

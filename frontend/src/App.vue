@@ -24,6 +24,7 @@ const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
 const runHistory = ref<RunResponse[]>([])
+const runTitles = ref<Record<string, string>>({})
 const events = ref<RunEvent[]>([])
 const eventSource = ref<EventSource | null>(null)
 const inspectorSelection = ref<InspectorSelection>({ kind: 'welcome' })
@@ -99,6 +100,7 @@ async function submitRun() {
     const run = await createRun(prompt)
     activeRun.value = run
     activePrompt.value = prompt
+    runTitles.value = { ...runTitles.value, [run.id]: titleFromPrompt(prompt) }
     upsertRun(run)
     connectEventStream(run.id)
   } catch (caught) {
@@ -199,6 +201,8 @@ async function selectRun(run: RunResponse) {
   upsertRun(run)
   try {
     events.value = await fetchRunEvents(run.id)
+    const title = titleFromEvents(events.value)
+    if (title) runTitles.value = { ...runTitles.value, [run.id]: title }
   } catch (caught) {
     events.value = []
     runError.value = caught instanceof Error ? caught.message : 'Failed to load run events'
@@ -303,6 +307,16 @@ function upsertRun(run: RunResponse) {
   runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
 }
 
+function titleFromEvents(runEvents: RunEvent[]) {
+  const event = runEvents.find((item) => item.type === 'USER_MESSAGE_ACCEPTED')
+  return typeof event?.payload.prompt === 'string' ? titleFromPrompt(event.payload.prompt) : ''
+}
+
+function titleFromPrompt(prompt: string) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim()
+  return normalized.length > 34 ? `${normalized.slice(0, 34)}…` : normalized
+}
+
 function closeEventStream() {
   eventSource.value?.close()
   eventSource.value = null
@@ -314,6 +328,7 @@ function closeEventStream() {
     <ProjectSidebar
       :active-run-id="activeRun?.id ?? null"
       :runs="runHistory"
+      :run-titles="runTitles"
       @new-task="resetComposer"
       @select-run="selectRun"
     />
