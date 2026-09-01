@@ -14,6 +14,7 @@ defineProps<{
     | 'search'
     | 'stop'
     | 'undo'
+    | 'arrow-up'
 }>()
 </script>
 

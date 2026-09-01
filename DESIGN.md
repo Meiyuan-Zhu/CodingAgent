@@ -18,19 +18,20 @@ Runtime CSS variables and component styles in `frontend/src/style.css` are curre
 
 ## Visual vocabulary
 
-- Background: white and very light neutral gray surfaces.
+- Background: white and very light neutral gray surfaces with a barely visible technical grid under the main shell. The texture should feel precise and quiet, not decorative.
 - Text: near-black body text with muted gray secondary text.
 - Accent: green for healthy/successful state, amber for permission-needed state, red for failures, blue only for selected review affordances.
 - Shape: rounded but controlled. Composer and empty-state cards are softer; action rows are flatter.
-- Elevation: only the composer and empty-state intro use visible shadow. Operational rows should stay quiet.
+- Elevation: the composer, active change card, and inspector diff block may use visible but soft shadow. Operational rows should stay quiet.
 - Iconography: use the shared line-style UI icon component for tool rows, tabs, run/stop, and undo affordances instead of one-off text glyphs.
 - Motion: restrained micro-interactions only: hover lift, live thinking pulse, and progressive assistant text. All motion must respect reduced-motion settings.
+- Typography: prefer a Geist-like sans-serif stack. Use compact, confident weights; avoid oversized marketing headings inside the workbench.
 
 ## Layout
 
-- Left sidebar: project identity and run list, compact and stable.
-- Center: chat/task narrative. User prompt appears as a right-aligned bubble; assistant progress appears as natural language plus small action rows.
-- Right panel: two user-facing surfaces only: 审查 and 文件. 审查 owns diffs and command/tool evidence; 文件 owns discovered files and readable previews.
+- Left sidebar: project identity and run list, compact and stable, with enough width for Chinese task titles to scan cleanly.
+- Center: chat/task narrative with a readable Codex-like measure. User prompt appears as a right-aligned bubble; assistant progress appears as natural language plus small action rows.
+- Right panel: two user-facing surfaces only: 审查 and 文件. 审查 owns the list of modified files and their diffs; 文件 owns discovered files and readable previews.
 - The right panel may collapse and resize. There is no persistent bottom terminal until backend terminal semantics exist.
 
 ## Interaction principles

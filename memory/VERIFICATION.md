@@ -1140,3 +1140,29 @@
 - 命令：`cd backend && mvn test`。结果：通过，149 tests, 0 failures, 0 errors, 0 skipped。
 - 运行检查：后端已重新执行 `cd backend && mvn spring-boot:run`，在默认配置下启动到 8080；前端 Vite 保持 `http://localhost:5173/`。
 - 说明：本轮未主动创建真实模型 run，避免额外发送用户任务到外部模型服务；刷新页面后新建任务会使用默认 DeepSeek provider。
+
+## UI-016 — Codex-like 高级视觉升级验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：前端工作台视觉系统、三栏尺度、sidebar、workspace header、timeline、composer、审查 diff、文件预览和设计上下文。
+- 实现检查：
+  - 左侧栏从 260px 调整为 288px，中间主列最小宽度从 520px 调整为 560px，提升任务列表和对话区稳定性。
+  - `frontend/src/style.css` 增加 Codex-like token 覆盖层：浅色技术网格背景、Geist-like 字体栈、玻璃 header/composer、统一滚动条、克制阴影和状态色。
+  - 中间 timeline 收敛为 820px 阅读宽度，用户气泡使用深色高对比，assistant 输出保持轻量叙事面。
+  - 右侧 Inspector 的审查文件行、语言徽标、diff block、横向滚动代码区和文件预览面板完成视觉统一。
+  - `DESIGN.md` 已同步记录本轮视觉方向，避免后续漂回普通后台模板。
+- 追加修正：
+  - 用户消息气泡从深色改为 Codex 参考中的右侧浅灰气泡，避免通用段落色覆盖后出现深底深字不可读。
+  - 对话区进一步按 Codex 参考收敛：用户消息靠右，assistant 正文和工具动作保持中央阅读流，工具动作降低视觉权重。
+  - 顶部左侧 workspace 图标改为共享 folder icon，移除异常空白方块来源。
+  - 顶部右侧移除在线/运行状态 chip，避免和审查入口重叠；折叠审查面板时只显示小型图标按钮。
+  - Composer 去掉预设任务 chip，收窄为 Codex-like 输入框，并使用圆形 icon 发送按钮。
+  - Composer 宽度恢复为随页面可用宽度自适应的 `min(760px, calc(100% - 56px))`，接近空状态说明卡宽度。
+  - Composer 底部去掉 `+` 和 `本地 workspace`，只保留“帮我批准”模式开关和运行控制；发送按钮改为向上箭头 icon。
+  - 前端新增自动批准模式：开启后检测到 `pendingApproval` 会自动调用现有 approve API；在已有待审批状态下打开也会立即批准。
+  - “帮我批准”已改为 Codex-like 权限模式选择器：点击后弹出菜单，可选择“请求批准”或“帮我批准”，并显示当前选中状态。
+  - 修复权限菜单显示异常：最终 CSS 覆盖 `composer-box { overflow: visible; }`，避免 popover 被输入框裁剪；模板确认包含“请求批准”和“帮我批准”两个 menuitem。
+  - 修复发送箭头和权限图标异常：发送按钮改用稳定文本箭头，权限模式按钮改用局部 `approval-glyph`，避免全局 `.ui-icon` 伪元素叠加。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 说明：本轮为视觉与前端构建验证；最终提交前仍建议在浏览器中刷新 `http://localhost:5173/` 做一次人工目视验收。

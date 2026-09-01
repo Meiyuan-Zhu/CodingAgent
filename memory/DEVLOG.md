@@ -579,3 +579,19 @@
 - 如果一个文件的修改都已撤销，审查文件列表显示 `已撤销`，不再继续显示绿色新增/删除统计。
 - 单个 diff block 会根据 `tool.undone` 显示 `已撤销`，撤销按钮禁用，diff 内容弱化展示，和聊天卡片的撤销状态保持一致。
 - 验证：`cd frontend && npm run build` 通过。
+
+## 2026-09-01：Codex-like 高级视觉升级
+
+- 根据用户提供的 Codex 参考图和当前前端截图，使用 Frontend Design Premium 与 gpt-taste 约束重新收敛工作台视觉方向。
+- 保持现有三栏产品结构不变，不引入 landing page 或无功能装饰；重点优化 sidebar、workspace header、timeline、composer、审查 diff 和文件预览的视觉层级。
+- 左侧栏宽度从 260px 调整为 288px，中间主列最小宽度从 520px 调整为 560px，提升任务标题和中英文混排的可读性。
+- 新增 Codex-like token 覆盖层：Geist-like 字体栈、浅色技术网格底纹、玻璃质感 header/composer、克制阴影、统一圆角、稳定滚动条和更清晰的成功/失败/运行状态芯片。
+- 优化中间对话区：消息阅读宽度收敛到 820px，用户气泡改为深色高对比，assistant 内容保持轻量白色叙事面；底部 composer 改为更精致的大输入面板和灰色主运行按钮。
+- 优化右侧 Inspector：审查文件行、语言徽标、diff block、横向滚动代码区和文件预览面板进一步接近 Codex 的密度与层次。
+- 更新 `DESIGN.md`，记录本轮高级视觉语言，避免后续 UI 回退到普通后台模板。
+- 根据用户反馈继续修正对话区：上一轮深色用户气泡被通用段落色覆盖，导致文字不可读；本轮改为 Codex 参考中的右侧浅灰用户气泡，并把 assistant 正文、工具动作行和变更卡片收敛到中央对话流。
+- 根据用户继续反馈修正三个细节：顶部左侧 workspace 图标改为共享 folder icon，移除导致异常空白方块的 CSS 伪元素；顶部右侧移除在线/运行状态 chip，仅保留一个小型面板图标按钮；composer 去掉预设任务 chip，压窄宽度并改为 Codex-like 的轻量输入框和圆形发送按钮。
+- 根据用户对 Codex composer 的进一步参考，将输入框宽度恢复为自适应的 `min(760px, calc(100% - 56px))`，去掉 `+` 和 `本地 workspace` 等底部杂项文案；发送按钮改为向上箭头 icon。
+- 新增前端“帮我批准”模式：composer 中提供一个 Codex-like pill 开关；开启后，前端在检测到待审批工具调用时自动调用现有 approve API，已出现待审批时打开开关也会立即批准。该模式不绕过后端审批事件和审查记录。
+- 将“帮我批准”从单一开关改为 Codex-like 权限模式选择器：点击后弹出菜单，可在“请求批准”和“帮我批准”之间切换；当前模式在 composer 底部以轻量 pill 展示。
+- 根据用户截图修复 composer 权限菜单显示异常：最终生效 CSS 中 `composer-box` 改为允许 popover 溢出，避免菜单只露出一个选项；发送按钮不再使用 CSS 伪元素拼出的 `UiIcon arrow-up`，改为稳定文本箭头；权限按钮图标改为控件内局部 class，避免被全局 `.ui-icon` 规则污染。

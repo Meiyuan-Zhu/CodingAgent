@@ -4,6 +4,7 @@ import ChatTimeline from './components/ChatTimeline.vue'
 import ComposerBox from './components/ComposerBox.vue'
 import InspectorPane from './components/InspectorPane.vue'
 import ProjectSidebar from './components/ProjectSidebar.vue'
+import UiIcon from './components/UiIcon.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
 import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
 import { fetchWorkspaceFile, fetchWorkspaceFiles, type WorkspaceFileEntry, type WorkspaceFileResponse } from './api/workspace'
@@ -21,6 +22,7 @@ const taskDraft = ref(defaultPrompt)
 const submitting = ref(false)
 const cancelling = ref(false)
 const resolvingApproval = ref(false)
+const autoApprove = ref(false)
 const undoingToolCallId = ref<string | null>(null)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
@@ -40,24 +42,8 @@ const loadingWorkspacePath = ref<string | null>(null)
 const workspaceError = ref<string | null>(null)
 
 const layoutStyle = computed(() => ({
-  gridTemplateColumns: `260px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
+  gridTemplateColumns: `288px minmax(560px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
 }))
-
-const healthStatus = computed(() => {
-  if (loadingHealth.value) return 'checking'
-  if (healthError.value) return 'offline'
-  return health.value?.status ?? 'unknown'
-})
-
-const healthLabel = computed(() => {
-  const labels: Record<string, string> = {
-    checking: '检查中',
-    offline: '离线',
-    ok: '在线',
-    unknown: '未知',
-  }
-  return labels[healthStatus.value] ?? healthStatus.value
-})
 
 const canSubmit = computed(() => {
   return !submitting.value && !loadingHealth.value && !healthError.value && taskDraft.value.trim().length > 0
@@ -87,7 +73,6 @@ const timelineItems = computed(() => buildTimelineItems(events.value, activeProm
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
 const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? '代码任务' : 'CodingAgent')
 const workspaceSubtitle = computed(() => activeRun.value ? workspacePath : '本地 workspace')
-const runStatusLabel = computed(() => activeRun.value ? statusLabel(effectiveRunStatus.value) : '')
 
 watch(inspectorSelection, (next) => {
   if (next.kind !== 'welcome') inspectorOpen.value = true
@@ -102,6 +87,16 @@ watch(toolCards, (cards) => {
     inspectorSelection.value = { kind: 'welcome' }
   }
 }, { deep: true })
+
+watch(pendingApproval, (approval) => {
+  if (!approval || !autoApprove.value || resolvingApproval.value) return
+  void approvePendingTool()
+})
+
+watch(autoApprove, (enabled) => {
+  if (!enabled || !pendingApproval.value || resolvingApproval.value) return
+  void approvePendingTool()
+})
 
 onMounted(async () => {
   window.addEventListener('mousemove', handlePanelResize)
@@ -453,19 +448,6 @@ function upsertRun(run: RunResponse) {
   runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
 }
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    CREATED: '已创建',
-    RUNNING: '运行中',
-    WAITING_FOR_APPROVAL: '等待批准',
-    CANCELLING: '取消中',
-    CANCELLED: '已取消',
-    FAILED: '失败',
-    SUCCEEDED: '已完成',
-  }
-  return labels[status] ?? status.toLowerCase()
-}
-
 function titleFromEvents(runEvents: RunEvent[]) {
   const event = runEvents.find((item) => item.type === 'USER_MESSAGE_ACCEPTED')
   return typeof event?.payload.prompt === 'string' ? titleFromPrompt(event.payload.prompt) : ''
@@ -495,16 +477,17 @@ function closeEventStream() {
     <section class="workspace-column" aria-label="对话工作区">
       <header class="workspace-header">
         <div class="workspace-titlebar">
-          <span class="workspace-folder" aria-hidden="true"></span>
+          <span class="workspace-folder" aria-hidden="true">
+            <UiIcon name="folder" />
+          </span>
           <div>
             <h1>{{ workspaceTitle }}</h1>
             <p class="workspace-subtitle">{{ workspaceSubtitle }}</p>
           </div>
         </div>
-        <div class="run-health">
-          <span class="health-pill" :class="`health-${healthStatus}`">{{ healthLabel }}</span>
-          <span v-if="activeRun" class="run-chip">{{ runStatusLabel }}</span>
-        </div>
+        <button class="workspace-panel-button" type="button" :aria-label="inspectorOpen ? '收起审查面板' : '展开审查面板'" @click="inspectorOpen = !inspectorOpen">
+          <UiIcon :name="inspectorOpen ? 'chevron-right' : 'review'" />
+        </button>
       </header>
 
       <ChatTimeline
@@ -526,12 +509,16 @@ function closeEventStream() {
         :submitting="submitting"
         :cancelling="cancelling"
         :can-cancel="canCancel"
+        :auto-approve="autoApprove"
         @submit="submitRun"
         @cancel="cancelActiveRun"
+        @set-auto-approve="autoApprove = $event"
       />
     </section>
 
-    <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="展开审查面板" @click="inspectorOpen = true">审查</button>
+    <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="展开审查面板" @click="inspectorOpen = true">
+      <UiIcon name="review" />
+    </button>
     <div v-if="inspectorOpen" class="inspector-resize-handle" role="separator" aria-orientation="vertical" title="拖拽调整审查面板宽度" @mousedown.prevent="startInspectorResize"></div>
 
     <InspectorPane

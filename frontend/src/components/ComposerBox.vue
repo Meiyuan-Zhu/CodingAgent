@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import UiIcon from './UiIcon.vue'
 
 const model = defineModel<string>({ required: true })
@@ -8,27 +9,16 @@ const props = defineProps<{
   submitting: boolean
   cancelling: boolean
   canCancel: boolean
+  autoApprove: boolean
 }>()
 
 const emit = defineEmits<{
   submit: []
   cancel: []
+  setAutoApprove: [enabled: boolean]
 }>()
 
-const suggestions = [
-  {
-    label: '修复 demo 测试',
-    prompt: '修复 demo workspace 中失败的 Python pricing 测试，并运行 unittest 验证。',
-  },
-  {
-    label: '审查最近改动',
-    prompt: '阅读当前 repo 的最近改动，指出可能的风险、遗漏的测试和需要我确认的地方。',
-  },
-  {
-    label: '优化前端体验',
-    prompt: '检查前端工作台界面，按 Codex-like 方向优化交互、文案和视觉细节。',
-  },
-]
+const approvalMenuOpen = ref(false)
 
 function handleEnter(event: KeyboardEvent) {
   if (event.isComposing || event.shiftKey) return
@@ -36,8 +26,9 @@ function handleEnter(event: KeyboardEvent) {
   emit('submit')
 }
 
-function useSuggestion(prompt: string) {
-  model.value = prompt
+function selectApprovalMode(enabled: boolean) {
+  emit('setAutoApprove', enabled)
+  approvalMenuOpen.value = false
 }
 </script>
 
@@ -53,25 +44,50 @@ function useSuggestion(prompt: string) {
       @keydown.meta.enter.prevent="emit('submit')"
       @keydown.ctrl.enter.prevent="emit('submit')"
     />
-    <div v-if="model.trim().length === 0" class="composer-suggestions" aria-label="快捷任务建议">
-      <button v-for="suggestion in suggestions" :key="suggestion.label" type="button" @click="useSuggestion(suggestion.prompt)">
-        {{ suggestion.label }}
-      </button>
-    </div>
     <footer class="composer-footer">
       <div class="composer-hints">
-        <span>本地 workspace</span>
-        <span>编辑和命令需要批准</span>
-        <span>Shift Return 换行</span>
+        <div class="approval-mode" @keydown.escape.stop="approvalMenuOpen = false">
+          <button
+            class="approval-mode-button"
+            type="button"
+            :class="{ active: props.autoApprove }"
+            :aria-expanded="approvalMenuOpen"
+            aria-haspopup="menu"
+            aria-label="选择批准方式"
+            @click="approvalMenuOpen = !approvalMenuOpen"
+          >
+            <span class="approval-glyph" aria-hidden="true"></span>
+            <span>{{ props.autoApprove ? '帮我批准' : '请求批准' }}</span>
+            <span class="approval-caret" aria-hidden="true"></span>
+          </button>
+
+          <div v-if="approvalMenuOpen" class="approval-mode-menu" role="menu" aria-label="批准方式">
+            <button type="button" role="menuitemradio" :aria-checked="!props.autoApprove" @click="selectApprovalMode(false)">
+              <span class="mode-icon mode-icon-hand" aria-hidden="true"></span>
+              <span>
+                <strong>请求批准</strong>
+                <small>修改文件和执行命令前询问</small>
+              </span>
+              <b v-if="!props.autoApprove" aria-hidden="true">✓</b>
+            </button>
+            <button type="button" role="menuitemradio" :aria-checked="props.autoApprove" @click="selectApprovalMode(true)">
+              <span class="mode-icon mode-icon-agent" aria-hidden="true"></span>
+              <span>
+                <strong>帮我批准</strong>
+                <small>自动批准检测到的操作</small>
+              </span>
+              <b v-if="props.autoApprove" aria-hidden="true">✓</b>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="composer-actions">
-        <button class="ghost-button" type="button" :disabled="!props.canCancel" aria-label="停止当前任务" @click="emit('cancel')">
+        <button v-if="props.canCancel" class="ghost-button" type="button" aria-label="停止当前任务" @click="emit('cancel')">
           <UiIcon name="stop" />
-          {{ props.cancelling ? '停止中' : '停止' }}
+          <span>{{ props.cancelling ? '停止中' : '停止' }}</span>
         </button>
-        <button class="send-button" type="submit" :disabled="props.disabled">
-          <UiIcon name="run" />
-          {{ props.submitting ? '启动中' : '运行' }}
+        <button class="send-button" type="submit" :disabled="props.disabled" :aria-label="props.submitting ? '启动中' : '运行'">
+          <span class="send-arrow" aria-hidden="true">↑</span>
         </button>
       </div>
     </footer>
