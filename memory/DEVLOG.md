@@ -599,3 +599,6 @@
 - 将“变更待审查”提示从页面中部偏移改回贴近 composer 上沿的位置：最终 CSS 覆盖 `floating-change-chip bottom: 10px`，避免遮挡正文内容。
 - 根据用户最新反馈，移除 timeline 中央悬浮的“1 个变更待审查”提示，不再在对话区重复展示右侧审查信息。
 - 修复右侧审查面板纵向滚动：Inspector 外壳固定裁剪，`.inspector-body` 负责 `overflow-y: auto`，长审查列表和 diff 可在侧栏内上下滚动。
+- 根据用户截图发现上一版滚动修复仍不够：Inspector 在主 grid 中未显式跨满全部行，导致右侧面板滚动边界仍可能被中间 composer 行影响。
+- 进一步修复右侧滚动高度链路：Inspector 显式 `grid-row: 1 / -1`、`height: 100vh`、flex column 布局，header/tabs 固定，body 占剩余空间并独立纵向滚动。
+- 清理所有遗留 `.floating-change-chip` 样式，确保“变更待审查”悬浮提示不会被后续样式复活。

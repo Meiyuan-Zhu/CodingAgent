@@ -1167,6 +1167,8 @@
   - “变更待审查”提示位置修正为贴近 composer 上沿：最终 CSS 覆盖 `floating-change-chip bottom: 10px`。
   - Timeline 中央悬浮的“变更待审查”提示已移除，审查入口只保留在右侧 Inspector。
   - 右侧 Inspector 通过 `.inspector-body { overflow-y: auto; }` 接管纵向滚动，长审查列表和展开 diff 不再撑出面板。
+  - 追加修正：Inspector 显式跨满主布局全部 grid rows，并使用 `height: 100vh` + flex column 固定高度链路；header/tabs 不滚动，body 独立滚动。
+  - 源码中已确认不再存在 `floating-change-chip` 或“变更待审查”时间线提示。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
 - 说明：本轮为视觉与前端构建验证；最终提交前仍建议在浏览器中刷新 `http://localhost:5173/` 做一次人工目视验收。
