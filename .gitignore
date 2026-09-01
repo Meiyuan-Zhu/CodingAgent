@@ -16,7 +16,12 @@ coverage/
 /backend/data/
 /workspaces/*
 !/workspaces/demo/
-!/workspaces/demo/**
+/workspaces/demo/*
+!/workspaces/demo/README.md
+!/workspaces/demo/src/
+!/workspaces/demo/src/**
+!/workspaces/demo/tests/
+!/workspaces/demo/tests/**
 /workspaces/demo/*.cpp
 /workspaces/demo/selftest_*.py
 /workspaces/demo/selftest_*
