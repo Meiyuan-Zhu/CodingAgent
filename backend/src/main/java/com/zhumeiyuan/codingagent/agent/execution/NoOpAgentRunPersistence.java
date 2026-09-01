@@ -33,4 +33,8 @@ final class NoOpAgentRunPersistence implements AgentRunPersistence {
 	@Override
 	public void deletePendingApproval(RunId runId) {
 	}
+
+	@Override
+	public void deleteRun(RunId runId) {
+	}
 }

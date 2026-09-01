@@ -12,16 +12,25 @@ public class WorkspacePathResolver {
 	private static final Set<String> SENSITIVE_NAMES = Set.of(".env", ".env.local", ".env.development",
 			".env.production", ".env.test");
 
-	private final Path configuredRoot;
-	private final Path realRoot;
+	private volatile Path configuredRoot;
+	private volatile Path realRoot;
 
 	public WorkspacePathResolver(Path configuredRoot) {
-		this.configuredRoot = Objects.requireNonNull(configuredRoot, "configuredRoot").toAbsolutePath().normalize();
+		switchRoot(configuredRoot);
+	}
+
+	public synchronized void switchRoot(Path configuredRoot) {
+		Path nextRoot = Objects.requireNonNull(configuredRoot, "configuredRoot").toAbsolutePath().normalize();
 		try {
-			Files.createDirectories(this.configuredRoot);
-			this.realRoot = this.configuredRoot.toRealPath();
+			Files.createDirectories(nextRoot);
+			if (!Files.isDirectory(nextRoot, LinkOption.NOFOLLOW_LINKS)) {
+				throw new WorkspaceAccessException(WorkspaceAccessCode.NOT_DIRECTORY, nextRoot.toString(),
+						"Workspace root is not a directory");
+			}
+			this.configuredRoot = nextRoot;
+			this.realRoot = nextRoot.toRealPath();
 		} catch (IOException ex) {
-			throw new WorkspaceAccessException(WorkspaceAccessCode.IO_ERROR, this.configuredRoot.toString(),
+			throw new WorkspaceAccessException(WorkspaceAccessCode.IO_ERROR, nextRoot.toString(),
 					"Cannot initialize workspace root", ex);
 		}
 	}

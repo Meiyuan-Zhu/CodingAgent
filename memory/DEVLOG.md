@@ -602,3 +602,11 @@
 - 根据用户截图发现上一版滚动修复仍不够：Inspector 在主 grid 中未显式跨满全部行，导致右侧面板滚动边界仍可能被中间 composer 行影响。
 - 进一步修复右侧滚动高度链路：Inspector 显式 `grid-row: 1 / -1`、`height: 100vh`、flex column 布局，header/tabs 固定，body 占剩余空间并独立纵向滚动。
 - 清理所有遗留 `.floating-change-chip` 样式，确保“变更待审查”悬浮提示不会被后续样式复活。
+
+## 2026-09-01：项目切换与任务删除
+
+- 根据用户反馈修正左侧任务列表排序：`upsertRun` 仍更新任务状态，但最终按 `createdAt` 倒序排序，不再因为点击历史任务而把该任务移动到最上面。
+- 新增本地项目管理能力：后端持久化 `workspace_projects`，启动时自动注册默认 workspace；前端左侧项目区可添加本地目录或创建新目录，并切换当前项目。
+- `WorkspacePathResolver` 支持运行时切换 root；切换项目后，文件树、文件读取和后续 Agent 工具执行都会基于当前项目目录。
+- 新增 task 删除能力：`DELETE /api/runs/{runId}` 会取消非终态任务并删除 run、事件、pending approval 和 undo snapshot；前端每条任务行提供删除按钮。
+- 补充 API 测试覆盖：删除 run 后查询返回 404；添加并选择本地 project 后，workspace 文件列表来自新目录。

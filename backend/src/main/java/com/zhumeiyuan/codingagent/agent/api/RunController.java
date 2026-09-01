@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,6 +50,12 @@ class RunController {
 	@GetMapping("/{runId}")
 	RunResponse getRun(@PathVariable String runId) {
 		return RunResponse.from(this.agentRunService.getRun(RunId.from(runId)));
+	}
+
+	@DeleteMapping("/{runId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void deleteRun(@PathVariable String runId) {
+		this.agentRunService.deleteRun(RunId.from(runId));
 	}
 
 	@PostMapping("/{runId}/cancel")

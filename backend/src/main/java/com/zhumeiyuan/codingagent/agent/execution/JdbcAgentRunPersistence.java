@@ -112,6 +112,14 @@ final class JdbcAgentRunPersistence implements AgentRunPersistence {
 		this.jdbcTemplate.update("DELETE FROM pending_tool_approvals WHERE run_id = ?", runId.value());
 	}
 
+	@Override
+	public void deleteRun(RunId runId) {
+		this.jdbcTemplate.update("DELETE FROM pending_tool_approvals WHERE run_id = ?", runId.value());
+		this.jdbcTemplate.update("DELETE FROM workspace_change_undo WHERE run_id = ?", runId.value());
+		this.jdbcTemplate.update("DELETE FROM agent_run_events WHERE run_id = ?", runId.value());
+		this.jdbcTemplate.update("DELETE FROM agent_runs WHERE run_id = ?", runId.value());
+	}
+
 	private List<RunEvent> loadEvents(RunId runId) {
 		return this.jdbcTemplate.query("""
 				SELECT event_id, event_sequence, occurred_at, event_type, payload_json

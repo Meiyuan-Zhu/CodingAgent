@@ -17,4 +17,6 @@ interface AgentRunPersistence {
 	void savePendingApproval(PendingToolApproval approval);
 
 	void deletePendingApproval(RunId runId);
+
+	void deleteRun(RunId runId);
 }

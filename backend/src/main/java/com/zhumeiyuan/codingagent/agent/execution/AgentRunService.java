@@ -73,6 +73,14 @@ public class AgentRunService {
 		return completeCancellation(runId, interruptRequested);
 	}
 
+	public void deleteRun(RunId runId) {
+		AgentRun run = getRun(runId);
+		if (!run.status().isTerminal()) {
+			this.runTaskManager.cancel(runId);
+		}
+		this.store.delete(runId);
+	}
+
 	public AgentRun approveToolCall(RunId runId, String toolCallId) {
 		PendingToolApproval approval = consumeWaitingApproval(runId, toolCallId);
 		this.store.transition(runId, run -> run.resumeAfterApproval(this.clock));

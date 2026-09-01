@@ -32,3 +32,11 @@ CREATE TABLE IF NOT EXISTS workspace_change_undo (
 	result_json CLOB,
 	PRIMARY KEY (run_id, tool_call_id)
 );
+
+CREATE TABLE IF NOT EXISTS workspace_projects (
+	project_id VARCHAR(64) PRIMARY KEY,
+	name VARCHAR(256) NOT NULL,
+	path VARCHAR(2048) NOT NULL UNIQUE,
+	created_at VARCHAR(64) NOT NULL,
+	active BOOLEAN NOT NULL
+);

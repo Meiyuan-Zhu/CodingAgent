@@ -6,12 +6,11 @@ import InspectorPane from './components/InspectorPane.vue'
 import ProjectSidebar from './components/ProjectSidebar.vue'
 import UiIcon from './components/UiIcon.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
-import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
-import { fetchWorkspaceFile, fetchWorkspaceFiles, type WorkspaceFileEntry, type WorkspaceFileResponse } from './api/workspace'
+import { approveToolCall, cancelRun, createRun, deleteRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
+import { addWorkspaceProject, fetchWorkspaceFile, fetchWorkspaceFiles, fetchWorkspaceProjects, selectWorkspaceProject, type WorkspaceFileEntry, type WorkspaceFileResponse, type WorkspaceProject } from './api/workspace'
 import { buildToolCards } from './run/toolCards'
 import { buildTimelineItems, pendingApprovalView, type InspectorSelection } from './run/timeline'
 
-const workspacePath = '/Users/zhumeiyuan/Desktop/CodingAgent'
 const defaultPrompt = ''
 const terminalStatuses = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED'])
 
@@ -24,6 +23,8 @@ const cancelling = ref(false)
 const resolvingApproval = ref(false)
 const autoApprove = ref(false)
 const undoingToolCallId = ref<string | null>(null)
+const deletingRunId = ref<string | null>(null)
+const addingProject = ref(false)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
@@ -40,6 +41,7 @@ const expandedDirectories = ref<string[]>([])
 const selectedWorkspaceFile = ref<WorkspaceFileResponse | null>(null)
 const loadingWorkspacePath = ref<string | null>(null)
 const workspaceError = ref<string | null>(null)
+const projects = ref<WorkspaceProject[]>([])
 
 const layoutStyle = computed(() => ({
   gridTemplateColumns: `288px minmax(560px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
@@ -71,8 +73,9 @@ const effectiveActiveRun = computed(() => {
 })
 const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, effectiveActiveRun.value))
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
-const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? '代码任务' : 'CodingAgent')
-const workspaceSubtitle = computed(() => activeRun.value ? workspacePath : '本地 workspace')
+const activeProject = computed(() => projects.value.find((project) => project.active) ?? projects.value[0] ?? null)
+const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? '代码任务' : activeProject.value?.name ?? 'CodingAgent')
+const workspaceSubtitle = computed(() => activeProject.value?.path ?? '本地 workspace')
 
 watch(inspectorSelection, (next) => {
   if (next.kind !== 'welcome') inspectorOpen.value = true
@@ -112,6 +115,7 @@ onMounted(async () => {
 
   if (!healthError.value) {
     try {
+      await loadProjects()
       await loadRunHistory()
       await ensureWorkspaceDirectory('.')
     } catch (caught) {
@@ -446,6 +450,74 @@ async function refreshRun(runId: string) {
 
 function upsertRun(run: RunResponse) {
   runHistory.value = [run, ...runHistory.value.filter((item) => item.id !== run.id)]
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+}
+
+async function addProject(path: string, createDirectory: boolean) {
+  addingProject.value = true
+  runError.value = null
+  try {
+    const project = await addWorkspaceProject(path, createDirectory)
+    await loadProjects()
+    selectProjectLocally(project)
+    resetWorkspaceBrowser()
+    await ensureWorkspaceDirectory('.')
+    resetComposer()
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : '添加项目失败'
+  } finally {
+    addingProject.value = false
+  }
+}
+
+async function selectProject(project: WorkspaceProject) {
+  if (activeProject.value?.id === project.id) return
+  runError.value = null
+  try {
+    const selected = await selectWorkspaceProject(project.id)
+    await loadProjects()
+    selectProjectLocally(selected)
+    resetWorkspaceBrowser()
+    await ensureWorkspaceDirectory('.')
+    resetComposer()
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : '切换项目失败'
+  }
+}
+
+async function removeRun(run: RunResponse) {
+  if (deletingRunId.value) return
+  deletingRunId.value = run.id
+  runError.value = null
+  try {
+    await deleteRun(run.id)
+    runHistory.value = runHistory.value.filter((item) => item.id !== run.id)
+    const nextTitles = { ...runTitles.value }
+    delete nextTitles[run.id]
+    runTitles.value = nextTitles
+    if (activeRun.value?.id === run.id) resetComposer()
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : '删除任务失败'
+  } finally {
+    deletingRunId.value = null
+  }
+}
+
+async function loadProjects() {
+  projects.value = await fetchWorkspaceProjects()
+}
+
+function selectProjectLocally(project: WorkspaceProject) {
+  projects.value = projects.value.map((item) => ({ ...item, active: item.id === project.id }))
+}
+
+function resetWorkspaceBrowser() {
+  workspaceEntriesByDirectory.value = {}
+  expandedDirectories.value = []
+  selectedWorkspaceFile.value = null
+  loadingWorkspacePath.value = null
+  workspaceError.value = null
+  inspectorSelection.value = { kind: 'welcome' }
 }
 
 function titleFromEvents(runEvents: RunEvent[]) {
@@ -470,8 +542,15 @@ function closeEventStream() {
       :active-run-id="activeRun?.id ?? null"
       :runs="runHistory"
       :run-titles="runTitles"
+      :projects="projects"
+      :active-project-id="activeProject?.id ?? null"
+      :adding-project="addingProject"
+      :deleting-run-id="deletingRunId"
       @new-task="resetComposer"
       @select-run="selectRun"
+      @add-project="addProject"
+      @select-project="selectProject"
+      @delete-run="removeRun"
     />
 
     <section class="workspace-column" aria-label="对话工作区">

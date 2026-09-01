@@ -16,6 +16,46 @@ export interface WorkspaceFileResponse {
   sizeBytes: number
 }
 
+export interface WorkspaceProject {
+  id: string
+  name: string
+  path: string
+  createdAt: string
+  active: boolean
+}
+
+export async function fetchWorkspaceProjects(): Promise<WorkspaceProject[]> {
+  const response = await fetch('/api/workspace/projects')
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return response.json() as Promise<WorkspaceProject[]>
+}
+
+export async function addWorkspaceProject(path: string, create: boolean): Promise<WorkspaceProject> {
+  const response = await fetch('/api/workspace/projects', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ path, create }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return response.json() as Promise<WorkspaceProject>
+}
+
+export async function selectWorkspaceProject(projectId: string): Promise<WorkspaceProject> {
+  const response = await fetch(`/api/workspace/projects/${encodeURIComponent(projectId)}/select`, {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return response.json() as Promise<WorkspaceProject>
+}
+
 export async function fetchWorkspaceFiles(path = '.'): Promise<WorkspaceFilesResponse> {
   const response = await fetch(`/api/workspace/files?path=${encodeURIComponent(path)}`)
   if (!response.ok) {

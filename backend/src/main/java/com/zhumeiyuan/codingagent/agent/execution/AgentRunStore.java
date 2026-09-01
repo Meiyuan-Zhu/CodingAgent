@@ -86,6 +86,15 @@ public class AgentRunStore {
 		return stored(runId).eventsAfter(afterSequence);
 	}
 
+	public void delete(RunId runId) {
+		Objects.requireNonNull(runId, "runId");
+		StoredRun removed = this.runs.remove(runId);
+		if (removed == null) {
+			throw new AgentRunNotFoundException(runId);
+		}
+		this.persistence.deleteRun(runId);
+	}
+
 	private StoredRun stored(RunId runId) {
 		Objects.requireNonNull(runId, "runId");
 		StoredRun storedRun = this.runs.get(runId);

@@ -1,6 +1,7 @@
 package com.zhumeiyuan.codingagent.agent.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -84,6 +85,22 @@ class RunControllerTests {
 		this.mvc.perform(get("/api/runs/{runId}", "missing"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("run_not_found"));
+	}
+
+	@Test
+	void deleteRunRemovesRunAndEvents() throws Exception {
+		MvcResult createResult = this.mvc.perform(post("/api/runs")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"prompt\":\"list workspace files\"}"))
+				.andExpect(status().isAccepted())
+				.andReturn();
+		String runId = this.objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
+
+		this.mvc.perform(delete("/api/runs/{runId}", runId))
+				.andExpect(status().isNoContent());
+
+		this.mvc.perform(get("/api/runs/{runId}", runId))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

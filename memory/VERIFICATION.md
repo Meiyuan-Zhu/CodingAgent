@@ -1172,3 +1172,19 @@
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
 - 说明：本轮为视觉与前端构建验证；最终提交前仍建议在浏览器中刷新 `http://localhost:5173/` 做一次人工目视验收。
+
+## UI-017 — 项目切换、任务固定排序与删除验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：左侧任务列表排序、项目添加/切换、任务删除、workspace root 运行时切换。
+- 实现检查：
+  - 前端 `upsertRun` 改为按 `createdAt` 倒序排序，点击历史任务只选中，不再改变任务列表顺序。
+  - 前端项目区支持输入本地路径添加项目，勾选“新建文件夹”时由后端创建目录；切换项目后重置文件树和新任务 composer。
+  - 后端新增 `workspace_projects` 持久化表，默认项目启动时自动注册，当前项目切换会调用 `WorkspacePathResolver.switchRoot`。
+  - 后端新增 `DELETE /api/runs/{runId}`；删除非终态任务前会请求取消后台任务，并清理 run/event/pending approval/undo snapshot。
+  - 前端每条任务行拆分为选择区域和删除按钮，避免按钮嵌套导致点击事件混乱。
+- 命令：`cd backend && mvn -Dtest=RunControllerTests,WorkspaceControllerTests,WorkspacePathResolverTests test`。结果：通过，19 tests, 0 failures, 0 errors。
+- 命令：`cd backend && mvn test`。结果：通过，151 tests, 0 failures, 0 errors。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 说明：Spring/Mockito 测试在普通受限命令下触发 ByteBuddy self-attach 限制；使用已批准的 Maven 测试权限重新运行后通过。

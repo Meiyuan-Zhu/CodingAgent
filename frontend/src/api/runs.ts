@@ -63,6 +63,16 @@ export async function fetchRuns(): Promise<RunResponse[]> {
   return response.json() as Promise<RunResponse[]>
 }
 
+export async function deleteRun(runId: string): Promise<void> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`, {
+    method: 'DELETE',
+  })
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+}
+
 export async function fetchRunEvents(runId: string): Promise<RunEvent[]> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/events`)
 
