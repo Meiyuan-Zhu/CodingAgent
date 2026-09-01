@@ -1165,6 +1165,8 @@
   - 修复发送箭头和权限图标异常：发送按钮改用稳定文本箭头，权限模式按钮改用局部 `approval-glyph`，避免全局 `.ui-icon` 伪元素叠加。
   - 权限模式选择器已改为纯文字：模板和 CSS 中不再使用 `approval-glyph`、`mode-icon`、`ui-icon-arrow-up` 或 `UiIcon name="arrow-up"`。
   - “变更待审查”提示位置修正为贴近 composer 上沿：最终 CSS 覆盖 `floating-change-chip bottom: 10px`。
+  - Timeline 中央悬浮的“变更待审查”提示已移除，审查入口只保留在右侧 Inspector。
+  - 右侧 Inspector 通过 `.inspector-body { overflow-y: auto; }` 接管纵向滚动，长审查列表和展开 diff 不再撑出面板。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
 - 说明：本轮为视觉与前端构建验证；最终提交前仍建议在浏览器中刷新 `http://localhost:5173/` 做一次人工目视验收。

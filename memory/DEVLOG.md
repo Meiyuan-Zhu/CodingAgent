@@ -597,3 +597,5 @@
 - 根据用户截图修复 composer 权限菜单显示异常：最终生效 CSS 中 `composer-box` 改为允许 popover 溢出，避免菜单只露出一个选项；发送按钮不再使用 CSS 伪元素拼出的 `UiIcon arrow-up`，改为稳定文本箭头；权限按钮图标改为控件内局部 class，避免被全局 `.ui-icon` 规则污染。
 - 根据用户进一步反馈，权限模式选择器改为纯文字显示：移除按钮和菜单项中的图标、对勾以及未使用的 arrow-up/approval 图标样式；当前选中模式只通过浅色背景表达。
 - 将“变更待审查”提示从页面中部偏移改回贴近 composer 上沿的位置：最终 CSS 覆盖 `floating-change-chip bottom: 10px`，避免遮挡正文内容。
+- 根据用户最新反馈，移除 timeline 中央悬浮的“1 个变更待审查”提示，不再在对话区重复展示右侧审查信息。
+- 修复右侧审查面板纵向滚动：Inspector 外壳固定裁剪，`.inspector-body` 负责 `overflow-y: auto`，长审查列表和 diff 可在侧栏内上下滚动。

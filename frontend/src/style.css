@@ -4309,9 +4309,22 @@ textarea:focus-visible {
   color: #171a1f;
 }
 
-.floating-change-chip {
-  bottom: 10px;
-  z-index: 12;
-  transform: translateY(0);
-  box-shadow: 0 10px 30px rgba(31, 41, 55, 0.1);
+/* Inspector scroll fix: the right panel owns vertical scrolling. */
+.inspector-pane {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.inspector-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.review-surface,
+.workspace-file-browser,
+.review-file-list,
+.review-file-diffs {
+  min-height: 0;
 }

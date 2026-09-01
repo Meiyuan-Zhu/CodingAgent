@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 import ActionRow from './ActionRow.vue'
 import ApprovalCard from './ApprovalCard.vue'
 import ChangeSummaryCard from './ChangeSummaryCard.vue'
@@ -27,28 +27,6 @@ const timelineElement = ref<HTMLElement | null>(null)
 const displayedAssistantContent = ref<Record<string, string>>({})
 const userPinnedToBottom = ref(true)
 const streamTimers = new Map<string, number>()
-
-const changedCount = computed(() => props.items.filter((item) => item.kind === 'tool' && isChangeTool(item.card) && item.card.status === 'finished' && !item.card.undone).length)
-const firstChangedToolId = computed(() => {
-  const item = props.items.find((entry) => entry.kind === 'tool' && isChangeTool(entry.card) && !entry.card.undone)
-  return item?.kind === 'tool' ? item.card.id : ''
-})
-
-const changeTotals = computed(() => {
-  let additions = 0
-  let deletions = 0
-  for (const item of props.items) {
-    if (item.kind !== 'tool' || !isChangeTool(item.card) || item.card.undone || !item.card.result) continue
-    const diff = typeof item.card.result.unifiedDiff === 'string' ? item.card.result.unifiedDiff : ''
-    for (const line of diff.split('\n')) {
-      if (line.startsWith('+++') || line.startsWith('---')) continue
-      if (line.startsWith('+')) additions += 1
-      if (line.startsWith('-')) deletions += 1
-    }
-  }
-  return { additions, deletions }
-})
-
 
 watch(() => props.items, (items) => {
   const assistantIds = new Set(items.filter((item) => item.kind === 'assistant').map((item) => item.id))
@@ -185,10 +163,6 @@ function handleScroll() {
         </div>
       </article>
     </template>
-
-    <button v-if="changedCount > 0" class="floating-change-chip" type="button" @click="emit('selectTool', firstChangedToolId)">
-      {{ changedCount }} 个变更待审查 <b>+{{ changeTotals.additions }}</b> <i>-{{ changeTotals.deletions }}</i>
-    </button>
 
     <p v-if="props.runError" class="run-error">{{ props.runError }}</p>
   </section>
