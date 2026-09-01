@@ -11,6 +11,7 @@ const props = defineProps<{
   projects: WorkspaceProject[]
   activeProjectId: string | null
   addingProject: boolean
+  choosingProjectFolder: boolean
   deletingRunId: string | null
 }>()
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   selectRun: [run: RunResponse]
   newTask: []
   addProject: [path: string, create: boolean]
+  chooseProjectFolder: []
   selectProject: [project: WorkspaceProject]
   deleteRun: [run: RunResponse]
 }>()
@@ -25,6 +27,7 @@ const emit = defineEmits<{
 const addingProjectOpen = ref(false)
 const projectPath = ref('')
 const createProjectDirectory = ref(false)
+const manualProjectPathOpen = ref(false)
 
 function shortId(id: string) {
   return id.slice(0, 8)
@@ -53,6 +56,7 @@ function submitProject() {
   emit('addProject', path, createProjectDirectory.value)
   projectPath.value = ''
   createProjectDirectory.value = false
+  manualProjectPathOpen.value = false
   addingProjectOpen.value = false
 }
 </script>
@@ -92,16 +96,29 @@ function submitProject() {
         <UiIcon name="plus" />
         添加项目
       </button>
-      <form v-if="addingProjectOpen" class="project-add-form" @submit.prevent="submitProject">
-        <input v-model="projectPath" type="text" placeholder="/Users/me/code/my-project" :disabled="props.addingProject">
-        <label>
-          <input v-model="createProjectDirectory" type="checkbox" :disabled="props.addingProject">
-          新建文件夹
-        </label>
-        <button type="submit" :disabled="props.addingProject || !projectPath.trim()">
-          {{ props.addingProject ? '添加中' : '添加' }}
+      <div v-if="addingProjectOpen" class="project-add-form">
+        <button
+          class="project-folder-button"
+          type="button"
+          :disabled="props.addingProject || props.choosingProjectFolder"
+          @click="emit('chooseProjectFolder')"
+        >
+          {{ props.choosingProjectFolder ? '正在打开选择器' : '选择文件夹' }}
         </button>
-      </form>
+        <button class="manual-path-toggle" type="button" @click="manualProjectPathOpen = !manualProjectPathOpen">
+          {{ manualProjectPathOpen ? '收起手动路径' : '手动输入路径' }}
+        </button>
+        <form v-if="manualProjectPathOpen" class="manual-project-form" @submit.prevent="submitProject">
+          <input v-model="projectPath" type="text" placeholder="/Users/me/code/my-project" :disabled="props.addingProject">
+          <label>
+            <input v-model="createProjectDirectory" type="checkbox" :disabled="props.addingProject">
+            新建文件夹
+          </label>
+          <button type="submit" :disabled="props.addingProject || !projectPath.trim()">
+            {{ props.addingProject ? '添加中' : '添加' }}
+          </button>
+        </form>
+      </div>
     </section>
 
     <section class="sidebar-section runs-section">

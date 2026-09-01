@@ -21,6 +21,8 @@ const emit = defineEmits<{
   undoChange: [toolCallId: string]
   approve: []
   reject: []
+  copyUserMessage: [content: string]
+  editUserMessage: [content: string]
 }>()
 
 const timelineElement = ref<HTMLElement | null>(null)
@@ -107,8 +109,18 @@ function handleScroll() {
 
     <template v-for="item in props.items" :key="item.id">
       <article v-if="item.kind === 'user'" class="message-row user-row">
-        <div class="message-bubble user-bubble">
-          <p>{{ item.content }}</p>
+        <div class="user-message-stack">
+          <div class="message-bubble user-bubble">
+            <p>{{ item.content }}</p>
+          </div>
+          <div class="message-actions user-message-actions" aria-label="用户消息操作">
+            <button type="button" aria-label="复制用户消息" title="复制" @click="emit('copyUserMessage', item.content)">
+              复制
+            </button>
+            <button type="button" aria-label="修改用户消息" title="修改" @click="emit('editUserMessage', item.content)">
+              修改
+            </button>
+          </div>
         </div>
       </article>
 

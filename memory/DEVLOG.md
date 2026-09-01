@@ -610,3 +610,12 @@
 - `WorkspacePathResolver` 支持运行时切换 root；切换项目后，文件树、文件读取和后续 Agent 工具执行都会基于当前项目目录。
 - 新增 task 删除能力：`DELETE /api/runs/{runId}` 会取消非终态任务并删除 run、事件、pending approval 和 undo snapshot；前端每条任务行提供删除按钮。
 - 补充 API 测试覆盖：删除 run 后查询返回 404；添加并选择本地 project 后，workspace 文件列表来自新目录。
+
+## 2026-09-02：本机项目选择与用户消息操作
+
+- 根据用户反馈，将左侧“添加项目”从手动路径输入为主改为系统文件夹选择入口，样式更接近 Codex/ChatGPT 的本机文件夹 picker 流程。
+- 新增后端 `FolderChooserService` 和 `POST /api/workspace/projects/choose-folder`：本地 macOS 环境通过 `osascript choose folder` 打开系统文件夹选择器，返回 POSIX path；用户取消时返回 `cancelled=true`。
+- 前端新增 `chooseWorkspaceProjectFolder` API；选择文件夹后复用既有 `addWorkspaceProject` 逻辑添加并切换项目。手动路径输入保留为折叠兜底，用于 picker 不可用或需要新建目录时。
+- 用户消息气泡新增轻量 hover 操作：`复制` 将消息写入剪贴板，`修改` 将原用户 prompt 放回 composer 并聚焦输入框，方便基于历史任务快速改写后重新运行。
+- `ComposerBox` 暴露 `focus()`，App 层接收 timeline 的消息操作事件并更新 draft。
+- 验证：`cd backend && mvn test` 通过 151 tests；`cd frontend && npm run build` 通过。

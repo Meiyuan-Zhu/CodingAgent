@@ -19,6 +19,13 @@ const emit = defineEmits<{
 }>()
 
 const approvalMenuOpen = ref(false)
+const textareaElement = ref<HTMLTextAreaElement | null>(null)
+
+defineExpose({
+  focus() {
+    textareaElement.value?.focus()
+  },
+})
 
 function handleEnter(event: KeyboardEvent) {
   if (event.isComposing || event.shiftKey) return
@@ -35,6 +42,7 @@ function selectApprovalMode(enabled: boolean) {
 <template>
   <form class="composer-box" aria-label="任务输入" novalidate @submit.prevent="emit('submit')">
     <textarea
+      ref="textareaElement"
       v-model="model"
       aria-label="任务内容"
       class="resize-none"

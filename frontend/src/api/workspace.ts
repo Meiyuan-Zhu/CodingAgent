@@ -24,6 +24,11 @@ export interface WorkspaceProject {
   active: boolean
 }
 
+export interface ChooseFolderResponse {
+  path: string | null
+  cancelled: boolean
+}
+
 export async function fetchWorkspaceProjects(): Promise<WorkspaceProject[]> {
   const response = await fetch('/api/workspace/projects')
   if (!response.ok) {
@@ -44,6 +49,16 @@ export async function addWorkspaceProject(path: string, create: boolean): Promis
     throw new Error(await errorMessage(response))
   }
   return response.json() as Promise<WorkspaceProject>
+}
+
+export async function chooseWorkspaceProjectFolder(): Promise<ChooseFolderResponse> {
+  const response = await fetch('/api/workspace/projects/choose-folder', {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return response.json() as Promise<ChooseFolderResponse>
 }
 
 export async function selectWorkspaceProject(projectId: string): Promise<WorkspaceProject> {

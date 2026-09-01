@@ -7,7 +7,7 @@ import ProjectSidebar from './components/ProjectSidebar.vue'
 import UiIcon from './components/UiIcon.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
 import { approveToolCall, cancelRun, createRun, deleteRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
-import { addWorkspaceProject, fetchWorkspaceFile, fetchWorkspaceFiles, fetchWorkspaceProjects, selectWorkspaceProject, type WorkspaceFileEntry, type WorkspaceFileResponse, type WorkspaceProject } from './api/workspace'
+import { addWorkspaceProject, chooseWorkspaceProjectFolder, fetchWorkspaceFile, fetchWorkspaceFiles, fetchWorkspaceProjects, selectWorkspaceProject, type WorkspaceFileEntry, type WorkspaceFileResponse, type WorkspaceProject } from './api/workspace'
 import { buildToolCards } from './run/toolCards'
 import { buildTimelineItems, pendingApprovalView, type InspectorSelection } from './run/timeline'
 
@@ -25,6 +25,7 @@ const autoApprove = ref(false)
 const undoingToolCallId = ref<string | null>(null)
 const deletingRunId = ref<string | null>(null)
 const addingProject = ref(false)
+const choosingProjectFolder = ref(false)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
@@ -42,6 +43,7 @@ const selectedWorkspaceFile = ref<WorkspaceFileResponse | null>(null)
 const loadingWorkspacePath = ref<string | null>(null)
 const workspaceError = ref<string | null>(null)
 const projects = ref<WorkspaceProject[]>([])
+const composer = ref<InstanceType<typeof ComposerBox> | null>(null)
 
 const layoutStyle = computed(() => ({
   gridTemplateColumns: `288px minmax(560px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
@@ -470,6 +472,22 @@ async function addProject(path: string, createDirectory: boolean) {
   }
 }
 
+async function chooseAndAddProject() {
+  if (addingProject.value || choosingProjectFolder.value) return
+  choosingProjectFolder.value = true
+  runError.value = null
+  try {
+    const selection = await chooseWorkspaceProjectFolder()
+    if (!selection.cancelled && selection.path) {
+      await addProject(selection.path, false)
+    }
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : '选择项目文件夹失败'
+  } finally {
+    choosingProjectFolder.value = false
+  }
+}
+
 async function selectProject(project: WorkspaceProject) {
   if (activeProject.value?.id === project.id) return
   runError.value = null
@@ -534,6 +552,20 @@ function closeEventStream() {
   eventSource.value?.close()
   eventSource.value = null
 }
+
+async function copyUserMessage(content: string) {
+  runError.value = null
+  try {
+    await navigator.clipboard.writeText(content)
+  } catch {
+    runError.value = '复制失败，请检查浏览器剪贴板权限。'
+  }
+}
+
+function editUserMessage(content: string) {
+  taskDraft.value = content
+  void composer.value?.focus()
+}
 </script>
 
 <template>
@@ -545,10 +577,12 @@ function closeEventStream() {
       :projects="projects"
       :active-project-id="activeProject?.id ?? null"
       :adding-project="addingProject"
+      :choosing-project-folder="choosingProjectFolder"
       :deleting-run-id="deletingRunId"
       @new-task="resetComposer"
       @select-run="selectRun"
       @add-project="addProject"
+      @choose-project-folder="chooseAndAddProject"
       @select-project="selectProject"
       @delete-run="removeRun"
     />
@@ -580,9 +614,12 @@ function closeEventStream() {
         @undo-change="undoChange"
         @approve="approvePendingTool"
         @reject="rejectPendingTool"
+        @copy-user-message="copyUserMessage"
+        @edit-user-message="editUserMessage"
       />
 
       <ComposerBox
+        ref="composer"
         v-model="taskDraft"
         :disabled="!canSubmit"
         :submitting="submitting"

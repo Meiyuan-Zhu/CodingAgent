@@ -36,4 +36,9 @@ class WorkspaceConfiguration {
 			Clock clock) {
 		return new WorkspaceProjectService(jdbcTemplate, resolver, clock);
 	}
+
+	@Bean
+	FolderChooserService folderChooserService() {
+		return new FolderChooserService();
+	}
 }

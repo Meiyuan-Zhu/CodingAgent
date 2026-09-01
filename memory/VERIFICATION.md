@@ -1188,3 +1188,16 @@
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
 - 说明：Spring/Mockito 测试在普通受限命令下触发 ByteBuddy self-attach 限制；使用已批准的 Maven 测试权限重新运行后通过。
+
+## UI-018 — 本机文件夹选择与用户消息操作验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：左侧添加项目入口、后端本机文件夹选择 API、用户消息复制/修改操作、composer 聚焦。
+- 实现检查：
+  - 后端新增 `FolderChooserService`，在 macOS 本地通过 `osascript` 打开系统文件夹选择器；超时或中断时会清理 chooser 进程树。
+  - `POST /api/workspace/projects/choose-folder` 返回 `{ path, cancelled }`，用户取消选择不会被前端误报为失败。
+  - 前端左侧项目区默认显示“选择文件夹”主按钮；手动路径输入移动到折叠兜底区域，仍支持“新建文件夹”。
+  - 用户消息气泡新增 `复制` 和 `修改` 操作；修改会把历史用户 prompt 回填到 composer 并聚焦，复制使用浏览器 clipboard API。
+- 命令：`cd backend && mvn test`。结果：通过，151 tests, 0 failures, 0 errors。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 说明：自动化测试验证编译、Spring 上下文和前端类型构建；系统文件夹选择器涉及 macOS GUI，最终交互仍建议在浏览器里点击“选择文件夹”做一次目视确认。

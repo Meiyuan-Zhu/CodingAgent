@@ -1,8 +1,10 @@
 package com.zhumeiyuan.codingagent.agent.api;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.zhumeiyuan.codingagent.agent.workspace.FileListing;
+import com.zhumeiyuan.codingagent.agent.workspace.FolderChooserService;
 import com.zhumeiyuan.codingagent.agent.workspace.ListedWorkspaceFile;
 import com.zhumeiyuan.codingagent.agent.workspace.ReadFileResult;
 import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceProject;
@@ -26,10 +28,13 @@ class WorkspaceController {
 
 	private final WorkspaceReadTools readTools;
 	private final WorkspaceProjectService projectService;
+	private final FolderChooserService folderChooserService;
 
-	WorkspaceController(WorkspaceReadTools readTools, WorkspaceProjectService projectService) {
+	WorkspaceController(WorkspaceReadTools readTools, WorkspaceProjectService projectService,
+			FolderChooserService folderChooserService) {
 		this.readTools = readTools;
 		this.projectService = projectService;
+		this.folderChooserService = folderChooserService;
 	}
 
 	@GetMapping("/files")
@@ -52,6 +57,12 @@ class WorkspaceController {
 	@PostMapping("/projects")
 	WorkspaceProjectResponse addProject(@Valid @RequestBody AddWorkspaceProjectRequest request) {
 		return WorkspaceProjectResponse.from(this.projectService.addProject(request.path(), request.create()));
+	}
+
+	@PostMapping("/projects/choose-folder")
+	ChooseFolderResponse chooseProjectFolder() {
+		Optional<String> path = this.folderChooserService.chooseFolder();
+		return new ChooseFolderResponse(path.orElse(null), path.isEmpty());
 	}
 
 	@PostMapping("/projects/{projectId}/select")
@@ -84,6 +95,9 @@ class WorkspaceController {
 
 	record AddWorkspaceProjectRequest(@NotBlank(message = "Project path must not be blank") String path,
 			boolean create) {
+	}
+
+	record ChooseFolderResponse(String path, boolean cancelled) {
 	}
 
 	record WorkspaceProjectResponse(String id, String name, String path, String createdAt, boolean active) {
