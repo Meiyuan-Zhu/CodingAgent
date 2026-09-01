@@ -38,6 +38,11 @@ class WorkspaceToolConfiguration {
 	}
 
 	@Bean
+	RegisteredTool editFileTool(WorkspaceWriteTools workspaceWriteTools, ObjectMapper objectMapper) {
+		return WorkspaceToolFactory.editFile(workspaceWriteTools, objectMapper);
+	}
+
+	@Bean
 	RegisteredTool runCommandTool(WorkspaceCommandTools workspaceCommandTools, ObjectMapper objectMapper) {
 		return WorkspaceToolFactory.runCommand(workspaceCommandTools, objectMapper);
 	}

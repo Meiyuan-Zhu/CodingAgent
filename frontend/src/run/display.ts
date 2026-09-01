@@ -20,7 +20,7 @@ export function basename(path: string | null) {
 }
 
 export function isChangeTool(card: ToolCard) {
-  return card.name === 'write_file' || card.name === 'replace_text'
+  return card.name === 'write_file' || card.name === 'replace_text' || card.name === 'edit_file'
 }
 
 export function diffStats(diff: string | null | undefined): ChangeStats {
@@ -63,6 +63,7 @@ export function actionText(card: ToolCard) {
 
 export function changeTitle(card: ToolCard) {
   const name = basename(toolPath(card))
+  if (card.undone) return `已撤销 ${name}`
   if (card.status === 'waiting') return `准备编辑 ${name}`
   if (card.status === 'rejected') return `已拒绝编辑 ${name}`
   if (card.status === 'running') return `正在编辑 ${name}`
@@ -91,7 +92,7 @@ export function approvalActionTitle(toolName: string, argumentsValue: unknown, f
   const path = fallbackPath ?? argumentPath(argumentsValue)
   const target = basename(path)
   if (toolName === 'write_file') return `申请写入 ${target}`
-  if (toolName === 'replace_text') return `申请修改 ${target}`
+  if (toolName === 'replace_text' || toolName === 'edit_file') return `申请修改 ${target}`
   if (toolName === 'run_command') return '申请运行命令'
   if (toolName === 'read_file') return `申请读取 ${target}`
   return `申请执行 ${toolName}`

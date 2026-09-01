@@ -1,6 +1,7 @@
 package com.zhumeiyuan.codingagent.agent.api;
 
 import com.zhumeiyuan.codingagent.agent.execution.AgentRunNotFoundException;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceAccessException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,12 @@ class RunApiExceptionHandler {
 	ResponseEntity<ErrorResponse> badRequest(Exception ex) {
 		return ResponseEntity.badRequest()
 				.body(new ErrorResponse("bad_request", message(ex)));
+	}
+
+	@ExceptionHandler(WorkspaceAccessException.class)
+	ResponseEntity<ErrorResponse> workspaceError(WorkspaceAccessException ex) {
+		return ResponseEntity.badRequest()
+				.body(new ErrorResponse(ex.code().name().toLowerCase(), ex.getMessage()));
 	}
 
 	private String message(Exception ex) {

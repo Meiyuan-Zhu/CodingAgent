@@ -17,6 +17,18 @@ import com.zhumeiyuan.codingagent.agent.run.RunId;
 public class AgentRunStore {
 
 	private final Map<RunId, StoredRun> runs = new ConcurrentHashMap<>();
+	private final AgentRunPersistence persistence;
+
+	public AgentRunStore() {
+		this(NoOpAgentRunPersistence.INSTANCE);
+	}
+
+	AgentRunStore(AgentRunPersistence persistence) {
+		this.persistence = Objects.requireNonNull(persistence, "persistence");
+		for (PersistedRun persisted : this.persistence.loadRuns()) {
+			this.runs.put(persisted.run().id(), StoredRun.from(persisted));
+		}
+	}
 
 	public AgentRun create(Clock clock) {
 		AgentRun run = AgentRun.create(clock);
@@ -24,6 +36,7 @@ public class AgentRunStore {
 		if (previous != null) {
 			throw new IllegalStateException("Duplicate run id generated: " + run.id());
 		}
+		this.persistence.saveRun(run);
 		return run;
 	}
 
@@ -31,25 +44,42 @@ public class AgentRunStore {
 		return stored(runId).snapshot();
 	}
 
+	public List<AgentRun> listRuns() {
+		return this.runs.values().stream()
+				.map(StoredRun::snapshot)
+				.sorted((left, right) -> right.createdAt().compareTo(left.createdAt()))
+				.toList();
+	}
+
 	public AgentRun transition(RunId runId, UnaryOperator<AgentRun> transition) {
-		return stored(runId).transition(transition);
+		AgentRun run = stored(runId).transition(transition);
+		this.persistence.saveRun(run);
+		return run;
 	}
 
 	public RunEvent appendEvent(RunId runId, RunEventType type, Map<String, Object> payload, Clock clock) {
-		return stored(runId).appendEvent(type, payload, clock);
+		StoredRun storedRun = stored(runId);
+		RunEvent event = storedRun.appendEvent(type, payload, clock);
+		this.persistence.saveRun(storedRun.snapshot());
+		this.persistence.insertEvent(event);
+		return event;
 	}
 
 	public void savePendingApproval(PendingToolApproval approval) {
 		Objects.requireNonNull(approval, "approval");
 		stored(approval.runId()).savePendingApproval(approval);
+		this.persistence.savePendingApproval(approval);
 	}
 
 	public PendingToolApproval consumePendingApproval(RunId runId, String toolCallId) {
-		return stored(runId).consumePendingApproval(toolCallId);
+		PendingToolApproval approval = stored(runId).consumePendingApproval(toolCallId);
+		this.persistence.deletePendingApproval(runId);
+		return approval;
 	}
 
 	public void clearPendingApproval(RunId runId) {
 		stored(runId).clearPendingApproval();
+		this.persistence.deletePendingApproval(runId);
 	}
 
 	public List<RunEvent> listEvents(RunId runId, long afterSequence) {
@@ -73,6 +103,13 @@ public class AgentRunStore {
 
 		private StoredRun(AgentRun run) {
 			this.run = Objects.requireNonNull(run, "run");
+		}
+
+		private static StoredRun from(PersistedRun persisted) {
+			StoredRun storedRun = new StoredRun(persisted.run());
+			storedRun.events.addAll(persisted.events());
+			storedRun.pendingApproval = persisted.pendingApproval();
+			return storedRun;
 		}
 
 		private synchronized AgentRun snapshot() {

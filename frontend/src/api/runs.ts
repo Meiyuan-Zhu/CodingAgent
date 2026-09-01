@@ -19,6 +19,14 @@ export interface RunEvent {
   payload: Record<string, unknown>
 }
 
+export interface UndoWorkspaceChangeResponse {
+  toolCallId: string
+  state: string
+  path: string
+  deleted: boolean
+  restored: boolean
+}
+
 export async function createRun(prompt: string): Promise<RunResponse> {
   const response = await fetch('/api/runs', {
     method: 'POST',
@@ -45,6 +53,15 @@ export async function fetchRun(runId: string): Promise<RunResponse> {
   return response.json() as Promise<RunResponse>
 }
 
+export async function fetchRuns(): Promise<RunResponse[]> {
+  const response = await fetch('/api/runs')
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<RunResponse[]>
+}
 
 export async function fetchRunEvents(runId: string): Promise<RunEvent[]> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/events`)
@@ -102,4 +119,17 @@ export async function rejectToolCall(runId: string, toolCallId: string): Promise
   }
 
   return response.json() as Promise<RunResponse>
+}
+
+export async function undoWorkspaceChange(runId: string, toolCallId: string): Promise<UndoWorkspaceChangeResponse> {
+  const response = await fetch(
+    `/api/runs/${encodeURIComponent(runId)}/changes/${encodeURIComponent(toolCallId)}/undo`,
+    { method: 'POST' },
+  )
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+
+  return response.json() as Promise<UndoWorkspaceChangeResponse>
 }

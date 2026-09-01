@@ -55,6 +55,10 @@ public class ToolArgumentReader {
 		return stringValue;
 	}
 
+	public Object raw(String name) {
+		return this.arguments.get(name);
+	}
+
 	public List<String> requiredStringList(String name, int maxSize) {
 		Object value = this.arguments.get(name);
 		if (!(value instanceof List<?> listValue) || listValue.isEmpty()) {

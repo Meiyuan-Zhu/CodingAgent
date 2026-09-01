@@ -11,6 +11,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
 import com.zhumeiyuan.codingagent.agent.model.ModelClientException;
 import com.zhumeiyuan.codingagent.agent.model.ModelFinishReason;
@@ -19,6 +21,7 @@ import com.zhumeiyuan.codingagent.agent.model.ModelParseException;
 import com.zhumeiyuan.codingagent.agent.model.ModelRequest;
 import com.zhumeiyuan.codingagent.agent.model.ModelResponse;
 import com.zhumeiyuan.codingagent.agent.model.ModelRole;
+import com.zhumeiyuan.codingagent.agent.model.StreamingModelClient;
 import com.zhumeiyuan.codingagent.agent.run.AgentRun;
 import com.zhumeiyuan.codingagent.agent.run.RunEvent;
 import com.zhumeiyuan.codingagent.agent.run.RunEventType;
@@ -35,7 +38,29 @@ import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
 
 public class MockAgentRunner {
 
-	private static final String SYSTEM_PROMPT = "You are a local coding agent. Return the agreed JSON response format.";
+	private static final String SYSTEM_PROMPT = """
+			You are an autonomous coding agent operating inside a local project workspace.
+
+			Your goal is to complete the user's programming task by inspecting, modifying, and verifying the project
+			using the available tools.
+
+			You do not have direct access to the filesystem or terminal. Always use the provided tools when you need to
+			inspect files, modify files, or execute commands.
+
+			Follow these principles:
+
+			1. Inspect relevant project files before modifying them.
+			2. Understand the existing implementation and avoid unnecessary changes.
+			3. Make focused, minimal edits that directly address the user's request.
+			4. Use the available tools instead of assuming file contents or execution results.
+			5. After modifying code, run appropriate tests, builds, or commands when available.
+			6. Treat tool errors and command failures as observations. Analyze the error, adjust your approach, and recover
+			   when possible.
+			7. Avoid repeatedly retrying the same failed action without changing your approach.
+			8. Avoid unnecessary exploration or unrelated modifications.
+			9. Do not claim the task is complete unless the result has been reasonably verified.
+			10. When the task is complete, provide a concise summary of the changes and any verification performed.
+			""";
 
 	private final AgentRunStore store;
 	private final RunEventStream runEventStream;
@@ -43,18 +68,27 @@ public class MockAgentRunner {
 	private final ToolApprovalPolicy toolApprovalPolicy;
 	private final ModelClient modelClient;
 	private final RunBudget runBudget;
+	private final WorkspaceChangeJournal changeJournal;
 	private final ExecutorService toolExecutor;
 	private final Clock clock;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	public MockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
 			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget, ExecutorService toolExecutor,
 			Clock clock) {
+		this(store, runEventStream, toolRegistry, toolApprovalPolicy, modelClient, runBudget, null, toolExecutor, clock);
+	}
+
+	public MockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
+			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget,
+			WorkspaceChangeJournal changeJournal, ExecutorService toolExecutor, Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
 		this.toolRegistry = Objects.requireNonNull(toolRegistry, "toolRegistry");
 		this.toolApprovalPolicy = Objects.requireNonNull(toolApprovalPolicy, "toolApprovalPolicy");
 		this.modelClient = Objects.requireNonNull(modelClient, "modelClient");
 		this.runBudget = Objects.requireNonNull(runBudget, "runBudget");
+		this.changeJournal = changeJournal;
 		this.toolExecutor = Objects.requireNonNull(toolExecutor, "toolExecutor");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
@@ -109,11 +143,6 @@ public class MockAgentRunner {
 			int toolCallsUsed = approval.toolCallsUsed() + 1;
 			List<ModelMessage> messages = new ArrayList<>(approval.messages());
 			messages.add(ModelMessage.tool(call.id(), call.name(), toolObservation(call, result)));
-			if (!result.success()) {
-				StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
-				fail(runId, stopReason, result.content());
-				return;
-			}
 			continueRunLoop(runId, messages, approval.round() + 1, toolCallsUsed);
 		} catch (ModelParseException ex) {
 			fail(runId, StopReason.MODEL_PARSE_ERROR, ex.getMessage());
@@ -140,16 +169,17 @@ public class MockAgentRunner {
 					"contextMessages", context.size(),
 					"toolCallsUsed", toolCallsUsed));
 
-			ModelResponse response = this.modelClient.complete(new ModelRequest(context, this.toolRegistry.definitions()));
+			ModelResponse response = completeModel(runId, round, new ModelRequest(context, this.toolRegistry.definitions()));
 			if (stopIfCancellationRequested(runId)) {
 				return;
 			}
+			List<ToolCall> calls = acceptedToolCalls(response);
 			emit(runId, RunEventType.MODEL_MESSAGE_RECEIVED, Map.of(
 					"provider", this.modelClient.providerName(),
 					"round", round,
 					"content", response.message(),
 					"finishReason", response.finishReason().name()));
-			messages.add(ModelMessage.assistant(response.message(), response.toolCalls()));
+			messages.add(ModelMessage.assistant(response.message(), calls));
 
 			if (response.finishReason() == ModelFinishReason.STOP) {
 				finishSuccessfully(runId, round, toolCallsUsed);
@@ -160,7 +190,6 @@ public class MockAgentRunner {
 				return;
 			}
 
-			List<ToolCall> calls = response.toolCalls();
 			if (toolCallsUsed + calls.size() > this.runBudget.maxToolCalls()) {
 				fail(runId, StopReason.TOOL_CALL_LIMIT,
 						"Run exceeded tool call limit of " + this.runBudget.maxToolCalls());
@@ -177,30 +206,91 @@ public class MockAgentRunner {
 				}
 				toolCallsUsed++;
 				messages.add(ModelMessage.tool(call.id(), call.name(), toolObservation(call, result)));
-				if (!result.success()) {
-					StopReason stopReason = isToolTimeout(result) ? StopReason.TIME_LIMIT : StopReason.TOOL_ERROR;
-					fail(runId, stopReason, result.content());
-					return;
-				}
 			}
 		}
 
 		fail(runId, StopReason.ROUND_LIMIT, "Run exceeded round limit of " + this.runBudget.maxRounds());
 	}
 
+	private List<ToolCall> acceptedToolCalls(ModelResponse response) {
+		if (response.finishReason() != ModelFinishReason.TOOL_CALLS) {
+			return List.of();
+		}
+		return List.of(response.toolCalls().get(0));
+	}
+
+	private ModelResponse completeModel(RunId runId, int round, ModelRequest request) {
+		if (this.modelClient instanceof StreamingModelClient streamingModelClient) {
+			return streamingModelClient.completeStreaming(request, delta -> {
+				if (!delta.isEmpty() && !isTerminal(runId)) {
+					emit(runId, RunEventType.MODEL_MESSAGE_DELTA, Map.of(
+							"provider", this.modelClient.providerName(),
+							"round", round,
+							"delta", delta));
+				}
+			});
+		}
+		return this.modelClient.complete(request);
+	}
+
 	private List<ModelMessage> contextWindow(List<ModelMessage> messages) {
 		if (messages.size() <= this.runBudget.maxContextMessages()) {
 			return List.copyOf(messages);
 		}
-		int maxTail = this.runBudget.maxContextMessages();
 		List<ModelMessage> window = new ArrayList<>();
-		ModelMessage first = messages.get(0);
-		if (first.role() == ModelRole.SYSTEM) {
-			window.add(first);
-			maxTail--;
+		int start = 0;
+		if (messages.get(0).role() == ModelRole.SYSTEM) {
+			window.add(messages.get(0));
+			start = 1;
 		}
-		window.addAll(messages.subList(messages.size() - maxTail, messages.size()));
+
+		int firstUser = firstUserIndex(messages, start);
+		if (firstUser >= 0 && window.size() < this.runBudget.maxContextMessages()) {
+			window.add(messages.get(firstUser));
+			start = firstUser + 1;
+		}
+
+		List<ModelMessage> recent = new ArrayList<>();
+		for (int index = messages.size() - 1; index >= start;) {
+			List<ModelMessage> group = contextGroupEndingAt(messages, index, start);
+			if (group.isEmpty()) {
+				index--;
+				continue;
+			}
+			if (window.size() + recent.size() + group.size() > this.runBudget.maxContextMessages()) {
+				break;
+			}
+			recent.addAll(0, group);
+			index -= group.size();
+		}
+		window.addAll(recent);
 		return List.copyOf(window);
+	}
+
+	private int firstUserIndex(List<ModelMessage> messages, int start) {
+		for (int index = start; index < messages.size(); index++) {
+			if (messages.get(index).role() == ModelRole.USER) {
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	private List<ModelMessage> contextGroupEndingAt(List<ModelMessage> messages, int end, int start) {
+		ModelMessage last = messages.get(end);
+		if (last.role() != ModelRole.TOOL) {
+			return List.of(last);
+		}
+		int firstTool = end;
+		while (firstTool > start && messages.get(firstTool - 1).role() == ModelRole.TOOL) {
+			firstTool--;
+		}
+		int assistantIndex = firstTool - 1;
+		if (assistantIndex < start || messages.get(assistantIndex).role() != ModelRole.ASSISTANT
+				|| messages.get(assistantIndex).toolCalls().isEmpty()) {
+			return List.of();
+		}
+		return messages.subList(assistantIndex, end + 1);
 	}
 
 	private ToolResult executeTool(RunId runId, int round, ToolCall call, List<ModelMessage> messages, int toolCallsUsed) {
@@ -224,13 +314,17 @@ public class MockAgentRunner {
 		if (result == null || isTerminal(runId)) {
 			return result;
 		}
+		if (this.changeJournal != null) {
+			this.changeJournal.recordIfUndoable(runId, call.name(), result);
+		}
 		emit(runId, RunEventType.TOOL_CALL_FINISHED, Map.of(
 				"round", round,
 				"toolCallId", result.toolCallId(),
 				"name", call.name(),
 				"success", result.success(),
 				"content", result.content(),
-				"metadata", result.metadata()));
+				"metadata", result.metadata(),
+				"undoable", result.privateMetadata().containsKey(WorkspaceChangeJournal.UNDO_SNAPSHOT_KEY)));
 		return result;
 	}
 
@@ -256,11 +350,12 @@ public class MockAgentRunner {
 			return future.get(this.runBudget.toolTimeout().toMillis(), TimeUnit.MILLISECONDS);
 		} catch (TimeoutException ex) {
 			future.cancel(true);
-			return ToolResult.failure(call.id(), "Tool timed out after " + this.runBudget.toolTimeout().toMillis() + " ms",
-					Map.of(
-							"toolName", call.name(),
-							"errorCode", ToolExecutionErrorCode.TOOL_TIMEOUT.name(),
-							"timeoutMillis", this.runBudget.toolTimeout().toMillis()),
+			Map<String, Object> metadata = Map.of(
+					"toolName", call.name(),
+					"errorCode", ToolExecutionErrorCode.TOOL_TIMEOUT.name(),
+					"timeoutMillis", this.runBudget.toolTimeout().toMillis());
+			return ToolResult.failure(call.id(), structuredToolFailure(call.name(), ToolExecutionErrorCode.TOOL_TIMEOUT,
+					"Tool timed out after " + this.runBudget.toolTimeout().toMillis() + " ms", metadata), metadata,
 					this.clock.instant());
 		} catch (InterruptedException ex) {
 			future.cancel(true);
@@ -277,8 +372,27 @@ public class MockAgentRunner {
 	private String toolObservation(ToolCall call, ToolResult result) {
 		return "tool_call_id=" + call.id() + "\n"
 				+ "tool_name=" + call.name() + "\n"
-				+ "success=" + result.success() + "\n"
+				+ "tool_execution_success=" + result.success() + "\n"
 				+ result.content();
+	}
+
+	private String structuredToolFailure(String toolName, ToolExecutionErrorCode code, String message,
+			Map<String, Object> metadata) {
+		Map<String, Object> body = Map.of(
+				"success", false,
+				"message", message,
+				"toolName", toolName,
+				"errorCode", code.name(),
+				"failureKind", "RECOVERABLE_TOOL_ERROR",
+				"recoverable", true,
+				"recoveryHint", "Use a narrower command or tool request, then try again within the budget.",
+				"timedOut", code == ToolExecutionErrorCode.TOOL_TIMEOUT,
+				"metadata", metadata);
+		try {
+			return this.objectMapper.writeValueAsString(body);
+		} catch (JsonProcessingException ex) {
+			return "{\"success\":false,\"message\":\"Tool failed and the failure result could not be serialized.\"}";
+		}
 	}
 
 	private void finishSuccessfully(RunId runId, int roundsUsed, int toolCallsUsed) {
@@ -331,10 +445,6 @@ public class MockAgentRunner {
 					"stopReason", failed.stopReason().name(),
 					"errorMessage", failed.errorMessage()));
 		}
-	}
-
-	private boolean isToolTimeout(ToolResult result) {
-		return ToolExecutionErrorCode.TOOL_TIMEOUT.name().equals(result.metadata().get("errorCode"));
 	}
 
 	private boolean isTerminal(RunId runId) {

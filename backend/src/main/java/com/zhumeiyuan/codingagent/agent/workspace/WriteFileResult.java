@@ -1,6 +1,10 @@
 package com.zhumeiyuan.codingagent.agent.workspace;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public record WriteFileResult(
+		boolean success,
+		String message,
 		String path,
 		boolean created,
 		boolean overwritten,
@@ -8,5 +12,6 @@ public record WriteFileResult(
 		String sha256,
 		long previousSizeBytes,
 		long sizeBytes,
-		String unifiedDiff) {
+		String unifiedDiff,
+		@JsonIgnore String previousContent) {
 }

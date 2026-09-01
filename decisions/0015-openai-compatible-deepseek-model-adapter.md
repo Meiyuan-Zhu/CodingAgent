@@ -1,10 +1,10 @@
 # ADR-0015：OpenAI-compatible DeepSeek 模型适配器
 
 - 日期：2026-08-28
-- 状态：accepted
+- 状态：superseded
 - 决策依据/确认来源：用户已配置 DeepSeek API key，并要求先接入 DeepSeek V4 Flash 试用
 - 实现状态：已实现，DeepSeek V4 Flash 真实只读端到端 run 已验证
-- 取代/被取代：无
+- 取代/被取代：默认 provider 策略被 [ADR-0037](0037-default-real-model-test-mock-override.md) 取代；OpenAI-compatible adapter 设计仍保留
 
 ## 问题与约束
 

@@ -39,6 +39,13 @@ class RunController {
 		return RunResponse.from(this.agentRunService.createRun(request.prompt()));
 	}
 
+	@GetMapping
+	List<RunResponse> listRuns() {
+		return this.agentRunService.listRuns().stream()
+				.map(RunResponse::from)
+				.toList();
+	}
+
 	@GetMapping("/{runId}")
 	RunResponse getRun(@PathVariable String runId) {
 		return RunResponse.from(this.agentRunService.getRun(RunId.from(runId)));
@@ -57,6 +64,12 @@ class RunController {
 	@PostMapping("/{runId}/approvals/{toolCallId}/reject")
 	RunResponse rejectToolCall(@PathVariable String runId, @PathVariable String toolCallId) {
 		return RunResponse.from(this.agentRunService.rejectToolCall(RunId.from(runId), toolCallId));
+	}
+
+	@PostMapping("/{runId}/changes/{toolCallId}/undo")
+	UndoWorkspaceChangeResponse undoWorkspaceChange(@PathVariable String runId, @PathVariable String toolCallId) {
+		return UndoWorkspaceChangeResponse.from(
+				this.agentRunService.undoWorkspaceChange(RunId.from(runId), toolCallId));
 	}
 
 	@GetMapping("/{runId}/events")

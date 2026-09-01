@@ -62,7 +62,7 @@ public class WorkspaceReadTools {
 					"Cannot list workspace directory", ex);
 		}
 
-		return new FileListing(directory.displayPath(), files, truncated);
+		return new FileListing(true, "Listed workspace directory.", directory.displayPath(), files, truncated);
 	}
 
 	public ReadFileResult readFile(String requestedPath) {
@@ -79,7 +79,8 @@ public class WorkspaceReadTools {
 						"Workspace file is too large to read into the model context");
 			}
 			byte[] bytes = Files.readAllBytes(file.realPath());
-			return new ReadFileResult(file.displayPath(), decodeUtf8(bytes, requestedPath), size);
+				return new ReadFileResult(true, "Read workspace file.", file.displayPath(), decodeUtf8(bytes, requestedPath),
+						size);
 		} catch (WorkspaceAccessException ex) {
 			throw ex;
 		} catch (IOException ex) {
@@ -118,7 +119,7 @@ public class WorkspaceReadTools {
 		} catch (IOException ex) {
 			throw new WorkspaceAccessException(WorkspaceAccessCode.IO_ERROR, ".", "Cannot search workspace", ex);
 		}
-		return new SearchResult(query, matches, truncated);
+			return new SearchResult(true, "Searched workspace text.", query, matches, truncated);
 	}
 
 	private ListedWorkspaceFile toListedFile(Path path, Path relative) throws IOException {

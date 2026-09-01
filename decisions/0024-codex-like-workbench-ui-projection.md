@@ -21,7 +21,7 @@ accepted
 - 输入区 `ComposerBox` 固定在对话区底部，强调本地 workspace 和审批边界。
 - 新增 `run/timeline.ts`，把后端审计事件转换成 UI-friendly timeline、inspector、terminal 和 approval view；Vue 组件不直接解释原始后端 payload。
 
-后端事件协议保持不变。前端的“流式”先基于已有 SSE 事件渐进渲染消息和工具状态，不在本阶段引入 provider token streaming。
+后端事件协议在本阶段保持不变。前端的“流式”先基于已有 SSE 事件渐进渲染消息和工具状态，不在 ADR-0024 阶段引入 provider token streaming；该能力后来由 [ADR-0033](0033-provider-token-streaming.md) 补充。
 
 ## 理由
 

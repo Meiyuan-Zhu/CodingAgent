@@ -18,7 +18,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+		"agent.model.provider=mock",
+		"spring.datasource.url=jdbc:h2:mem:coding-agent-test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+})
 @AutoConfigureMockMvc
 class RunControllerTests {
 
@@ -48,6 +51,23 @@ class RunControllerTests {
 		JsonNode events = this.objectMapper.readTree(eventsResult.getResponse().getContentAsString());
 		assertThat(events).isNotEmpty();
 		assertThat(events.get(0).get("type").asText()).isEqualTo("RUN_CREATED");
+	}
+
+	@Test
+	void listRunsReturnsCreatedRuns() throws Exception {
+		MvcResult createResult = this.mvc.perform(post("/api/runs")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"prompt\":\"list workspace files\"}"))
+				.andExpect(status().isAccepted())
+				.andReturn();
+		String runId = this.objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
+
+		MvcResult listResult = this.mvc.perform(get("/api/runs"))
+				.andExpect(status().isOk())
+				.andReturn();
+		JsonNode runs = this.objectMapper.readTree(listResult.getResponse().getContentAsString());
+
+		assertThat(runs).anySatisfy(run -> assertThat(run.get("id").asText()).isEqualTo(runId));
 	}
 
 	@Test
@@ -95,6 +115,33 @@ class RunControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("FAILED"))
 				.andExpect(jsonPath("$.stopReason").value("APPROVAL_REJECTED"));
+	}
+
+	@Test
+	void undoWorkspaceChangeEndpointRevertsApprovedWrite() throws Exception {
+		MvcResult createResult = this.mvc.perform(post("/api/runs")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"prompt\":\"please write a note\"}"))
+				.andExpect(status().isAccepted())
+				.andReturn();
+		String runId = this.objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
+		waitForStatus(runId, "WAITING_FOR_APPROVAL");
+
+		this.mvc.perform(post("/api/runs/{runId}/approvals/{toolCallId}/approve", runId, "mock-call-1"))
+				.andExpect(status().isOk());
+		waitForStatus(runId, "SUCCEEDED");
+
+		this.mvc.perform(post("/api/runs/{runId}/changes/{toolCallId}/undo", runId, "mock-call-1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.toolCallId").value("mock-call-1"))
+				.andExpect(jsonPath("$.state").value("UNDONE"))
+				.andExpect(jsonPath("$.deleted").value(true));
+
+		MvcResult eventsResult = this.mvc.perform(get("/api/runs/{runId}/events", runId))
+				.andExpect(status().isOk())
+				.andReturn();
+		JsonNode events = this.objectMapper.readTree(eventsResult.getResponse().getContentAsString());
+		assertThat(events.toString()).contains("CHANGE_UNDONE");
 	}
 
 	@Test

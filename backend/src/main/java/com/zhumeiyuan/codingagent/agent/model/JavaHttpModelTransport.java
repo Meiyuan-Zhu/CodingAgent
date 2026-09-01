@@ -30,4 +30,22 @@ public class JavaHttpModelTransport implements ModelHttpTransport {
 			throw new ModelClientException("Model HTTP request was interrupted", ex);
 		}
 	}
+
+	@Override
+	public ModelHttpStreamResponse stream(ModelHttpRequest request) {
+		HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri())
+				.timeout(request.timeout())
+				.POST(HttpRequest.BodyPublishers.ofString(request.body()));
+		request.headers().forEach(builder::header);
+		try {
+			HttpResponse<java.util.stream.Stream<String>> response =
+					this.httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofLines());
+			return new ModelHttpStreamResponse(response.statusCode(), response.body());
+		} catch (IOException ex) {
+			throw new ModelClientException("Model HTTP streaming request failed", ex);
+		} catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new ModelClientException("Model HTTP streaming request was interrupted", ex);
+		}
+	}
 }

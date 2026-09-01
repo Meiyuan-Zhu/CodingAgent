@@ -13,9 +13,13 @@ coverage/
 # Local runtime data, temporary files, and private demo workspaces.
 /tmp/
 /.runtime/
+/backend/data/
 /workspaces/*
 !/workspaces/demo/
 !/workspaces/demo/**
+/workspaces/demo/*.cpp
+/workspaces/demo/selftest_*.py
+/workspaces/demo/selftest_*
 *.log
 __pycache__/
 *.py[cod]

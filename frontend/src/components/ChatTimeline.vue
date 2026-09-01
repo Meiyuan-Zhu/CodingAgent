@@ -12,22 +12,25 @@ const props = defineProps<{
   pendingApproval: ApprovalView | null
   selectedToolCallId: string | null
   resolvingApproval: boolean
+  undoingToolCallId: string | null
   runError: string | null
 }>()
 
 const emit = defineEmits<{
   selectTool: [toolCallId: string]
+  undoChange: [toolCallId: string]
   approve: []
   reject: []
 }>()
 
 const timelineElement = ref<HTMLElement | null>(null)
 const displayedAssistantContent = ref<Record<string, string>>({})
+const userPinnedToBottom = ref(true)
 const streamTimers = new Map<string, number>()
 
-const changedCount = computed(() => props.items.filter((item) => item.kind === 'tool' && isChangeTool(item.card) && item.card.status === 'finished').length)
+const changedCount = computed(() => props.items.filter((item) => item.kind === 'tool' && isChangeTool(item.card) && item.card.status === 'finished' && !item.card.undone).length)
 const firstChangedToolId = computed(() => {
-  const item = props.items.find((entry) => entry.kind === 'tool' && isChangeTool(entry.card))
+  const item = props.items.find((entry) => entry.kind === 'tool' && isChangeTool(entry.card) && !entry.card.undone)
   return item?.kind === 'tool' ? item.card.id : ''
 })
 
@@ -35,7 +38,7 @@ const changeTotals = computed(() => {
   let additions = 0
   let deletions = 0
   for (const item of props.items) {
-    if (item.kind !== 'tool' || !isChangeTool(item.card) || !item.card.result) continue
+    if (item.kind !== 'tool' || !isChangeTool(item.card) || item.card.undone || !item.card.result) continue
     const diff = typeof item.card.result.unifiedDiff === 'string' ? item.card.result.unifiedDiff : ''
     for (const line of diff.split('\n')) {
       if (line.startsWith('+++') || line.startsWith('---')) continue
@@ -103,17 +106,23 @@ function streamChunkSize(content: string, cursor: number) {
 
 watch(() => props.items.length, async () => {
   await nextTick()
-  if (!timelineElement.value) return
+  if (!timelineElement.value || !userPinnedToBottom.value) return
   timelineElement.value.scrollTop = timelineElement.value.scrollHeight
 })
+
+function handleScroll() {
+  if (!timelineElement.value) return
+  const distanceFromBottom = timelineElement.value.scrollHeight - timelineElement.value.scrollTop - timelineElement.value.clientHeight
+  userPinnedToBottom.value = distanceFromBottom < 96
+}
 </script>
 
 <template>
-  <section ref="timelineElement" class="chat-timeline" aria-label="Agent conversation">
+  <section ref="timelineElement" class="chat-timeline" aria-label="Agent 对话" @scroll="handleScroll">
     <article v-if="props.items.length === 0" class="empty-thread">
       <div class="assistant-avatar">CA</div>
       <div>
-        <h2>开始一个 coding task</h2>
+        <h2>要让 Agent 改什么？</h2>
         <p>描述你希望 Agent 在本地 workspace 中完成的任务。它会读取文件、提出修改、请求权限，并把可审查的变更展示在右侧。</p>
       </div>
     </article>
@@ -156,7 +165,13 @@ watch(() => props.items.length, async () => {
       </article>
 
       <article v-else-if="item.kind === 'tool' && isChangeTool(item.card)" class="message-row assistant-row change-row">
-        <ChangeSummaryCard :card="item.card" :selected="props.selectedToolCallId === item.card.id" @select="emit('selectTool', $event)" />
+        <ChangeSummaryCard
+          :card="item.card"
+          :selected="props.selectedToolCallId === item.card.id"
+          :undoing="props.undoingToolCallId === item.card.id"
+          @select="emit('selectTool', $event)"
+          @undo="emit('undoChange', $event)"
+        />
       </article>
 
       <article v-else-if="item.kind === 'tool'" class="message-row assistant-row action-row-shell">
@@ -172,7 +187,7 @@ watch(() => props.items.length, async () => {
     </template>
 
     <button v-if="changedCount > 0" class="floating-change-chip" type="button" @click="emit('selectTool', firstChangedToolId)">
-      {{ changedCount }} 个文件已更改 <b>+{{ changeTotals.additions }}</b> <i>-{{ changeTotals.deletions }}</i>
+      {{ changedCount }} 个变更待审查 <b>+{{ changeTotals.additions }}</b> <i>-{{ changeTotals.deletions }}</i>
     </button>
 
     <p v-if="props.runError" class="run-error">{{ props.runError }}</p>

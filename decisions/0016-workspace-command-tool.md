@@ -38,12 +38,12 @@
 
 命令进程使用最小环境变量：清空继承环境后只传 `PATH`、`LANG`、可选 `LC_ALL`、`CI=true` 和 `PWD`。第一版不允许模型提供自定义环境变量，避免误把 API key、HOME 目录配置或开发机隐私暴露给命令。
 
-stdout 和 stderr 分开捕获，均做长度截断并返回 `stdoutTruncated` / `stderrTruncated`。命令超时继续使用已有 runner 工具 timeout；命令线程被中断时会 `destroyForcibly()` 当前进程。
+stdout 和 stderr 分开捕获，均做长度截断并返回 `stdoutTruncated` / `stderrTruncated`。命令超时继续使用已有 runner 工具 timeout；命令线程被中断时会清理当前进程及可枚举的后代进程，见 [ADR-0032](0032-command-process-tree-cleanup.md)。
 
 ## 代价与限制
 
 - 这不是操作系统级沙箱。workspace cwd 限制只约束工作目录，不阻止命令通过绝对路径访问主机上进程权限可读的其他文件。因此必须保留审批，并在演示和文档中避免把它描述成强沙箱。
-- 当前只销毁直接子进程，不保证完整进程树清理；复杂命令或脚本派生的孙进程需要后续补充 process-tree 管理。
+- 进程树清理由 ADR-0032 补充；若 OS 或 sandbox 禁止枚举 descendants，则只能 best-effort 清理 parent。
 - 清空 `HOME`、自定义环境变量和大部分 inherited env 会提升安全性，但可能导致依赖用户配置的命令失败，例如依赖 Maven settings、npm 私有 registry 或 shell profile 的命令。
 - 不支持 shell 管道、重定向、通配符和内建命令。需要此类能力时应新增单独 ADR，设计受控 shell 策略和更强审批展示。
 
@@ -59,6 +59,6 @@ stdout 和 stderr 分开捕获，均做长度截断并返回 `stdoutTruncated` /
 
 ## 何时重新考虑
 
-- 需要支持 shell 组合命令、交互式命令、长时间后台进程或完整 process tree 终止时。
+- 需要支持 shell 组合命令、交互式命令、长时间后台进程或更强隔离时。
 - 需要让命令访问受控凭据、私有依赖仓库或特定构建环境变量时。
 - 项目从本地单用户演示扩展到多用户或公网部署时，应重新设计隔离模型，而不是沿用当前本地进程执行方案。

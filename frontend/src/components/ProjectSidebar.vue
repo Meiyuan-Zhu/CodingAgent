@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RunResponse } from '../api/runs'
+import UiIcon from './UiIcon.vue'
 
 const props = defineProps<{
   activeRunId: string | null
@@ -35,7 +36,7 @@ function statusFor(status: string) {
 </script>
 
 <template>
-  <aside class="sidebar" aria-label="Projects and runs">
+  <aside class="sidebar" aria-label="项目和任务">
     <header class="sidebar-brand">
       <div class="brand-dot">CA</div>
       <div>
@@ -44,14 +45,14 @@ function statusFor(status: string) {
     </header>
 
     <button class="new-task-button" type="button" @click="emit('newTask')">
-      <span>＋</span>
+      <UiIcon name="plus" />
       新任务
     </button>
 
     <section class="sidebar-section">
       <p class="section-label">项目</p>
       <div class="project-row active">
-        <span class="folder-icon">▱</span>
+        <span class="folder-icon"><UiIcon name="folder" /></span>
         <span>
           <strong>CodingAgent</strong>
         </span>

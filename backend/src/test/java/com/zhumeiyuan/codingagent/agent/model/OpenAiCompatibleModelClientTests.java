@@ -3,6 +3,7 @@ package com.zhumeiyuan.codingagent.agent.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,91 @@ class OpenAiCompatibleModelClientTests {
 				.isEqualTo("object");
 		assertThat(body.path("messages")).hasSize(2);
 		assertThat(body.path("messages").path(0).path("content").asText()).contains("provided function tools");
+	}
+
+	@Test
+	void streamsNativeTextDeltasAndReturnsFinalResponse() throws Exception {
+		CapturingTransport transport = new CapturingTransport(new ModelHttpResponse(200, """
+				data: {"choices":[{"delta":{"content":"Hel"}}]}
+
+				data: {"choices":[{"delta":{"content":"lo"},"finish_reason":"stop"}]}
+
+				data: [DONE]
+				"""));
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+		List<String> deltas = new java.util.ArrayList<>();
+
+		ModelResponse response = client.completeStreaming(new ModelRequest(List.of(ModelMessage.user("say hi")), List.of()),
+				deltas::add);
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
+		assertThat(response.message()).isEqualTo("Hello");
+		assertThat(deltas).containsExactly("Hel", "lo");
+		JsonNode body = this.objectMapper.readTree(transport.request.body());
+		assertThat(body.path("stream").asBoolean()).isTrue();
+	}
+
+	@Test
+	void parsesFragmentedNativeToolCallsFromStream() {
+		CapturingTransport transport = new CapturingTransport(new ModelHttpResponse(200, """
+				data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"list_files","arguments":"{\\\"pa"}}]}}]}
+
+				data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\\\":\\\".\\\"}"}}]},"finish_reason":"tool_calls"}]}
+
+				data: [DONE]
+				"""));
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+
+		ModelResponse response = client.completeStreaming(new ModelRequest(List.of(ModelMessage.user("inspect")), List.of()),
+				ignored -> {});
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.TOOL_CALLS);
+		assertThat(response.message()).isEqualTo("Model requested tool execution.");
+		assertThat(response.toolCalls()).singleElement().satisfies(call -> {
+			assertThat(call.id()).isEqualTo("call-1");
+			assertThat(call.name()).isEqualTo("list_files");
+			assertThat(call.arguments()).containsEntry("path", ".");
+		});
+	}
+
+	@Test
+	void fallsBackToNonStreamingNativeRequestWhenProviderStreamIsEmpty() throws Exception {
+		CapturingTransport transport = new CapturingTransport(
+				new ModelHttpResponse(200, "data: [DONE]\n"),
+				new ModelHttpResponse(200, nativeStopResponse("Recovered with non-streaming response")));
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+
+		ModelResponse response = client.completeStreaming(new ModelRequest(List.of(ModelMessage.user("hi")), List.of()),
+				ignored -> {});
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
+		assertThat(response.message()).isEqualTo("Recovered with non-streaming response");
+		assertThat(transport.requestCount()).isEqualTo(2);
+		assertThat(this.objectMapper.readTree(transport.requests().get(0).body()).path("stream").asBoolean()).isTrue();
+		assertThat(this.objectMapper.readTree(transport.requests().get(1).body()).path("stream").asBoolean()).isFalse();
+	}
+
+	@Test
+	void fallsBackToNonStreamingNativeRequestWhenProviderStreamTransportFails() throws Exception {
+		CapturingTransport transport = new CapturingTransport(new ModelHttpResponse(200,
+				nativeStopResponse("Recovered after streaming transport failure"))) {
+			@Override
+			public ModelHttpStreamResponse stream(ModelHttpRequest request) {
+				this.requests.add(request);
+				this.requestCount++;
+				throw new ModelClientException("Model HTTP streaming request failed", new IOException("connection reset"));
+			}
+		};
+		OpenAiCompatibleModelClient client = client(transport, env -> "test-key");
+
+		ModelResponse response = client.completeStreaming(new ModelRequest(List.of(ModelMessage.user("hi")), List.of()),
+				ignored -> {});
+
+		assertThat(response.finishReason()).isEqualTo(ModelFinishReason.STOP);
+		assertThat(response.message()).isEqualTo("Recovered after streaming transport failure");
+		assertThat(transport.requestCount()).isEqualTo(2);
+		assertThat(this.objectMapper.readTree(transport.requests().get(0).body()).path("stream").asBoolean()).isTrue();
+		assertThat(this.objectMapper.readTree(transport.requests().get(1).body()).path("stream").asBoolean()).isFalse();
 	}
 
 	@Test
@@ -211,9 +297,9 @@ class OpenAiCompatibleModelClientTests {
 
 		private ModelHttpRequest request;
 
-		private final List<ModelHttpRequest> requests = new java.util.ArrayList<>();
+		protected final List<ModelHttpRequest> requests = new java.util.ArrayList<>();
 
-		private int requestCount;
+		protected int requestCount;
 
 		CapturingTransport(ModelHttpResponse response) {
 			this(List.of(response));

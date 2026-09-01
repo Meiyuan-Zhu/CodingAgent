@@ -13,6 +13,8 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhumeiyuan.codingagent.agent.execution.WorkspaceChangeJournal;
+import com.zhumeiyuan.codingagent.agent.execution.WorkspaceChangeUndoSnapshot;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.run.ToolResult;
 import com.zhumeiyuan.codingagent.agent.tool.RegisteredTool;
@@ -51,21 +53,27 @@ class WorkspaceToolFactoryTests {
 		this.registry = new ToolRegistry(List.of(
 				WorkspaceToolFactory.listFiles(workspaceReadTools, this.objectMapper),
 				WorkspaceToolFactory.readFile(workspaceReadTools, this.objectMapper),
-				WorkspaceToolFactory.searchText(workspaceReadTools, this.objectMapper),
-				WorkspaceToolFactory.writeFile(workspaceWriteTools, this.objectMapper),
-				WorkspaceToolFactory.replaceText(workspaceWriteTools, this.objectMapper),
-				WorkspaceToolFactory.runCommand(workspaceCommandTools, this.objectMapper)),
-				this.clock);
+					WorkspaceToolFactory.searchText(workspaceReadTools, this.objectMapper),
+					WorkspaceToolFactory.writeFile(workspaceWriteTools, this.objectMapper),
+					WorkspaceToolFactory.replaceText(workspaceWriteTools, this.objectMapper),
+					WorkspaceToolFactory.editFile(workspaceWriteTools, this.objectMapper),
+					WorkspaceToolFactory.runCommand(workspaceCommandTools, this.objectMapper)),
+					this.clock);
 	}
 
 	@Test
 	void registersWorkspaceReadToolDefinitions() {
 		List<ToolDefinition> definitions = this.registry.definitions();
 
-		assertThat(definitions).extracting(ToolDefinition::name)
-				.containsExactly("list_files", "read_file", "replace_text", "run_command", "search_text", "write_file");
-		assertThat(definitions.get(1).inputSchema()).containsEntry("additionalProperties", false);
-		assertThat(definitions.get(1).inputSchema()).containsEntry("required", List.of("path"));
+			assertThat(definitions).extracting(ToolDefinition::name)
+					.containsExactly("edit_file", "list_files", "read_file", "replace_text", "run_command", "search_text",
+							"write_file");
+			ToolDefinition readFile = definitions.stream()
+					.filter(definition -> definition.name().equals("read_file"))
+					.findFirst()
+					.orElseThrow();
+			assertThat(readFile.inputSchema()).containsEntry("additionalProperties", false);
+			assertThat(readFile.inputSchema()).containsEntry("required", List.of("path"));
 	}
 
 	@Test
@@ -74,8 +82,10 @@ class WorkspaceToolFactoryTests {
 
 		assertThat(result.success()).isTrue();
 		assertThat(result.metadata()).containsEntry("toolName", "list_files").containsEntry("path", ".");
-		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("root").asText()).isEqualTo(".");
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isNotBlank();
+			assertThat(json.get("root").asText()).isEqualTo(".");
 		assertThat(json.get("files").toString()).contains("README.md", "src").doesNotContain(".env");
 	}
 
@@ -84,8 +94,10 @@ class WorkspaceToolFactoryTests {
 		ToolResult result = this.registry.execute(new ToolCall("call-1", "read_file", Map.of("path", "README.md")));
 
 		assertThat(result.success()).isTrue();
-		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("path").asText()).isEqualTo("README.md");
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isNotBlank();
+			assertThat(json.get("path").asText()).isEqualTo("README.md");
 		assertThat(json.get("content").asText()).contains("hello agent");
 	}
 
@@ -96,8 +108,10 @@ class WorkspaceToolFactoryTests {
 
 		assertThat(result.success()).isTrue();
 		assertThat(result.metadata()).containsEntry("maxMatches", 2);
-		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("matches")).hasSize(2);
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isNotBlank();
+			assertThat(json.get("matches")).hasSize(2);
 		assertThat(json.get("truncated").asBoolean()).isTrue();
 	}
 
@@ -116,7 +130,18 @@ class WorkspaceToolFactoryTests {
 
 		assertThat(result.success()).isFalse();
 		assertThat(result.content()).contains("escapes the workspace root");
-		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_ACCESS_DENIED.name());
+		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_INVALID_PATH.name());
+	}
+
+	@Test
+	void missingWorkspacePathReturnsRecoverableNotFoundFailure() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "read_file", Map.of("path", "missing.py")));
+
+		assertThat(result.success()).isFalse();
+		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.WORKSPACE_NOT_FOUND.name());
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("recoverable").asBoolean()).isTrue();
+		assertThat(json.get("recoveryHint").asText()).contains("list_files");
 	}
 
 	@Test
@@ -126,11 +151,16 @@ class WorkspaceToolFactoryTests {
 
 		assertThat(result.success()).isTrue();
 		assertThat(result.metadata()).containsEntry("toolName", "write_file").containsEntry("overwrite", false);
-		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("path").asText()).isEqualTo("src/New.java");
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isNotBlank();
+			assertThat(json.get("path").asText()).isEqualTo("src/New.java");
 		assertThat(json.get("created").asBoolean()).isTrue();
 		assertThat(json.get("sha256").asText()).hasSize(64);
 		assertThat(json.get("unifiedDiff").asText()).contains("+class New {}");
+		assertThat(json.has("previousContent")).isFalse();
+		assertThat(result.privateMetadata().get(WorkspaceChangeJournal.UNDO_SNAPSHOT_KEY))
+				.isInstanceOf(WorkspaceChangeUndoSnapshot.class);
 	}
 
 	@Test
@@ -139,10 +169,31 @@ class WorkspaceToolFactoryTests {
 				Map.of("path", "README.md", "old_text", "hello ", "new_text", "")));
 
 		assertThat(result.success()).isTrue();
-		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("path").asText()).isEqualTo("README.md");
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isNotBlank();
+			assertThat(json.get("path").asText()).isEqualTo("README.md");
 		assertThat(json.get("replacements").asInt()).isEqualTo(1);
 		assertThat(json.get("unifiedDiff").asText()).contains("-hello agent", "+agent");
+		assertThat(json.has("previousContent")).isFalse();
+		assertThat(result.privateMetadata().get(WorkspaceChangeJournal.UNDO_SNAPSHOT_KEY))
+				.isInstanceOf(WorkspaceChangeUndoSnapshot.class);
+	}
+
+	@Test
+	void editFileAliasesReplaceTextAndReturnsUndoMetadata() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "edit_file",
+				Map.of("path", "README.md", "old_text", "hello", "new_text", "hi")));
+
+		assertThat(result.success()).isTrue();
+		assertThat(result.metadata()).containsEntry("toolName", "edit_file").containsEntry("path", "README.md");
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("success").asBoolean()).isTrue();
+		assertThat(json.get("path").asText()).isEqualTo("README.md");
+		assertThat(json.get("replacements").asInt()).isEqualTo(1);
+		assertThat(json.get("unifiedDiff").asText()).contains("-hello agent", "+hi agent");
+		assertThat(result.privateMetadata().get(WorkspaceChangeJournal.UNDO_SNAPSHOT_KEY))
+				.isInstanceOf(WorkspaceChangeUndoSnapshot.class);
 	}
 
 	@Test
@@ -152,9 +203,34 @@ class WorkspaceToolFactoryTests {
 
 		assertThat(result.success()).isTrue();
 		assertThat(result.metadata()).containsEntry("toolName", "run_command").containsEntry("cwd", ".");
+			JsonNode json = this.objectMapper.readTree(result.content());
+			assertThat(json.get("success").asBoolean()).isTrue();
+			assertThat(json.get("message").asText()).isEqualTo("Command completed successfully.");
+			assertThat(json.get("timedOut").asBoolean()).isFalse();
+			assertThat(json.get("exitCode").asInt()).isEqualTo(0);
+			assertThat(json.get("stdout").asText()).contains("hello");
+	}
+
+	@Test
+	void runCommandToolAcceptsJsonStringArrayFromModel() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "run_command",
+				Map.of("command", "[\"/bin/echo\",\"hello\"]", "cwd", ".", "max_output_chars", 1000)));
+
+		assertThat(result.success()).isTrue();
 		JsonNode json = this.objectMapper.readTree(result.content());
-		assertThat(json.get("exitCode").asInt()).isEqualTo(0);
+		assertThat(json.get("command").toString()).isEqualTo("[\"/bin/echo\",\"hello\"]");
 		assertThat(json.get("stdout").asText()).contains("hello");
+	}
+
+	@Test
+	void runCommandToolStillRejectsShellCommandString() throws Exception {
+		ToolResult result = this.registry.execute(new ToolCall("call-1", "run_command",
+				Map.of("command", "which g++", "cwd", ".")));
+
+		assertThat(result.success()).isFalse();
+		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.INVALID_ARGUMENTS.name());
+		JsonNode json = this.objectMapper.readTree(result.content());
+		assertThat(json.get("message").asText()).contains("argv array");
 	}
 
 	@Test

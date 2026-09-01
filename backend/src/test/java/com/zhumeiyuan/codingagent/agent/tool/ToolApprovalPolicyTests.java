@@ -24,6 +24,7 @@ class ToolApprovalPolicyTests {
 	void requiresApprovalForWorkspaceMutationsAndCommands() {
 		assertThat(this.policy.decide(new ToolCall("call-1", "write_file", Map.of())).requiresUserApproval()).isTrue();
 		assertThat(this.policy.decide(new ToolCall("call-2", "replace_text", Map.of())).requiresUserApproval()).isTrue();
-		assertThat(this.policy.decide(new ToolCall("call-3", "run_command", Map.of())).requiresUserApproval()).isTrue();
+		assertThat(this.policy.decide(new ToolCall("call-3", "edit_file", Map.of())).requiresUserApproval()).isTrue();
+		assertThat(this.policy.decide(new ToolCall("call-4", "run_command", Map.of())).requiresUserApproval()).isTrue();
 	}
 }

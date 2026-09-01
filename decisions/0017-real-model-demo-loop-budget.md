@@ -12,7 +12,7 @@
 
 ## 决策
 
-1. 默认运行预算调整为 `maxRounds=8`、`maxToolCalls=16`、`maxContextMessages=30`、`toolTimeout=5s`。
+1. 默认运行预算调整为 `maxRounds=1000`、`maxToolCalls=64`、`maxContextMessages=30`、`toolTimeout=5s`。`maxRounds` 仅保留为极端兜底，不作为正常 demo 的主要终止机制。
 2. OpenAI-compatible 模型系统提示中明确要求：一次最多调用一个工具，等待工具观察后再决定下一步。
 3. 系统提示中给出 `run_command` 的 argv 示例，强调不使用 shell 字符串。
 4. 当 provider 响应缺少可解析 content 时，错误信息只记录安全的响应形状：`finish_reason` 和 message 字段名，不记录完整原始响应，避免泄露模型输出中的潜在敏感内容。

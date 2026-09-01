@@ -21,7 +21,18 @@ public class AgentRunService {
 	private final RunEventStream runEventStream;
 	private final MockAgentRunner mockAgentRunner;
 	private final RunTaskManager runTaskManager;
+	private final WorkspaceChangeJournal workspaceChangeJournal;
 	private final Clock clock;
+
+	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
+			RunTaskManager runTaskManager, WorkspaceChangeJournal workspaceChangeJournal, Clock clock) {
+		this.store = Objects.requireNonNull(store, "store");
+		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
+		this.mockAgentRunner = Objects.requireNonNull(mockAgentRunner, "mockAgentRunner");
+		this.runTaskManager = Objects.requireNonNull(runTaskManager, "runTaskManager");
+		this.workspaceChangeJournal = Objects.requireNonNull(workspaceChangeJournal, "workspaceChangeJournal");
+		this.clock = Objects.requireNonNull(clock, "clock");
+	}
 
 	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
 			RunTaskManager runTaskManager, Clock clock) {
@@ -29,6 +40,7 @@ public class AgentRunService {
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
 		this.mockAgentRunner = Objects.requireNonNull(mockAgentRunner, "mockAgentRunner");
 		this.runTaskManager = Objects.requireNonNull(runTaskManager, "runTaskManager");
+		this.workspaceChangeJournal = null;
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
@@ -39,6 +51,10 @@ public class AgentRunService {
 		emit(run.id(), RunEventType.USER_MESSAGE_ACCEPTED, Map.of("prompt", normalizedPrompt));
 		this.runTaskManager.start(run.id(), () -> this.mockAgentRunner.run(run.id(), normalizedPrompt));
 		return getRun(run.id());
+	}
+
+	public List<AgentRun> listRuns() {
+		return this.store.listRuns();
 	}
 
 	public AgentRun cancelRun(RunId runId) {
@@ -88,6 +104,22 @@ public class AgentRunService {
 		return getRun(runId);
 	}
 
+	public WorkspaceChangeUndo undoWorkspaceChange(RunId runId, String toolCallId) {
+		if (this.workspaceChangeJournal == null) {
+			throw new IllegalStateException("Workspace change undo is not configured");
+		}
+		WorkspaceChangeUndo undo = this.workspaceChangeJournal.undo(runId, toolCallId);
+		emit(runId, RunEventType.CHANGE_UNDONE, Map.of(
+				"toolCallId", undo.toolCallId(),
+				"state", undo.state().name(),
+				"path", undo.result().path(),
+				"deleted", undo.result().deleted(),
+				"restored", undo.result().restored(),
+				"previousSha256", nullSafe(undo.result().previousSha256()),
+				"sha256", nullSafe(undo.result().sha256())));
+		return undo;
+	}
+
 	public AgentRun getRun(RunId runId) {
 		return this.store.get(runId);
 	}
@@ -135,5 +167,9 @@ public class AgentRunService {
 			throw new IllegalArgumentException("Prompt must not exceed " + MAX_PROMPT_LENGTH + " characters");
 		}
 		return normalized;
+	}
+
+	private String nullSafe(String value) {
+		return value == null ? "" : value;
 	}
 }

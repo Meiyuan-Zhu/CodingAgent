@@ -101,6 +101,40 @@ class WorkspaceWriteToolsTests {
 	}
 
 	@Test
+	void undoChangeDeletesCreatedFileWhenCurrentHashMatches() throws IOException {
+		WriteFileResult write = this.tools.writeFile("src/new.txt", "new content\n", false, "");
+
+		WorkspaceChangeUndoResult undo = this.tools.undoChange(write.path(), write.created(), write.previousContent(),
+				write.sha256());
+
+		assertThat(undo.deleted()).isTrue();
+		assertThat(undo.restored()).isFalse();
+		assertThat(Files.exists(this.root.resolve("src/new.txt"))).isFalse();
+		assertThat(undo.unifiedDiff()).contains("-new content");
+	}
+
+	@Test
+	void undoChangeRestoresEditedFileWhenCurrentHashMatches() throws IOException {
+		TextReplacementResult edit = this.tools.replaceText("README.md", "hello agent", "hi agent", "", 1);
+
+		WorkspaceChangeUndoResult undo = this.tools.undoChange(edit.path(), false, edit.previousContent(), edit.sha256());
+
+		assertThat(undo.deleted()).isFalse();
+		assertThat(undo.restored()).isTrue();
+		assertThat(Files.readString(this.root.resolve("README.md"))).isEqualTo("hello agent\nhello workspace\n");
+		assertThat(undo.unifiedDiff()).contains("-hi agent", "+hello agent");
+	}
+
+	@Test
+	void undoChangeRejectsWhenFileChangedAfterAgentEdit() throws IOException {
+		TextReplacementResult edit = this.tools.replaceText("README.md", "hello agent", "hi agent", "", 1);
+		Files.writeString(this.root.resolve("README.md"), "manual edit\n");
+
+		assertWorkspaceError(() -> this.tools.undoChange(edit.path(), false, edit.previousContent(), edit.sha256()),
+				WorkspaceAccessCode.CONTENT_CONFLICT);
+	}
+
+	@Test
 	void replaceTextRejectsDirectoryInvalidUtf8AndTooManyReplacements() {
 		assertWorkspaceError(() -> this.tools.replaceText("src", "old", "new", "", 1),
 				WorkspaceAccessCode.NOT_REGULAR_FILE);

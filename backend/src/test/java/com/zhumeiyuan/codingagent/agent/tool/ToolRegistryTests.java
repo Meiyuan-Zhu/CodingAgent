@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.run.ToolResult;
 
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 class ToolRegistryTests {
 
 	private final Clock clock = Clock.fixed(Instant.parse("2026-08-27T07:30:00Z"), ZoneOffset.UTC);
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Test
 	void exposesDefinitionsInStableNameOrder() {
@@ -65,7 +67,7 @@ class ToolRegistryTests {
 	}
 
 	@Test
-	void toolExecutionExceptionReturnsFailureResult() {
+	void toolExecutionExceptionReturnsStructuredFailureResult() throws Exception {
 		ToolRegistry registry = new ToolRegistry(List.of(
 				tool("read_file", arguments -> {
 					throw new ToolExecutionException(ToolExecutionErrorCode.INVALID_ARGUMENTS, "read_file", "bad args");
@@ -75,13 +77,20 @@ class ToolRegistryTests {
 		ToolResult result = registry.execute(new ToolCall("call-1", "read_file", Map.of()));
 
 		assertThat(result.success()).isFalse();
-		assertThat(result.content()).isEqualTo("bad args");
+		assertThat(this.objectMapper.readTree(result.content()).get("success").asBoolean()).isFalse();
+		assertThat(this.objectMapper.readTree(result.content()).get("message").asText()).isEqualTo("bad args");
+		assertThat(this.objectMapper.readTree(result.content()).get("errorCode").asText())
+				.isEqualTo(ToolExecutionErrorCode.INVALID_ARGUMENTS.name());
+		assertThat(this.objectMapper.readTree(result.content()).get("failureKind").asText())
+				.isEqualTo("RECOVERABLE_TOOL_ERROR");
+		assertThat(this.objectMapper.readTree(result.content()).get("recoverable").asBoolean()).isTrue();
+		assertThat(this.objectMapper.readTree(result.content()).get("recoveryHint").asText()).contains("schema");
 		assertThat(result.metadata()).containsEntry("toolName", "read_file")
 				.containsEntry("errorCode", ToolExecutionErrorCode.INVALID_ARGUMENTS.name());
 	}
 
 	@Test
-	void unexpectedRuntimeExceptionReturnsFailureResultWithoutStackTrace() {
+	void unexpectedRuntimeExceptionReturnsStructuredFailureResultWithoutStackTrace() throws Exception {
 		ToolRegistry registry = new ToolRegistry(List.of(
 				tool("read_file", arguments -> {
 					throw new IllegalStateException("secret internal details");
@@ -93,6 +102,7 @@ class ToolRegistryTests {
 		assertThat(result.success()).isFalse();
 		assertThat(result.content()).contains("Tool failed unexpectedly")
 				.doesNotContain("secret internal details");
+		assertThat(this.objectMapper.readTree(result.content()).get("success").asBoolean()).isFalse();
 		assertThat(result.metadata()).containsEntry("errorCode", ToolExecutionErrorCode.TOOL_RUNTIME_ERROR.name());
 	}
 

@@ -4,20 +4,23 @@ import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.model.ModelClient;
 import com.zhumeiyuan.codingagent.agent.tool.ToolApprovalPolicy;
 import com.zhumeiyuan.codingagent.agent.tool.ToolRegistry;
+import com.zhumeiyuan.codingagent.agent.workspace.WorkspaceWriteTools;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 class ExecutionConfiguration {
 
 	@Bean
-	AgentRunStore agentRunStore() {
-		return new AgentRunStore();
+	AgentRunStore agentRunStore(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+		return new AgentRunStore(new JdbcAgentRunPersistence(jdbcTemplate, objectMapper));
 	}
 
 	@Bean
@@ -33,6 +36,13 @@ class ExecutionConfiguration {
 	@Bean
 	ToolApprovalPolicy toolApprovalPolicy() {
 		return new ToolApprovalPolicy();
+	}
+
+	@Bean
+	WorkspaceChangeJournal workspaceChangeJournal(WorkspaceWriteTools workspaceWriteTools, JdbcTemplate jdbcTemplate,
+			ObjectMapper objectMapper) {
+		return new WorkspaceChangeJournal(workspaceWriteTools,
+				new JdbcWorkspaceChangePersistence(jdbcTemplate, objectMapper));
 	}
 
 	@Bean(destroyMethod = "shutdownNow")
@@ -61,14 +71,15 @@ class ExecutionConfiguration {
 	@Bean
 	MockAgentRunner mockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
 			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget,
+			WorkspaceChangeJournal workspaceChangeJournal,
 			@Qualifier("agentToolExecutor") ExecutorService agentToolExecutor, Clock clock) {
 		return new MockAgentRunner(store, runEventStream, toolRegistry, toolApprovalPolicy, modelClient, runBudget,
-				agentToolExecutor, clock);
+				workspaceChangeJournal, agentToolExecutor, clock);
 	}
 
 	@Bean
 	AgentRunService agentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
-			RunTaskManager runTaskManager, Clock clock) {
-		return new AgentRunService(store, runEventStream, mockAgentRunner, runTaskManager, clock);
+			RunTaskManager runTaskManager, WorkspaceChangeJournal workspaceChangeJournal, Clock clock) {
+		return new AgentRunService(store, runEventStream, mockAgentRunner, runTaskManager, workspaceChangeJournal, clock);
 	}
 }

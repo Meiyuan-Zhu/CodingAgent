@@ -791,3 +791,352 @@
 - 命令：`git diff --check`。结果：通过。
 - 覆盖：确认本轮 UI polish 通过类型检查、生产构建、严格设计审计和 diff 空白检查。
 - 限制：本环境未成功加载 Playwright 做自动截图；仍建议你在 `http://127.0.0.1:5173/` 手动刷新查看动态界面，尤其是真实审批后的审查面板和最终回答。
+
+## UNDO-001 — Agent 文件变更撤销验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`WorkspaceWriteTools` 撤销执行、`WorkspaceChangeJournal` 撤销快照、工具私有 metadata、`POST /api/runs/{runId}/changes/{toolCallId}/undo`、前端变更卡和右侧审查面板撤销入口。
+- 命令：`cd backend && mvn test`。结果：通过，128 tests, 0 failures, 0 errors。
+- 后端覆盖：
+  - `write_file` 新建文件后，撤销会在当前 hash 匹配时删除该文件。
+  - `replace_text` 修改文件后，撤销会在当前 hash 匹配时恢复旧内容。
+  - 撤销前若文件已被用户或后续工具改动，返回内容冲突而不覆盖。
+  - 工具结果 JSON 不包含 `previousContent`，但 `ToolResult.privateMetadata` 保留 `WorkspaceChangeUndoSnapshot` 供后端 journal 使用。
+  - Mock run 写入审批通过并成功结束后，undo endpoint 返回 `UNDONE`，事件回看包含 `CHANGE_UNDONE`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict --no-write`。结果：通过，0 findings。
+- 命令：`git diff --check`。结果：通过。
+- 限制：撤销记录目前只保存在后端进程内存，后端重启后不能撤销旧 run 的变更；本次未启动浏览器手动点击撤销按钮做目视验收。
+
+## UI-012 — Codex-like 前端体验升级验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`frontend/src/components/UiIcon.vue`、`ComposerBox.vue`、`ActionRow.vue`、`ChangeSummaryCard.vue`、`ChatTimeline.vue`、`InspectorPane.vue`、`ProjectSidebar.vue`、`frontend/src/App.vue`、`frontend/src/run/timeline.ts`、`frontend/src/run/toolCards.ts`、`frontend/src/style.css`、`DESIGN.md`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict --no-write`。结果：通过，0 findings。
+- 命令：`git diff --check`。结果：通过。
+- 反模式搜索：`rg -n "Unknown backend error|Failed to create run|Failed to cancel|Failed to undo|Event stream closed|Workspace panel|Workspace panel tabs|Conversation workspace|Task composer|Task input|Projects and runs|Drag to resize|Permission needed|Waiting approval|Proposed|Finished|Running|Rejected|coding task|letter-spacing:\s*-|background:\s*linear-gradient|hero|orb|bokeh" frontend/src DESIGN.md`。结果：仅命中 `DESIGN.md` 中的 Codex 参考和 `runFinishedContent` 函数名，未发现界面文案泄漏或样式反模式。
+- 覆盖：确认共享图标组件、composer 键盘交互、撤销状态展示、timeline 滚动策略、Inspector 语言徽标和样式 token 覆盖通过类型检查、生产构建和严格设计审计。
+- 限制：本次没有启动浏览器做截图/点击验收，也没有新建真实模型 run；真实审批和撤销点击仍需在录屏前动态检查。
+
+## UI-013 — Composer 对话框专项优化验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：`frontend/src/App.vue`、`frontend/src/components/ComposerBox.vue`、`frontend/src/style.css`。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict --no-write`。结果：通过，0 findings。
+- 命令：`git diff --check`。结果：通过。
+- 反模式搜索：未发现默认英文 demo prompt、英文 run-event fallback、负字距或装饰渐变；旧全局 `textarea:focus-visible` 规则仍存在，但 composer 专项规则已覆盖为无 textarea outline，焦点反馈迁移到外层 composer。
+- 覆盖：确认空白默认 composer、快捷建议 chip、焦点样式覆盖和中文 fallback 文案通过前端类型检查、生产构建和严格设计审计。
+- 限制：本次未用浏览器截图复核视觉结果；已启动的 Vite dev server 会热更新展示最新 composer。
+
+## SELFTEST-001 — 本地后端启动与 mock 功能闭环自测
+
+- 日期：2026-08-29（北京时间）。
+- 启动：`cd backend && mvn spring-boot:run`。结果：通过，Tomcat 在 `http://localhost:8080` 启动成功。
+- 前端：既有 Vite dev server 仍运行在 `http://127.0.0.1:5173/`，`/api` 代理到后端。
+- 健康检查：
+  - `curl -fsS http://127.0.0.1:8080/api/health`：通过，返回 `status=ok`、`service=coding-agent-backend`、`javaVersion=21`。
+  - `curl -fsS http://127.0.0.1:5173/api/health`：通过，确认前端 dev proxy 可访问后端。
+- 写入审批闭环：
+  - 创建 run：`d2b9a74e-f3b2-41df-9d37-3dfb03ccef9f`，prompt 为创建 mock note 文件。
+  - 事件回看：模型请求 `write_file`，toolCallId `mock-call-1`，后端产生 `APPROVAL_REQUIRED`。
+  - 批准：`POST /api/runs/d2b9a74e-f3b2-41df-9d37-3dfb03ccef9f/approvals/mock-call-1/approve`。
+  - 结果：`TOOL_CALL_FINISHED` 返回 `undoable=true`，content 含 `src/mock-note.txt` 的 unified diff；run 以 `SUCCEEDED / COMPLETED` 结束。
+  - 文件检查：`workspaces/demo/src/mock-note.txt` 创建成功，内容为 `mock note`。
+- 撤销闭环：
+  - 调用：`POST /api/runs/d2b9a74e-f3b2-41df-9d37-3dfb03ccef9f/changes/mock-call-1/undo`。
+  - 结果：返回 `state=UNDONE`、`deleted=true`、`restored=false`；文件 `workspaces/demo/src/mock-note.txt` 已不存在；事件回看包含 `CHANGE_UNDONE`。
+- 命令审批闭环：
+  - 创建 run：`8f35c119-168e-4567-a974-d44fac993180`，prompt 为运行测试命令。
+  - 事件回看：模型请求 `run_command`，arguments 为 `["/bin/echo","mock command"]`，cwd 为 `.`，后端产生 `APPROVAL_REQUIRED`。
+  - 批准：`POST /api/runs/8f35c119-168e-4567-a974-d44fac993180/approvals/mock-call-1/approve`。
+  - 结果：`TOOL_CALL_FINISHED` 返回 `exitCode=0`、`stdout="mock command\n"`、`stderr=""`、`durationMillis=11`；run 以 `SUCCEEDED / COMPLETED` 结束。
+- 拒绝审批闭环：
+  - 创建 run：`0bfe2f58-2048-4794-8c63-6ecc30c7e7ed`，prompt 为创建会被拒绝的 mock 文件。
+  - 拒绝：`POST /api/runs/0bfe2f58-2048-4794-8c63-6ecc30c7e7ed/approvals/mock-call-1/reject`。
+  - 结果：run 返回 `FAILED`，`stopReason=APPROVAL_REJECTED`，事件回看包含 `APPROVAL_RESOLVED approved=false` 和 `RUN_FINISHED`；未继续执行工具。
+- 观察：普通 sandbox 中 `curl` 无法连接本机 dev server；使用已批准的 localhost `curl` 提权完成自测。一次读取拒绝事件时自动审批审查超时，重试后成功。
+- 限制：本次是 HTTP/API 层 mock 功能自测，没有通过浏览器实际点击 Approve/Reject/Undo，也没有使用真实 DeepSeek 模型跑完整前端动态流程。
+
+## PERSIST-001 — H2 持久化测试与跨重启验证
+
+- 日期：2026-08-29（北京时间）。
+- 范围：H2 file datasource、`schema.sql`、`JdbcAgentRunPersistence`、`JdbcWorkspaceChangePersistence`、`AgentRunStore` 启动加载、`WorkspaceChangeJournal` undo snapshot 持久化、`GET /api/runs`、前端启动历史加载。
+- 命令：`cd backend && mvn test`。结果：通过，131 tests, 0 failures, 0 errors。
+- 后端测试覆盖：
+  - `JdbcPersistenceTests.runStoreReloadsRunsEventsAndPendingApproval`：同一 H2 memory DB 中，第二个 `AgentRunStore` 实例可恢复 run、事件和 pending approval continuation。
+  - `JdbcPersistenceTests.workspaceChangePersistenceReloadsUndoSnapshotAndResult`：undo snapshot、`UNDOABLE`/`UNDONE` 状态和撤销结果可从 DB 恢复。
+  - `RunControllerTests.listRunsReturnsCreatedRuns`：`GET /api/runs` 返回已创建 run。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- HTTP 跨重启验证：
+  - 第一次启动：`cd backend && mvn spring-boot:run`，Hikari 连接 `jdbc:h2:file:./data/coding-agent`。
+  - 创建只读 run：`205548a7-4244-451b-a135-036ac9ee87de`，prompt 为查看 workspace 文件列表。
+  - 重启前事件回看：11 条事件，包含 `TOOL_CALL_REQUESTED list_files`、`TOOL_CALL_FINISHED` 和 `RUN_FINISHED status=SUCCEEDED`。
+  - 停止后端并第二次启动。
+  - `GET /api/runs`：通过，重启后列表包含 `205548a7-4244-451b-a135-036ac9ee87de`。
+  - `GET /api/runs/205548a7-4244-451b-a135-036ac9ee87de/events`：通过，仍返回 11 条事件，第一条 `RUN_CREATED`，最后一条 `RUN_FINISHED / SUCCEEDED`。
+  - `GET http://127.0.0.1:5173/api/runs`：通过，前端 Vite proxy 能访问 run 列表，返回 12 条历史 run。
+- 忽略规则验证：`git check-ignore -v backend/data/coding-agent.mv.db` 命中 `.gitignore` 的 `/backend/data/`。
+- 限制：非终态 `RUNNING`/`CANCELLING` run 在后端崩溃后不会自动恢复后台任务；持久化主要覆盖历史回看、pending approval continuation 和 undo snapshot。H2 数据是本地运行数据，不提交仓库。
+
+## RUNTIME-001 — 工具失败作为可恢复 Observation 验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`MockAgentRunner` 普通 loop、审批恢复后的 loop、tool timeout observation、运行终止语义。
+- 命令：`cd backend && mvn test`。结果：通过，131 tests, 0 failures, 0 errors。
+- 覆盖：
+  - `MockAgentRunnerTests.failedToolResultIsReturnedToModelAsObservation`：工具返回 `success=false` 后，run 不直接 failed；下一轮 `ModelRequest` 包含 `ModelRole.TOOL` 消息，内容含 `tool_call_id`、`tool_name`、`success=false` 和失败文本；随后模型 STOP，run 以 `SUCCEEDED / COMPLETED` 结束。
+  - `MockAgentRunnerTests.toolTimeoutIsReturnedToModelAsObservation`：工具超时产生 `TOOL_TIMEOUT` metadata 和 `success=false` observation；runner 继续向模型发起下一轮请求，模型 STOP 后 run 成功结束。
+- 说明：工具执行失败现在被视为可恢复 observation；不可恢复失败仍包括 `ModelClientException`、`ModelParseException` 和 runner 内部异常；系统强制结束仍包括 round limit、tool call limit、length/token limit 和用户取消。
+- 限制：本次验证使用替身模型和单元测试，未启动真实 DeepSeek run 专门验证“工具失败后自修”；context window 仍是简单尾部裁剪，尚未按 tool-call/tool-result pair 做成组裁剪。
+
+## TOOL-OBS-001 — Tool System 结构化 observation 与 edit_file 验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`WorkspaceToolFactory`、`WorkspaceToolConfiguration`、`ToolRegistry`、`ToolApprovalPolicy`、`WorkspaceChangeJournal`、`WorkspaceReadTools`、`WorkspaceWriteTools`、`WorkspaceCommandTools`、前端 `display.ts` 和 `timeline.ts`。
+- 命令：`cd backend && mvn test`。结果：通过，132 tests, 0 failures, 0 errors。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 覆盖：
+  - Spring 工具注册表包含 `edit_file`、`list_files`、`read_file`、`replace_text`、`run_command`、`search_text`、`write_file`。
+  - `edit_file` 复用 exact replacement 逻辑，返回 path、replacement count、unified diff，并携带 undo snapshot 私有 metadata。
+  - `ToolApprovalPolicy` 对 `edit_file` 要求用户审批。
+  - `list_files`、`read_file`、`search_text`、`write_file`、`replace_text` 和 `run_command` 成功 JSON 均包含 `success=true` 和 `message`。
+  - `run_command` 非 0 exit code 在命令结果 JSON 中表现为 `success=false`，同时保留 stdout/stderr/exitCode/timedOut/duration。
+  - `ToolRegistry` 对参数错误和运行时异常返回结构化失败 JSON，包含 `success=false`、`message` 和 `errorCode`，且不泄漏内部异常细节。
+- 限制：本次未启动真实模型验证模型是否更偏好 `edit_file`；`edit_file` 和 `replace_text` 暂时作为等价工具共同暴露。
+
+## CONTEXT-001 — Context window 配对感知裁剪验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`MockAgentRunner.contextWindow`、assistant tool_calls 与 tool result 的上下文配对、运行预算下的历史消息裁剪。
+- 命令：`cd backend && mvn test`。结果：通过，133 tests, 0 failures, 0 errors。
+- 命令：`git diff --check`。结果：通过。
+- 覆盖：
+  - `MockAgentRunnerTests.contextWindowKeepsSystemPromptAndRecentMessages`：裁剪后仍保留 system prompt 和初始 user task，且保留的 tool result 前一条是包含对应 tool call id 的 assistant 消息。
+  - `MockAgentRunnerTests.contextWindowDoesNotKeepOrphanToolMessagesWhenTrimming`：小上下文窗口下只保留完整的最近 assistant/tool pair，不会留下孤立 `ModelRole.TOOL` 消息。
+- 说明：当前仍是 message-count 窗口，不是真实 token-aware compression；但 provider-facing context 已避免拆散 native tool calling 所需的 assistant/tool 对应关系。
+- 清理：测试生成的 `backend/data/coding-agent.mv.db` 和 `backend/data/coding-agent.trace.db` 已删除。
+
+## FAILURE-001 — Failure Recovery 可恢复工具错误验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`ToolRegistry` 失败 observation schema、workspace error code 映射、`MockAgentRunner` 工具失败后继续 loop、system prompt 恢复策略。
+- 命令：`cd backend && mvn test`。结果：通过，135 tests, 0 failures, 0 errors。
+- 命令：`git diff --check`。结果：通过。
+- 覆盖：
+  - `MockAgentRunnerTests.recoverableWorkspaceErrorCanDriveTheNextToolAttempt`：模型先调用 `read_file("src/foo.py")`，工具返回 `WORKSPACE_NOT_FOUND`、`failureKind=RECOVERABLE_TOOL_ERROR`、`recoverable=true` 和包含 `list_files` 的 `recoveryHint`；runner 没有失败，而是继续下一轮 `list_files(".")`，再 `read_file("README.md")`，最终 `SUCCEEDED / COMPLETED`。
+  - `WorkspaceToolFactoryTests.missingWorkspacePathReturnsRecoverableNotFoundFailure`：缺失文件映射为 `WORKSPACE_NOT_FOUND`，失败 JSON 包含可恢复标记和恢复提示。
+  - `ToolRegistryTests.toolExecutionExceptionReturnsStructuredFailureResult`：参数错误等 `ToolExecutionException` 返回结构化 recoverable failure，不抛出到 runner。
+  - 既有 `toolTimeoutIsReturnedToModelAsObservation` 继续验证 timeout 作为失败 observation 回填，而不是直接终止。
+- 说明：resource/policy termination 仍由 round/tool-call/token/cancel/approval rejection 控制；模型 provider 错误、模型响应解析错误和 runner 内部异常仍归为 failed。
+- 清理：测试生成的 `backend/data/coding-agent.mv.db` 已删除；未发现残留 H2 trace 文件。
+- 限制：本次验证使用替身模型和真实本地 workspace 工具，没有启动真实 DeepSeek 专门跑“读错文件后自恢复”的动态 demo；重复同类失败目前由 budget 兜底，尚未实现 no-progress detector。
+
+## PROMPT-001 — Agent Operating Policy Prompt 验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`MockAgentRunner.SYSTEM_PROMPT`、OpenAI-compatible JSON protocol instruction formatting、模型请求中的 system message。
+- 命令：`cd backend && mvn test`。结果：通过，136 tests, 0 failures, 0 errors。
+- 命令：`git diff --check`。结果：通过。
+- 覆盖：
+  - `MockAgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`：首轮 `ModelRequest` 的 system message 包含 autonomous coding agent、本地 workspace、无直接 filesystem/terminal 访问、修改前检查、工具错误作为 observation、避免重复失败动作、合理验证后再完成等关键 operating policy。
+- 说明：runner prompt 负责 Agent 行为策略；OpenAI-compatible adapter 继续负责 JSON/native tool calling provider 协议说明。
+- 清理：测试生成的 `backend/data/coding-agent.mv.db` 已删除；未发现残留 H2 trace 文件。
+- 限制：本次没有跑真实 DeepSeek 专项验证 prompt 对模型行为的影响；真实录屏前仍需做一次端到端 demo 检查。
+
+## COMMAND-CLEANUP-001 — run_command 进程树清理验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：`WorkspaceCommandTools` 命令等待 interrupt 响应、`ProcessHandle.descendants()` 进程树清理、受限环境 fallback。
+- 命令：`mvn -Dtest=WorkspaceCommandToolsTests test`。结果：普通 sandbox 下通过，8 tests, 0 failures, 0 errors, 1 skipped；跳过原因为 sandbox 禁止 `ProcessHandle.descendants()` 枚举，表现为 `/bin/ps: Operation not permitted`。
+- 命令：提权后 `mvn -Dtest=WorkspaceCommandToolsTests test`。结果：通过，8 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn test`。结果：通过，137 tests, 0 failures, 0 errors, 0 skipped。
+- 覆盖：
+  - `WorkspaceCommandToolsTests.interruptedCommandDestroysChildProcessTree`：启动会派生后台子进程并持续写文件的命令；中断命令线程后，工具线程退出为 `WorkspaceAccessException`，后台子进程不再继续写输出。
+  - `WorkspaceCommandTools.destroyProcessTree`：中断时按 descendants → parent 顺序强制销毁，并在 parent 退出后再次 best-effort 补扫 descendants。
+  - 受限环境下 descendants 枚举异常会被捕获，至少清理 parent，避免 cleanup 抛出原始 runtime exception。
+- 说明：这降低 timeout/cancel 后残留子进程风险，但不是 OS 级沙箱；daemon 化或脱离父子关系的进程仍不保证覆盖。
+
+## STREAM-001 — Provider token-level streaming 验证
+
+- 日期：2026-08-30（北京时间）。
+- 范围：OpenAI-compatible native tools streaming request、provider SSE chunk 解析、fragmented tool call arguments 累计、runner delta event、前端 timeline 拼接。
+- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test`。结果：通过，26 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn test`。结果：通过，140 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 覆盖：
+  - `OpenAiCompatibleModelClientTests.streamsNativeTextDeltasAndReturnsFinalResponse`：native tools 请求包含 `stream=true`，provider SSE 中的 `"Hel"`、`"lo"` 被逐段回调，并最终组装为完整 `ModelResponse("Hello")`。
+  - `OpenAiCompatibleModelClientTests.parsesFragmentedNativeToolCallsFromStream`：streamed `delta.tool_calls` 的 id、name 和 arguments 跨 chunk 拼接后，仍能生成 `ToolCall("call-1", "list_files", {"path":"."})`。
+  - `MockAgentRunnerTests.emitsModelMessageDeltaEventsForStreamingClients`：runner 对 streaming client 发出两个 `MODEL_MESSAGE_DELTA` 事件，并保留最终 `MODEL_MESSAGE_RECEIVED`。
+  - 前端 `npm run build` 覆盖 `model_message_delta` SSE 监听和 timeline delta 拼接类型检查。
+- 说明：当前 JSON content fallback 不做 token-level streaming；真实 provider stream 尚未在浏览器录屏路径中专项验证。
+
+## FULLCHECK-001 — 全项目提交前检查
+
+- 日期：2026-08-30（北京时间）。
+- 范围：题目 PDF 要求对照、后端全量测试、前端构建、demo workspace 测试、禁用 Agent 框架扫描、敏感信息扫描、提交物与忽略规则检查。
+- 命令：`cd backend && mvn test`。结果：通过，140 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`cd workspaces/demo && python3 -m unittest discover -s tests -v`。结果：通过，4 tests, 0 failures, 0 errors。
+- 命令：`rg -n "LangChain|LlamaIndex|OpenAI Agents SDK|Claude Agent SDK|AutoGen|CrewAI|Spring AI|langchain|llamaindex|autogen|crewai|spring-ai|openai-agents" backend frontend backend/pom.xml frontend/package.json -S`。结果：无命中；未发现禁用 Agent 框架依赖或代码引用。
+- 命令：`rg -n "sk-[A-Za-z0-9]|Bearer [A-Za-z0-9_\\-]{12,}|api[_-]?key\\s*[:=]\\s*['\\\"][^'\\\"]+|DEEPSEEK_API_KEY\\s*=\"" -S .`。结果：未发现真实 API key；命中项为正常 UI/CSS token 命名、环境变量名或测试假数据。
+- 命令：`git check-ignore -v 推免考核题目学生版.pdf backend/data/coding-agent.mv.db workspaces/private-demo/foo.txt`。结果：题目 PDF、H2 本地数据库和非 demo 私有 workspace 均被 `.gitignore` 覆盖。
+- 命令：`find . -maxdepth 3 -iname 'README.txt' -o -iname '*.mp4' -o -iname '*.zip'`。结果：检查前无提交版 README、视频或 zip；随后已新增根目录 `README.txt` 草稿。
+- 命令：`wc -m README.txt`。结果：883 个字符，低于题目要求的 1000 汉字限制。
+- 清理：全量测试生成的 `backend/data/coding-agent.mv.db` 已删除；复查 `find backend/data -maxdepth 1 -type f -print` 无输出。
+- 结论：从功能实现和验证证据看，项目已满足简化版 Coding Agent 的核心要求；提交前还需整理提交历史、推送公开仓库、录制 2 分钟内 mp4，并制作包含 `README.txt` 和视频的姓名 zip。
+- 风险：当前 Git 工作区有大量未提交改动；`workspaces/demo` 下存在若干 untracked C++ 临时文件和测试产生的 `__pycache__`，公开前建议清理或保持不暂存。
+
+## BUGFIX-001 — 真实命令 run 的 model_error 定位与修复验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：`run_command` 参数归一化、OpenAI-compatible native tools 空 stream 降级、前端工具卡命令展示、Spring 集成测试数据源隔离。
+- 现场复现：
+  - `cd workspaces/demo && g++ --version`：失败，exit code 69，stderr/stdout 提示未同意 Xcode license，需要在 Terminal 中执行 `sudo xcodebuild -license`。
+  - `cd backend && mvn test` 初次失败：SpringBootTest 连接真实 `backend/data/coding-agent.mv.db`，H2 报 `Database may be already in use` 和 `The file is locked`。
+- 修复覆盖：
+  - `WorkspaceToolFactoryTests.runCommandToolAcceptsJsonStringArrayFromModel`：`command` 为字符串 `"[\"/bin/echo\",\"hello\"]"` 时归一化为 argv array 并成功执行。
+  - `WorkspaceToolFactoryTests.runCommandToolStillRejectsShellCommandString`：`command` 为 `"which g++"` 时继续返回 `INVALID_ARGUMENTS`，不引入 shell 解析。
+  - `OpenAiCompatibleModelClientTests.fallsBackToNonStreamingNativeRequestWhenProviderStreamIsEmpty`：provider stream 只返回 `[DONE]` 时，客户端第二次发送 `stream=false` native request 并返回非 streaming 响应。
+- 命令：`cd backend && mvn -Dtest=WorkspaceToolFactoryTests,OpenAiCompatibleModelClientTests test`。结果：通过，26 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn test`。结果：通过，143 tests, 0 failures, 0 errors, 0 skipped；Spring 集成测试使用 `jdbc:h2:mem:coding-agent-test`，不再争抢真实运行数据库。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 说明：本次修复降低模型轻微参数格式错误和 provider 空 stream 对 run 的影响；它不修复本机 Xcode license 环境问题。C++ demo 需要先同意 license，或录屏继续使用已验证的 Python demo。
+
+## BUGFIX-002 — 多 tool calls native history 400 定位与修复验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：`MockAgentRunner` 单工具调用强制、native tools transcript 稳定性、失败 run 错误详情展示。
+- 现场定位：
+  - 从 `backend/data/coding-agent.mv.db` 复制快照后读取最新 run：`d2771827-317b-4906-b2d4-3f285c83754e`。
+  - 该 run 在 `which clang++` 成功后进入下一轮模型请求，随后 `RUN_FINISHED` 为 `FAILED / MODEL_ERROR`。
+  - 完整错误：`Model provider returned HTTP 400: {"error":{"message":"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. (insufficient tool messages following tool_calls message)"...}}`。
+  - 事件序列显示第 2 轮模型一次返回 4 个只读 tool calls，说明仅靠 prompt 的“一次最多一个工具”不足以约束真实 provider。
+- 修复覆盖：
+  - `MockAgentRunner.acceptedToolCalls` 在 `TOOL_CALLS` 响应中只接收第一个 tool call，进入 transcript 的 assistant message 不再携带多个 tool calls。
+  - `MockAgentRunnerTests.acceptsOnlyFirstToolCallFromEachModelResponse`：模型一次返回 `call-1` 与 `call-2` 时，runner 只执行 `call-1`，下一轮上下文只包含 `assistant(call-1)` 与 `tool(call-1)`。
+  - `toolCallLimitStopsBeforeExecutingTooManyCalls` 更新为新语义：已用完工具预算后，下一轮工具请求才触发 `TOOL_CALL_LIMIT`。
+  - 前端 `runFinishedContent` 展示 `errorMessage` 的精简版本，方便从 UI 直接看到 provider 错误。
+- 命令：`cd backend && mvn -Dtest=MockAgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test`。结果：通过，42 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn test`。结果：通过，144 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 说明：本修复解决的是 native tool calling history 形态导致的 provider HTTP 400；本机 C++ 编译链仍需处理 Xcode/CommandLineTools 环境问题。
+
+## BUGFIX-003 — Streaming 传输异常 fallback 验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：OpenAI-compatible native tools streaming、transport IO failure fallback、真实 run 中 `Model HTTP streaming request failed` 的恢复策略。
+- 现场定位：
+  - 真实 C++ run `c85ded0b-ddac-4ab7-a34d-1e22da149fda` 已完成写入 `selftest_rotate.cpp`、根据编译失败 observation 修改 include、继续验证等多轮动作。
+  - 后续模型请求以 `FAILED / MODEL_ERROR` 结束，错误信息为 `Model HTTP streaming request failed`，属于 Java HTTP streaming 传输层 IO 异常。
+- 修复覆盖：
+  - `OpenAiCompatibleModelClient.completeNativeToolStream` 在 native tools streaming 抛出由 `IOException` 引起的 `ModelClientException` 时，降级为同请求的非 streaming native completion。
+  - HTTP 非 2xx、provider 协议错误、鉴权/额度错误和非 IO 类异常不走该 fallback，仍暴露为真实 model/provider failure。
+  - `OpenAiCompatibleModelClientTests.fallsBackToNonStreamingNativeRequestWhenProviderStreamTransportFails` 验证第一次 streaming 请求失败后，会发送第二次 `stream=false` native request 并返回模型最终消息。
+- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test`。结果：通过，29 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn test`。结果：通过，145 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check`。结果：通过。
+- 说明：fallback 后该轮不再产生 token delta，但能保留完整 Agent loop；如果非 streaming retry 也失败，run 仍会按 infrastructure failure 结束。
+
+## REALFLOW-001 — DeepSeek native tools 真实 Python 端到端流程
+
+- 日期：2026-09-01（北京时间）。
+- 范围：真实模型、native tool calling、多轮 Agent loop、写文件审批、命令执行审批、命令 observation 回填、最终回答、H2 持久化。
+- 后端启动：`cd backend && mvn spring-boot:run -Dspring-boot.run.arguments="--agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash --agent.model.tool-protocol=native-tools"`。结果：启动成功，健康检查 `GET /api/health` 返回成功。
+- 真实 run：`2c110940-e4d7-4e42-b376-4ec0529046c3`。
+- 用户任务：创建 `selftest_factorial.py`，读取非负整数并打印阶乘，然后用输入 `5` 验证输出 `120`。
+- 结果：run 状态 `SUCCEEDED / COMPLETED`，共 3 个模型 round、2 次工具调用。
+- 工具链路：
+  - 第 1 轮模型请求 `write_file` 写入 `selftest_factorial.py`，审批后工具执行成功。
+  - 第 2 轮模型请求 `run_command`，命令为 `["sh","-c","echo 5 | python3 selftest_factorial.py"]`，审批后执行成功。
+  - 命令 observation：`exitCode=0`、`stdout="120\n"`、`stderr=""`、`success=true`。
+  - 第 3 轮模型返回最终总结，确认已创建文件并验证输出为 120。
+- 本地复核：在 `workspaces/demo` 执行 `python3` subprocess，向 `selftest_factorial.py` 输入 `5\n`，结果 `exit 0`、`stdout 120`、`stderr` 为空。
+- 全量验证：`cd backend && mvn test` 通过 145 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+- 限制：
+  - 因当前命令工具没有 stdin 字段，模型用 `sh -c "echo 5 | python3 ..."` 完成输入重定向；这是后续可优化的 tool schema 设计点。
+  - C++ 完整编译运行仍受本机 Xcode/CommandLineTools linker 影响：Homebrew clang 可 compile-only，但 link 阶段失败。这不是 Agent loop 的失败；C++ 录屏前仍建议修好本机 linker 或继续使用 Python demo。
+
+## REALFLOW-002 — Command Line Tools 修复后真实 C++ 端到端流程
+
+- 日期：2026-09-01（北京时间）。
+- 范围：本机 C++ toolchain、真实模型、native tool calling、多轮 Agent loop、写文件审批、C++ 编译命令审批、程序运行验证、最终回答。
+- 环境确认：
+  - `xcrun --find ld`：通过，输出 `/Library/Developer/CommandLineTools/usr/bin/ld`。
+  - `g++ --version`：通过，Apple clang 21 可响应。
+  - `clang++ -std=c++17 workspaces/demo/hello.cpp -o /private/tmp/coding-agent-hello`：通过；运行 `/private/tmp/coding-agent-hello` 输出 `Hello, world!`。
+- 真实 run：`019de8c5-f6f9-4af1-b308-52b33bc995e0`。
+- 用户任务：创建 C++17 程序 `selftest_sum_gcc.cpp`，读取两个整数并打印和；使用 `/opt/homebrew/bin/g++-15 -std=c++17 -O2 -o selftest_sum_gcc selftest_sum_gcc.cpp` 编译；用输入 `7 35` 验证输出 `42`。
+- 结果：run 状态 `SUCCEEDED / COMPLETED`，共 4 个模型 round、3 次工具调用。
+- 工具链路：
+  - 第 1 轮模型请求 `write_file` 写入 `selftest_sum_gcc.cpp`，审批后工具执行成功。
+  - 第 2 轮模型请求 `run_command` 编译，命令 exit code 0，无 stdout/stderr 错误。
+  - 第 3 轮模型请求 `run_command` 运行，命令为 `["sh","-c","echo '7 35' | ./selftest_sum_gcc"]`，exit code 0，stdout 为 `42\n`。
+  - 第 4 轮模型返回最终总结，确认编译和运行验证均成功。
+- 相关失败样例：run `30e87b32-9f8d-42e5-8591-076683f847a7` 使用裸 `clang++` 时，在命令工具的最小环境下出现 `fatal error: 'iostream' file not found`；模型继续排查 include 路径但最终达到 `ROUND_LIMIT`。这说明 C++ demo 若依赖本机 toolchain，prompt 最好显式指定已验证的 `/opt/homebrew/bin/g++-15`。
+- 限制：命令工具仍没有 stdin 字段，因此模型用 `sh -c` 管道输入完成交互式验证；这是后续安全与易用性可优化点。
+
+## BUGFIX-004 — run_command macOS C++ 环境修复验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：`WorkspaceCommandTools` 最小命令环境、PATH 优先级、`TMPDIR` 保留、`g++`/`gcc` Homebrew GCC alias、真实 C++ Agent flow。
+- 问题：
+  - 用户截图中的真实 run 使用普通 `g++ -std=c++17 ...` 时，在 Agent 的干净命令环境中落到 `/usr/bin/g++`，随后 Apple clang 找不到 `iostream`。
+  - Agent 因持续尝试诊断编译器环境，最终达到 `ROUND_LIMIT`，这是预算保护生效，不是 Runtime 崩溃。
+- 修复覆盖：
+  - `WorkspaceCommandTools` 默认 PATH 改为优先包含 `/opt/homebrew/opt/llvm/bin:/opt/homebrew/bin:/usr/local/bin`，再合并继承 PATH。
+  - `TMPDIR` 从后端环境白名单继承，避免 macOS 编译器在极简环境下创建临时文件失败。
+  - 当命令首项为 `g++` 或 `gcc`，且本机存在可执行的 `/opt/homebrew/bin/g++-15` 或 `/opt/homebrew/bin/gcc-15` 时，工具执行前解析到 Homebrew GCC。
+  - 最小环境仍不传递 `HOME`、模型 API key 或任意完整用户环境。
+  - 默认 `RunBudget.maxRounds` 从 8 调高到 1000，仅保留为极端兜底；正常防无限循环主要依赖 `maxToolCalls=64`、用户取消和模型/provider failure。
+- 单元测试：
+  - `WorkspaceCommandToolsTests.usesMinimalEnvironment`：验证 PATH/TMPDIR 存在，且不包含 `HOME`/`DEEPSEEK_API_KEY`。
+  - `WorkspaceCommandToolsTests.resolvesHomebrewGccAliasWhenAvailable`：验证存在 Homebrew GCC 时，`g++ --version` 实际解析为 `/opt/homebrew/bin/g++-15`。
+- 命令：`cd backend && mvn -Dtest=WorkspaceCommandToolsTests test`。结果：通过，9 tests, 0 failures, 0 errors。
+- 命令：`cd backend && mvn test`。结果：通过，146 tests, 0 failures, 0 errors, 0 skipped；调整默认 round 上限后重新执行仍通过。
+- 真实 run：`9718dc9f-2a36-4111-a22f-b62c56b85b1d`。
+  - 用户任务要求使用普通 `g++ -std=c++17 -O2 -o selftest_plain_gpp selftest_plain_gpp.cpp`。
+  - 工具执行 observation 中的实际 command 为 `["/opt/homebrew/bin/g++-15","-std=c++17","-O2","-o","selftest_plain_gpp","selftest_plain_gpp.cpp"]`。
+  - 编译 exit code 0。
+  - 运行命令 `echo '7 35' | ./selftest_plain_gpp` exit code 0，stdout 为 `42\n`。
+  - run 最终状态 `SUCCEEDED / COMPLETED`，共 4 rounds、3 tool calls。
+- 说明：该修复是 macOS/Homebrew toolchain 兼容策略，不改变 Agent loop、审批、安全边界或工具 schema。
+
+## UI-014 — Codex-like 审查聚合与 workspace 文件树验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：右侧 Inspector 审查/文件面板、workspace 只读 API、diff 横向滚动、文件内容预览。
+- 实现检查：
+  - 审查 tab 现在以当前 run 内所有成功修改过的文件为主列表，不再把最近一次工具调用或命令详情当作默认审查内容。
+  - 点击某个修改文件会展开该文件对应的 unified diff；同一文件多次修改会按工具调用分别展示。
+  - diff 行使用 `max-content` 代码列和 `overflow-x: auto`，长行可在侧栏内横向滚动查看。
+  - 文件 tab 通过 `/api/workspace/files` 读取 workspace 目录，并以目录树显示；点击文件后通过 `/api/workspace/file` 读取内容并在右侧预览。
+  - workspace API 复用既有 path resolver/read tools，路径穿越等非法路径返回 HTTP 400。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`cd backend && mvn -Dtest=WorkspaceControllerTests,WorkspaceCommandToolsTests test`。结果：通过，12 tests, 0 failures, 0 errors。
+- 命令：`cd backend && mvn test`。结果：通过，149 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`git diff --check`。结果：通过。
+- 说明：本轮完成构建和 API/单元验证；最终录屏前仍建议用真实模型 run 再做一次浏览器目视验收。
+
+## UI-015 — 默认真实模型与文件面板空态修正验证
+
+- 日期：2026-09-01（北京时间）。
+- 范围：默认模型 provider、Spring Boot 测试覆盖、右侧文件面板未选中文件布局。
+- 问题定位：
+  - 用户看到 “Mock model observed the tool result and finished.” 的原因是后端普通启动仍使用 `agent.model.provider=mock` 默认配置。
+  - 文件 tab 在未选中文件时固定渲染预览列，导致目录树只占左半边，右边出现空白提示块。
+- 修复覆盖：
+  - `backend/src/main/resources/application.properties` 默认改为 `agent.model.provider=openai-compatible`，继续使用 DeepSeek V4 Flash native tools 和 `DEEPSEEK_API_KEY` 环境变量。
+  - 4 个 `@SpringBootTest` 入口显式设置 `agent.model.provider=mock`，保证测试离线确定。
+  - 文件面板仅在 `selection.kind === 'file'` 时渲染预览列；未选中文件时目录树单列占满侧栏。
+  - 新增 ADR-0037，并更新 README/README.txt/STATUS 中的默认 provider 说明。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`cd backend && mvn test`。结果：通过，149 tests, 0 failures, 0 errors, 0 skipped。
+- 运行检查：后端已重新执行 `cd backend && mvn spring-boot:run`，在默认配置下启动到 8080；前端 Vite 保持 `http://localhost:5173/`。
+- 说明：本轮未主动创建真实模型 run，避免额外发送用户任务到外部模型服务；刷新页面后新建任务会使用默认 DeepSeek provider。

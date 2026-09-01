@@ -359,3 +359,223 @@
 - 左侧栏压缩为更接近 Codex 的任务导航：按钮和分组文案中文化，run 状态本地化，并修正长标题/状态导致的横向溢出风险。
 - 中央对话区降低卡片边框和阴影噪音，用户消息改为浅灰气泡，composer 收窄居中并中文化 placeholder、hint 和按钮。
 - 右侧审查/文件面板去掉管理后台式卡片感，diff/file 预览改为面板内换行和行号布局，避免长代码行把横向滚动条带到页面中部。
+
+## 2026-08-29：Agent 文件变更撤销
+
+- 目标：补齐类似 Codex 的“Agent 修改可撤销”体验，让用户在审批并执行文件变更后仍可从 UI 回退该次变更。
+- 后端实现进程内 `WorkspaceChangeJournal`：`write_file`/`replace_text` 成功后通过工具私有 metadata 记录撤销快照；旧内容不进入工具 JSON、模型观察或 SSE payload。
+- 新增 `POST /api/runs/{runId}/changes/{toolCallId}/undo`：用户直接触发撤销，不作为模型工具暴露；撤销前校验当前文件 hash 等于 Agent 修改后的 hash，若用户或后续工具已改动文件则拒绝覆盖。
+- 撤销新建文件时删除该文件；撤销替换/覆盖时恢复旧 UTF-8 内容；撤销成功后追加 `CHANGE_UNDONE` 事件。
+- 前端在变更摘要卡和右侧审查面板显示“撤销/撤销中/已撤销”，撤销后回拉事件列表并更新卡片状态。
+- 执行验证：`cd backend && mvn test` 通过 128 tests；`cd frontend && npm run build` 通过；Frontend Design Premium strict audit 0 findings；`git diff --check` 通过。
+- 限制：撤销 journal 目前为进程内存，后端重启后不能撤销旧 run 的变更；未做真实浏览器点击撤销的目视验收。
+
+## 2026-08-29：Codex-like 前端体验升级
+
+- 使用 Frontend Design Premium 和 `$gpt-taste` 约束做一轮产品工作台升级，不新增前端依赖。
+- 新增共享 `UiIcon` 线性图标组件，替换 sidebar、action row、Inspector tabs、run/stop、diff 和 undo 上的散装文字图标。
+- Composer 改为 IME 友好的 Return 发送：中文输入法 composition 期间不拦截，Shift-Return 换行，Command/Control-Return 仍可发送；停止/运行按钮统一图标和中文状态。
+- Timeline 保留用户阅读位置：只有用户停在底部时才随新事件自动滚动；待审查变更计数排除已撤销项。
+- Inspector 审查面板补齐 Codex-like 细节：按文件扩展名显示 `PY/VUE/MD` 等语言徽标，撤销按钮统一状态和可访问标签，命令详情中文化工作目录/退出码。
+- App 顶部健康状态、错误 fallback、面板 aria/title 文案中文化，并订阅 `CHANGE_UNDONE` SSE 事件。
+- 样式层新增 Codex-like v2 覆盖：Geist-like 字体栈、统一 token、轻量 hover motion、reduced-motion 保护、全局 scrollbar、无负字距和无新增装饰渐变。
+- 同步更新 `DESIGN.md`：记录已实现撤销入口、已撤销变更不再计入待审查、timeline 滚动策略和 IME composer 规则。
+- 验证：`cd frontend && npm run build` 通过；Frontend Design Premium strict audit 0 findings；`git diff --check` 通过；静态扫描未发现旧英文错误 fallback、负字距、装饰渐变、hero/orb/bokeh。
+
+## 2026-08-29：Composer 对话框专项优化
+
+- 根据用户截图反馈，聚焦底部对话框体验：移除默认填入的英文 demo prompt，初始输入框改为空白等待用户指令。
+- Composer 增加三枚轻量快捷建议：修复 demo 测试、审查最近改动、优化前端体验；点击后只填入输入框，不自动发送。
+- 输入框焦点样式从硬蓝色 textarea outline 改为外层 composer 的柔和 focus ring，footer 和按钮区更像一个整体命令面板。
+- Footer hint 改为更轻的分隔点样式，运行/停止按钮高度收紧，移动端建议 chip 自动铺开。
+- 额外本地化 `fetchRunEvents` 失败 fallback 文案。
+- 验证：`cd frontend && npm run build` 通过；Frontend Design Premium strict audit 0 findings；`git diff --check` 通过。
+
+## 2026-08-29：本地后端启动与 mock 功能自测
+
+- 按用户要求启动后端：`cd backend && mvn spring-boot:run`，Tomcat 在 `8080` 启动成功；既有 Vite dev server 在 `5173` 继续运行。
+- 验证后端健康接口和前端 `/api` 代理均返回 `status=ok`。
+- 通过 HTTP API 完成 mock 写入审批闭环：创建 run、产生 `APPROVAL_REQUIRED`、批准 `write_file`、生成 diff 和 `undoable=true`、文件落盘、run 成功结束。
+- 通过 HTTP API 完成撤销闭环：撤销刚才的 `write_file`，新建文件被删除，事件回看包含 `CHANGE_UNDONE`。
+- 通过 HTTP API 完成命令审批闭环：批准 `run_command` 后得到 `exitCode=0`、stdout 和 duration，run 成功结束。
+- 通过 HTTP API 完成拒绝审批闭环：拒绝 `write_file` 后 run 以 `APPROVAL_REJECTED` 失败，未执行工具。
+- 限制：本次没有通过浏览器实际点击 UI，也没有跑真实 DeepSeek 模型；记录见 `SELFTEST-001`。
+
+## 2026-08-29：H2 本地持久化
+
+- 数据库选择：采用 H2 file mode + Spring JDBC；理由是适合本地单用户作业场景，Spring 集成和测试简单，不需要 Postgres/MySQL 外部服务，也比 JSONL 更利于结构化查询和 schema 演进。
+- 新增 `spring-boot-starter-jdbc` 和 H2 runtime 依赖；默认数据库位于 `backend/data/coding-agent.*`，并已加入 `.gitignore`。
+- 新增 `schema.sql` 初始化 `agent_runs`、`agent_run_events`、`pending_tool_approvals` 和 `workspace_change_undo`。
+- `AgentRunStore` 启动时从 JDBC persistence adapter 加载历史 run、事件和 pending approval；运行中保存 run 状态、事件和 pending approval 消费状态。
+- `WorkspaceChangeJournal` 持久化 undo snapshot、撤销状态和撤销结果，旧内容仍只保存在本地数据库，不进入模型观察、SSE payload 或前端事件日志。
+- 新增 `GET /api/runs` 返回历史 run 列表；前端启动后拉取历史 run，并通过事件回看恢复侧栏任务标题。
+- 新增 ADR-0026 记录数据库选择和边界。
+- 验证：`cd backend && mvn test` 通过 131 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过；本地后端跨重启后 `GET /api/runs` 和指定 run 事件回看仍可读。
+
+## 2026-08-30：Agent Runtime 退出语义与工具失败恢复
+
+- 根据用户对 Agent Runtime 子任务的拆分，保持现有 loop 架构不大改，只收紧三类退出语义：模型最终回答为正常完成；round/tool/token/cancel 等预算或用户动作属于系统强制终止；模型 API、provider 响应解析和内部 runtime 异常属于不可恢复失败。
+- 修正 `MockAgentRunner` 对 `ToolResult.success=false` 的处理：工具失败不再直接 `TOOL_ERROR`/`TIME_LIMIT` 结束 run，而是作为 `success=false` tool observation 加回 `List<ModelMessage>`，继续下一轮 LLM，让模型有机会修正路径、参数、替换内容或命令。
+- 审批恢复路径同步使用相同语义：用户批准后若工具执行失败，也回填 observation 并继续下一轮，而不是直接 failed。
+- 新增 ADR-0027 记录“工具失败作为可恢复 Observation”的决策和代价。
+- 验证：`cd backend && mvn test` 通过 131 tests；新增/更新测试覆盖普通工具失败和工具 timeout 都会进入下一轮模型请求。
+
+## 2026-08-30：Tool System 语义与 Observation 结构化
+
+- 根据用户对子任务 2 Tool System 的建议，保持现有 Observe → Act → Verify 工具集合不扩张，只补语义统一和 observation 质量。
+- 新增 `edit_file` 工具，作为 `replace_text` 的兼容别名：参数、执行逻辑、审批策略、diff 和撤销 snapshot 均复用 exact text replacement 能力。
+- `WorkspaceChangeJournal`、`ToolApprovalPolicy` 和前端 change-tool 映射同步识别 `edit_file`。
+- 工具成功结果 JSON 增加统一 `success=true` 和 `message` 字段；命令结果增加 `success` 和 `timedOut`，其中非 0 exit code 表示命令 observation 的 `success=false`，但工具调用本身仍成功返回 observation。
+- `ToolRegistry` 将未知工具、参数错误、workspace 拒绝和运行时错误包装为结构化失败 JSON，包含 `success=false`、`message`、`toolName`、`errorCode`、`timedOut` 和 metadata，便于 LLM 下一轮恢复。
+- 验证：`cd backend && mvn test` 通过 132 tests；`cd frontend && npm run build` 通过。
+
+## 2026-08-30：Context Management 配对感知裁剪
+
+- 根据用户对子任务 3 Context Management 的要求，修复上下文窗口可能从中间截断 assistant tool call 与 tool result 的风险。
+- `MockAgentRunner` 的 context window 继续保留 system prompt 和初始 user task；最近历史改为从尾部按消息组纳入窗口。
+- 普通 user/assistant 消息按单条处理；assistant tool_calls 与其后连续 tool results 作为不可拆分组处理。
+- 若裁剪过程中遇到孤立 tool result，则跳过该消息，避免向 native tool calling provider 发送缺少对应 assistant tool_calls 的 `role=tool` 消息。
+- 新增 ADR-0029 记录这一 context strategy 的边界和限制。
+- 验证：`cd backend && mvn test` 通过 133 tests；`git diff --check` 通过；测试生成的本地 H2 数据库文件已清理。
+
+## 2026-08-30：Failure Recovery P0
+
+- 根据用户对子任务 4 的要求，将错误恢复正式拆成三类：recoverable tool error、resource/policy termination、infrastructure failure。
+- `ToolRegistry` 的失败 JSON 增加 `failureKind=RECOVERABLE_TOOL_ERROR`、`recoverable=true` 和 `recoveryHint`，让 LLM 下一轮知道该如何修正。
+- Workspace 错误码从泛化 access denied 细分为 `WORKSPACE_NOT_FOUND`、`WORKSPACE_INVALID_PATH`、`WORKSPACE_PERMISSION_DENIED`、`WORKSPACE_CONFLICT`、`WORKSPACE_EDIT_MISS` 和 `WORKSPACE_ACCESS_DENIED`。
+- `MockAgentRunner` 的 system prompt 增加恢复策略：工具失败是 observation，模型应读取 `errorCode/message/recoveryHint` 后调整计划继续，而不是直接最终失败。
+- 新增端到端式单元测试：模型先 `read_file("src/foo.py")` 失败，随后 `list_files(".")` 找到文件，再 `read_file("README.md")` 并正常完成。
+- 验证：`cd backend && mvn test` 通过 135 tests；`git diff --check` 通过；测试生成的本地 H2 数据库文件已清理。
+
+## 2026-08-30：System Prompt operating policy
+
+- 根据用户对子任务 5 System Prompt 的建议，将 runner system prompt 从临时“local coding agent + JSON 格式”提示升级为简短 operating policy。
+- 新 prompt 明确 role、workspace awareness、Inspect → Understand → Modify → Verify → Recover 工作流、避免无关探索、避免重复失败动作、完成时总结修改与验证。
+- 保持 prompt 克制，不写成长篇编程教程；provider adapter 仍只负责 JSON/native tool calling 输出协议和单工具轮次规则。
+- 新增 `MockAgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`，锁定关键 prompt 约束已注入模型请求。
+- 验证：`cd backend && mvn test` 通过 136 tests；`git diff --check` 通过；测试生成的本地 H2 数据库文件已清理。
+
+## 2026-08-30：Process timeout cleanup
+
+- 根据用户要求，补齐 `run_command` 中断/timeout 时的进程树清理，避免只销毁 parent 导致 child/grandchild 残留。
+- `WorkspaceCommandTools` 的命令等待从无限 `waitFor()` 改为短间隔轮询，以便更稳定响应线程 interrupt。
+- 命令线程被中断时，使用 `ProcessHandle.descendants()` 收集后代进程，按 descendants → parent 顺序 `destroyForcibly()` 并短暂等待退出；销毁 parent 后再 best-effort 补扫 descendants。
+- 若当前 OS/sandbox 禁止 descendants 枚举，则捕获异常并至少清理 parent，不让 cleanup 自己变成 runtime failure。
+- 新增 `WorkspaceCommandToolsTests.interruptedCommandDestroysChildProcessTree`，验证子进程被中断清理后不再继续产生输出。
+- 验证：普通 sandbox 下 `mvn -Dtest=WorkspaceCommandToolsTests test` 通过，因进程枚举受限跳过 1 项；提权后同一测试 8 tests 全部通过且 0 skipped；完整 `cd backend && mvn test` 通过 137 tests。
+
+## 2026-08-30：Provider token-level streaming
+
+- 根据用户要求，将此前前端消息级 reveal 升级为真实 provider token-level streaming。
+- 新增 `StreamingModelClient` 和 `ModelStreamListener`，runner 对支持 streaming 的模型客户端调用 `completeStreaming`，并把文本增量持久化为 `MODEL_MESSAGE_DELTA` 事件。
+- `OpenAiCompatibleModelClient` 在 native tools 协议下发送 `stream=true`，逐行解析 provider SSE chunk；`delta.content` 立即回调给 runner，fragmented `delta.tool_calls` 继续累计到完整 `ModelResponse` 后进入既有 Agent loop。
+- `JavaHttpModelTransport` 增加 streaming response 支持，普通 mock/JSON content 路径保持同步 complete 行为。
+- 前端 SSE 订阅新增 `model_message_delta`，timeline 会按 round 拼接 delta，在最终 `MODEL_MESSAGE_RECEIVED` 到达后使用完整消息替换临时流式内容，历史回放仍由持久化事件重建。
+- 新增 ADR-0033 记录流式协议边界。
+- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test` 通过，26 tests；完整 `cd backend && mvn test` 通过，140 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+
+## 2026-08-30：全项目提交前检查与文档更新
+
+- 按题目 PDF 重新对照当前项目：核心 Agent loop、本地工具、context management、termination、recoverable failure、workspace safety、system prompt、UI 展示和 demo workspace 均已有实现与测试证据。
+- 新增根目录 `README.txt`，作为提交 zip 中 1000 汉字以内说明草稿，包含公开 Git 仓库地址、运行方式、核心功能和验证命令。
+- 重新执行后端全量测试、前端生产构建和 demo workspace unittest。
+- 扫描禁用 Agent 框架关键字，未在后端/前端依赖中发现 LangChain、LlamaIndex、OpenAI Agents SDK、Claude Agent SDK、AutoGen、CrewAI 或 Spring AI。
+- 扫描常见密钥形态，未发现真实 API key；命中项为正常变量名、CSS token 命名或测试假数据。
+- 检查 `.gitignore` 命中题目 PDF、`backend/data/` 本地 H2 数据库和非 demo 私有 workspace。
+- 待处理：当前仍有大量未提交改动；demo workspace 中还有 untracked C++ 临时文件，提交前应清理或明确不纳入。
+
+## 2026-09-01：真实命令 run 截图问题定位与修复
+
+- 根据用户截图和本地后端测试报告定位：截图中的 `g++ -O2 -o solution solution.cpp` 退出码 69 来自本机 Xcode license 未同意；`g++ --version` 可复现相同提示。
+- 进一步排查到模型把下一次 `run_command.command` 发成了 JSON 字符串形式的 argv array：`"[\"which\", \"g++\"]"`。旧后端只接受真实 JSON array，会把该调用判为 `INVALID_ARGUMENTS`。
+- 修复 `run_command` 参数读取：继续要求 argv array；若收到字符串，只接受内容为 JSON string array 的情况并归一化；普通 shell 字符串如 `which g++` 仍然拒绝。
+- 修复 OpenAI-compatible native tools streaming：provider stream 若没有 assistant content/tool call，则降级为一次非 streaming native completion，避免空 stream 直接导致 `model_error`。
+- 前端工具卡补充 JSON-string argv 展示兼容，使旧事件中的命令显示为 `which g++` 而不是原始 JSON payload。
+- Spring 集成测试改用 H2 memory database，避免全量测试争抢真实 `backend/data/coding-agent.mv.db` 导致 `Database may be already in use`。
+- 新增 ADR-0034 记录命令参数归一化和空 stream 降级策略。
+- 验证：`cd backend && mvn -Dtest=WorkspaceToolFactoryTests,OpenAiCompatibleModelClientTests test` 通过，26 tests；`cd backend && mvn test` 通过，143 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+
+## 2026-09-01：多 tool calls native history 400 修复
+
+- 根据用户第二张截图继续排查 H2 事件库快照，最新 run 以 `MODEL_ERROR` 失败，完整 provider 响应为 HTTP 400：`An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'`。
+- 事件序列显示 DeepSeek 在第 2 轮无视 prompt，一次返回了 4 个只读 tool calls；后续这类多工具 assistant message 进入 native tools 历史后触发 provider 校验错误。
+- 修复 `MockAgentRunner`：每次 `TOOL_CALLS` 响应只接收第一个 tool call 写入 transcript 并执行，其他同批 tool calls 丢弃，让后续请求始终保持 `assistant(one tool_call) -> tool(result)` 的稳定形态。
+- 调整 tool-call budget 测试语义，并新增 `acceptsOnlyFirstToolCallFromEachModelResponse` 锁定单工具强制策略。
+- 前端 `RUN_FINISHED` 展示补充精简后的 `errorMessage`，以后 model/provider 错误不再只显示 `model_error`。
+- 新增 ADR-0035 记录 Runtime 单工具调用强制策略。
+- 验证：`cd backend && mvn -Dtest=MockAgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test` 通过，42 tests；`cd backend && mvn test` 通过，144 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+
+## 2026-09-01：Streaming fallback 与真实端到端流程复核
+
+- 用户表示本地环境已安装完成后，请求完整跑通流程；重新启动真实 DeepSeek V4 Flash native tools 后端并执行自测。
+- 复核发现系统 `g++`/`clang++` 仍因 Xcode/CommandLineTools linker 问题失败，Homebrew clang 可做 compile-only，但完整 C++ link 仍受本机环境影响；因此本轮用 Python 任务验证 Agent Runtime 闭环。
+- 真实 C++ run 在多轮写入/编译反馈后暴露 `Model HTTP streaming request failed`，定位为 streaming HTTP IO 传输异常被直接视为 `MODEL_ERROR`。
+- 修复 `OpenAiCompatibleModelClient`：native tools streaming 遇到 `IOException` cause 的 `ModelClientException` 时，降级为非 streaming native completion；HTTP 400/429 等 provider 错误继续显式失败。
+- 新增 `OpenAiCompatibleModelClientTests.fallsBackToNonStreamingNativeRequestWhenProviderStreamTransportFails`，锁定 streaming transport failure fallback 行为。
+- 真实 Python 端到端 run `2c110940-e4d7-4e42-b376-4ec0529046c3` 成功：模型写入 `selftest_factorial.py`，用户审批后运行 `echo 5 | python3 selftest_factorial.py`，命令返回 exit 0/stdout `120`，模型最终总结完成。
+- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test` 通过，29 tests；`cd backend && mvn test` 通过，145 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+
+## 2026-09-01：Command Line Tools 修复后真实 C++ Agent flow
+
+- 用户完成 `sudo xcode-select --switch /Library/Developer/CommandLineTools` 后，`xcrun --find ld` 已返回 `/Library/Developer/CommandLineTools/usr/bin/ld`。
+- 本地最小 C++ 验证通过：`clang++ -std=c++17 workspaces/demo/hello.cpp -o /private/tmp/coding-agent-hello` 成功，运行输出 `Hello, world!`。
+- 真实 Agent 首次使用裸 `clang++` 创建 `selftest_sum.cpp` 后，命令工具的最小环境下 Apple clang 找不到 `iostream`，模型尝试恢复但最终撞到 8 轮上限；这不是 linker 问题，而是干净命令环境和本机 C++ 标准库查找之间的兼容问题。
+- 随后使用明确路径 `/opt/homebrew/bin/g++-15` 运行真实 DeepSeek V4 Flash native tools C++ flow，run `019de8c5-f6f9-4af1-b308-52b33bc995e0` 成功完成。
+- 成功 flow 包含 4 个模型 round、3 次工具调用：写入 `selftest_sum_gcc.cpp`、编译生成 `selftest_sum_gcc`、用输入 `7 35` 运行并得到 stdout `42`。
+- 说明：C++ 录屏若要稳定，prompt 中建议明确使用 `/opt/homebrew/bin/g++-15`；长期可以考虑给 `run_command` 增加受控 stdin 字段和更完整的 macOS toolchain 环境白名单。
+
+## 2026-09-01：修复 run_command 的 macOS C++ 环境
+
+- 根据用户截图继续处理两个问题：`iostream` 找不到，以及 run 达到 8 轮上限后停止。
+- 解释并确认 8 轮停止来自 `RunBudget` 的 `MAX_ROUNDS` 防无限循环硬限制；它是 termination 机制，不是崩溃。
+- 修复 `WorkspaceCommandTools` 的命令环境：PATH 默认优先包含 `/opt/homebrew/opt/llvm/bin` 与 `/opt/homebrew/bin`，再合并后端进程继承 PATH；保留 `TMPDIR`，避免 clang 在极简环境下无法创建临时文件。
+- 增加 macOS 编译器窄范围 alias：当模型请求 `g++`/`gcc` 且 `/opt/homebrew/bin/g++-15`/`gcc-15` 存在时，工具执行前解析为 Homebrew GCC，避免落到本机 Apple clang 的不完整 C++ header 路径。
+- 根据用户反馈，将默认 `maxRounds` 从 8 调高到 1000，仅作为极端兜底；正常任务主要通过模型 STOP、`maxToolCalls=64`、用户取消和 provider/工具错误恢复策略结束。
+- 后端单元测试新增 `resolvesHomebrewGccAliasWhenAvailable`，同时锁定最小环境仍不暴露 `HOME` 或 `DEEPSEEK_API_KEY`。
+- 真实验证 run `9718dc9f-2a36-4111-a22f-b62c56b85b1d`：用户任务中编译命令为普通 `g++ -std=c++17 ...`，工具实际执行 `/opt/homebrew/bin/g++-15 ...`，编译 exit 0，运行输出 `42`，最终 `SUCCEEDED / COMPLETED`。
+- 验证：`cd backend && mvn -Dtest=WorkspaceCommandToolsTests test` 通过 9 tests；`cd backend && mvn test` 通过 146 tests；调整默认 round 上限后重新执行后端全量测试通过。
+
+## 2026-09-01：Codex-like 审查与文件面板升级
+
+- 根据用户提供的 Codex 参考图，重做右侧 Inspector 的审查/文件两个入口。
+- 审查面板不再跟随最后一次工具详情，而是按当前对话内所有成功修改聚合文件列表；点击某个文件后在该项下展开对应 diff，并保留撤销入口和新增/删除统计。
+- diff 视图改为代码列 `max-content` 布局并允许横向滚动，避免长行在窄侧栏内强制折行影响审查。
+- 新增只读 workspace API：`GET /api/workspace/files` 返回工作目录列表，`GET /api/workspace/file` 返回文件内容；实现复用既有 workspace path resolver 和 read tools，继续拒绝路径穿越。
+- 文件面板改为目录树形式，按目录优先排序、支持展开目录；点击文件后在右侧预览区读取并显示内容，内容区同样支持横向滚动。
+- 前端启动、切换 run 和回到新任务页时会预加载 workspace 根目录，避免文件面板首次打开为空。
+- 新增 `WorkspaceControllerTests` 覆盖根目录列表、读取文件和拒绝 `../` 越界路径。
+- 验证：`cd frontend && npm run build` 通过；`cd backend && mvn -Dtest=WorkspaceControllerTests,WorkspaceCommandToolsTests test` 通过 12 tests；`cd backend && mvn test` 通过 149 tests；`git diff --check` 通过。
+
+## 2026-09-01：默认真实模型与文件面板空态修正
+
+- 根据用户反馈，定位当前页面出现 mock 输出的原因：后端使用普通 `mvn spring-boot:run` 启动时仍读取默认 `agent.model.provider=mock`。
+- 将应用默认 provider 改为 `openai-compatible`，默认模型仍为 DeepSeek V4 Flash，协议为 native tools，密钥继续只从 `DEEPSEEK_API_KEY` 环境变量读取。
+- Spring Boot 集成测试显式覆盖 `agent.model.provider=mock`，避免自动化测试依赖外部模型服务、网络或真实密钥。
+- 新增 ADR-0037，并将 ADR-0015 中“应用默认仍使用 mock”的默认 provider 策略标记为被取代。
+- 文件面板在未选中文件时不再显示右侧空预览块，目录树单列占满 Inspector；选中文件后才切换为目录树 + 文件内容预览双列。
+- 验证：`cd frontend && npm run build` 通过；`cd backend && mvn test` 通过 149 tests；后端已用新默认配置重启到 8080，前端 Vite 保持 5173。
+
+## 2026-09-01：审查面板仅显示修改文件
+
+- 根据用户反馈，进一步收紧右侧审查面板职责：审查过程中不再显示命令、工具参数或 stdout/stderr 返回。
+- 批准 `run_command` 后 Inspector 保持在审查文件列表；只有 `write_file`、`replace_text`、`edit_file` 这类文件修改审批后才打开对应 diff。
+- 点击 timeline 中的命令卡或普通工具卡时，右侧仍回到审查文件列表；点击文件修改卡才展开该文件 diff。
+- 移除 Inspector 中命令详情和普通工具详情分支，避免历史/未来 selection 误入后展示命令结果。
+- 验证：`cd frontend && npm run build` 通过。
+
+## 2026-09-01：结束状态与审查展开保持修复
+
+- 根据用户反馈修复两个前端状态问题。
+- 结束状态：timeline 构建时只要事件列表出现 `RUN_FINISHED`，即使 run 状态刷新尚未完成，也立即将 assistant 消息视为非 streaming，避免最终回答后仍显示流式光标或运行中状态。
+- App 层新增 effective run status，以 `RUN_FINISHED` 事件优先驱动顶部状态、取消按钮和 timeline active 判断，降低状态刷新延迟对 UI 的影响。
+- 审查展开保持：批准或点击 `run_command`/普通工具不再修改当前 Inspector selection；如果用户已展开某个文件 diff，命令审批刷新后继续保持展开。
+- 只有文件修改工具 `write_file`、`replace_text`、`edit_file` 的审批或卡片点击会切换到对应 diff。
+- 验证：`cd frontend && npm run build` 通过。
+
+## 2026-09-01：审查面板撤销状态同步
+
+- 根据用户反馈修复聊天区撤销后右侧审查面板未明显同步的问题。
+- 审查聚合现在分别计算原始 diff 统计和仍有效的 active diff 统计；顶部 `修改位置` 只统计未撤销变更。
+- 如果一个文件的修改都已撤销，审查文件列表显示 `已撤销`，不再继续显示绿色新增/删除统计。
+- 单个 diff block 会根据 `tool.undone` 显示 `已撤销`，撤销按钮禁用，diff 内容弱化展示，和聊天卡片的撤销状态保持一致。
+- 验证：`cd frontend && npm run build` 通过。

@@ -18,11 +18,13 @@ Runtime CSS variables and component styles in `frontend/src/style.css` are curre
 
 ## Visual vocabulary
 
-- Background: white and very light blue-gray surfaces.
+- Background: white and very light neutral gray surfaces.
 - Text: near-black body text with muted gray secondary text.
 - Accent: green for healthy/successful state, amber for permission-needed state, red for failures, blue only for selected review affordances.
 - Shape: rounded but controlled. Composer and empty-state cards are softer; action rows are flatter.
 - Elevation: only the composer and empty-state intro use visible shadow. Operational rows should stay quiet.
+- Iconography: use the shared line-style UI icon component for tool rows, tabs, run/stop, and undo affordances instead of one-off text glyphs.
+- Motion: restrained micro-interactions only: hover lift, live thinking pulse, and progressive assistant text. All motion must respect reduced-motion settings.
 
 ## Layout
 
@@ -35,8 +37,9 @@ Runtime CSS variables and component styles in `frontend/src/style.css` are curre
 
 - Tool events are translated into user-understandable actions such as “正在运行 …”, “已读取 …”, “已编辑 …”. Raw JSON is secondary and only appears behind inspectable details.
 - Permission requests explain the risk in task language and provide clear Approve/Reject actions.
-- File changes produce a compact change summary card with an 审查 action. Undo is not shown until the backend implements undo.
+- File changes produce a compact change summary card with 审查 and, when the backend marks the change undoable, 撤销 actions. Once undone, counts and review chips should no longer present that change as pending review.
 - Streaming and running states should look alive without producing noisy metadata cards.
+- The timeline should follow active work when the user is at the bottom, but preserve the user's scroll position while they are reading earlier output.
 - Error states remain visible in the conversation and do not erase the run history.
 
 ## Accessibility and localization
@@ -49,8 +52,8 @@ Assistant narrative content supports a small safe Markdown subset rendered as Vu
 
 ## Composer behavior
 
-Return sends the task. Command-Return and Control-Return also send for keyboard familiarity. After a task is accepted, the composer clears so the submitted request is not duplicated in the input area. If run creation fails, the draft is restored for recovery.
+Return sends the task unless the user is composing IME text or holding Shift for a newline. Command-Return and Control-Return also send for keyboard familiarity. After a task is accepted, the composer clears so the submitted request is not duplicated in the input area. If run creation fails, the draft is restored for recovery.
 
 ## Streaming behavior
 
-Current streaming is UI-level progressive reveal driven by existing run SSE events. Backend model calls still return complete assistant messages per round; provider token-level streaming is a later backend protocol change. The UI should still feel live by showing thinking state, action rows, and animated assistant text when a model message arrives during an active run.
+Current streaming uses provider token-level deltas when the backend runs an OpenAI-compatible native-tools model. The backend emits `MODEL_MESSAGE_DELTA` events as text arrives, then persists the final full assistant message for replay. UI-level progressive reveal remains a fallback for non-streaming model paths.

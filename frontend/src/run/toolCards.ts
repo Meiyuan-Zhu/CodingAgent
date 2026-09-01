@@ -15,6 +15,8 @@ export type ToolCard = {
   result: Record<string, unknown> | null
   rawContent: string
   error: string | null
+  undoable: boolean
+  undone: boolean
 }
 
 export type CommandResult = {
@@ -32,7 +34,7 @@ export function buildToolCards(events: RunEvent[]) {
   const cards = new Map<string, ToolCard>()
 
   for (const event of events) {
-    if (!event.type.startsWith('TOOL_CALL') && !event.type.startsWith('APPROVAL')) continue
+    if (!event.type.startsWith('TOOL_CALL') && !event.type.startsWith('APPROVAL') && event.type !== 'CHANGE_UNDONE') continue
     const toolCallId = String(event.payload.toolCallId ?? event.payload.id ?? '')
     if (!toolCallId) continue
     const card = ensureToolCard(cards, toolCallId)
@@ -67,6 +69,11 @@ export function buildToolCards(events: RunEvent[]) {
       card.rawContent = typeof event.payload.content === 'string' ? event.payload.content : ''
       card.result = parseJsonObject(card.rawContent)
       card.error = typeof event.payload.errorMessage === 'string' ? event.payload.errorMessage : null
+      card.undoable = event.payload.undoable === true
+    }
+    if (event.type === 'CHANGE_UNDONE') {
+      card.undoable = false
+      card.undone = true
     }
   }
 
@@ -75,7 +82,7 @@ export function buildToolCards(events: RunEvent[]) {
 
 export function approvalReason(event: RunEvent) {
   const approval = event.payload.approval as { reason?: unknown } | undefined
-  return typeof approval?.reason === 'string' ? approval.reason : 'This tool requires approval before it can run.'
+  return typeof approval?.reason === 'string' ? approval.reason : '这个工具需要批准后才能运行。'
 }
 
 export function parseJsonObject(value: string): Record<string, unknown> | null {
@@ -96,8 +103,9 @@ export function formatArguments(value: unknown) {
 export function compactArguments(value: unknown) {
   if (!value || typeof value !== 'object') return '{}'
   const args = value as Record<string, unknown>
-  if (Array.isArray(args.command)) {
-    const command = args.command.map((part) => String(part)).join(' ')
+  const commandParts = commandPartsFromValue(args.command)
+  if (commandParts.length) {
+    const command = commandParts.map((part) => String(part)).join(' ')
     const cwd = typeof args.cwd === 'string' ? args.cwd : '.'
     return `${command}  ·  cwd: ${cwd}`
   }
@@ -108,11 +116,11 @@ export function compactArguments(value: unknown) {
 
 export function toolStatusLabel(status: ToolCardStatus) {
   const labels: Record<ToolCardStatus, string> = {
-    requested: 'Proposed',
-    waiting: 'Waiting approval',
-    running: 'Running',
-    finished: 'Finished',
-    rejected: 'Rejected',
+    requested: '已提出',
+    waiting: '等待批准',
+    running: '运行中',
+    finished: '已完成',
+    rejected: '已拒绝',
   }
   return labels[status]
 }
@@ -126,7 +134,8 @@ export function commandLine(card: ToolCard) {
   const result = commandResult(card)
   if (result?.command?.length) return result.command.join(' ')
   const args = card.arguments as Record<string, unknown> | null
-  if (args && Array.isArray(args.command)) return args.command.map((part) => String(part)).join(' ')
+  const commandParts = args ? commandPartsFromValue(args.command) : []
+  if (commandParts.length) return commandParts.join(' ')
   return compactArguments(card.arguments)
 }
 
@@ -166,6 +175,8 @@ function ensureToolCard(cards: Map<string, ToolCard>, id: string) {
     result: null,
     rawContent: '',
     error: null,
+    undoable: false,
+    undone: false,
   }
   cards.set(id, card)
   return card
@@ -173,4 +184,17 @@ function ensureToolCard(cards: Map<string, ToolCard>, id: string) {
 
 function truncate(value: string, limit: number) {
   return value.length > limit ? `${value.slice(0, limit)}...` : value
+}
+
+function commandPartsFromValue(value: unknown) {
+  if (Array.isArray(value)) return value.map((part) => String(part))
+  if (typeof value !== 'string') return []
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('[')) return []
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    return Array.isArray(parsed) ? parsed.map((part) => String(part)) : []
+  } catch {
+    return []
+  }
 }

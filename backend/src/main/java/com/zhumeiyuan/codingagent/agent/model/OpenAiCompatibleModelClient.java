@@ -1,5 +1,6 @@
 package com.zhumeiyuan.codingagent.agent.model;
 
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -16,7 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhumeiyuan.codingagent.agent.run.ToolCall;
 import com.zhumeiyuan.codingagent.agent.tool.ToolDefinition;
 
-public class OpenAiCompatibleModelClient implements ModelClient {
+public class OpenAiCompatibleModelClient implements StreamingModelClient {
 
 	private static final String JSON_PROTOCOL_INSTRUCTIONS = """
 			You are the model inside a local coding agent. You must reply with one JSON object only.
@@ -38,7 +39,7 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			The message field is required and must never be empty.
 			If you need workspace information, a file change, or command output, call one of the available tools.
 			Call at most one tool at a time, then wait for the tool observation before deciding the next step.
-			For code edits, prefer replace_text when changing a small known snippet.
+			For code edits, prefer edit_file or replace_text when changing a small known snippet.
 			For commands, use run_command with an argv array and no shell syntax, for example {"command":["python3","-m","unittest","discover","-s","tests","-v"],"cwd":"."}.
 			If no tool is needed, set finish_reason to "stop", omit tool_calls, and put your final user-facing answer in message.
 			Use only the tools listed below. The application, not you, executes tools and enforces approvals.
@@ -81,14 +82,45 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		return completeWithJsonContent(request);
 	}
 
+	@Override
+	public ModelResponse completeStreaming(ModelRequest request, ModelStreamListener listener) {
+		Objects.requireNonNull(request, "request");
+		Objects.requireNonNull(listener, "listener");
+		validateProperties();
+		if (this.properties.getToolProtocol() != AgentModelProperties.ToolProtocol.NATIVE_TOOLS) {
+			return complete(request);
+		}
+		return completeNativeToolStream(request, listener);
+	}
+
 	private ModelResponse completeWithNativeTools(ModelRequest request) {
 		String apiKey = apiKey();
 		ModelHttpResponse response = this.transport.send(new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
-				nativeToolRequestBody(request), this.properties.getTimeout()));
+				nativeToolRequestBody(request, false), this.properties.getTimeout()));
 		if (response.statusCode() < 200 || response.statusCode() >= 300) {
 			throw new ModelClientException("Model provider returned HTTP " + response.statusCode());
 		}
 		return parseNativeToolResponse(response.body());
+	}
+
+	private ModelResponse completeNativeToolStream(ModelRequest request, ModelStreamListener listener) {
+		String apiKey = apiKey();
+		try (ModelHttpStreamResponse response = this.transport.stream(new ModelHttpRequest(chatCompletionsUri(), headers(apiKey),
+				nativeToolRequestBody(request, true), this.properties.getTimeout()))) {
+			if (response.statusCode() < 200 || response.statusCode() >= 300) {
+				String body = response.lines().limit(20).reduce("", (left, right) -> left + right + "\n");
+				throw new ModelClientException("Model provider returned HTTP " + response.statusCode()
+						+ (body.isBlank() ? "" : ": " + body.strip()));
+			}
+			return parseNativeToolStream(response.lines(), listener);
+		} catch (EmptyModelContentException ex) {
+			return completeWithNativeTools(request);
+		} catch (ModelClientException ex) {
+			if (ex.getCause() instanceof IOException) {
+				return completeWithNativeTools(request);
+			}
+			throw ex;
+		}
 	}
 
 	private ModelResponse completeWithJsonContent(ModelRequest request) {
@@ -171,8 +203,9 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 	}
 
 
-	private String nativeToolRequestBody(ModelRequest request) {
+	private String nativeToolRequestBody(ModelRequest request, boolean stream) {
 		Map<String, Object> body = baseRequestBody();
+		body.put("stream", stream);
 		body.put("messages", nativeChatMessages(request));
 		if (!request.tools().isEmpty()) {
 			body.put("tools", nativeTools(request.tools()));
@@ -182,6 +215,66 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			return this.objectMapper.writeValueAsString(body);
 		} catch (JsonProcessingException ex) {
 			throw new ModelClientException("Cannot serialize model request", ex);
+		}
+	}
+
+	private ModelResponse parseNativeToolStream(java.util.stream.Stream<String> lines, ModelStreamListener listener) {
+		StringBuilder content = new StringBuilder();
+		Map<Integer, PartialToolCall> partialToolCalls = new LinkedHashMap<>();
+		String[] finishReason = new String[] { "stop" };
+		try {
+			java.util.Iterator<String> iterator = lines.iterator();
+			while (iterator.hasNext()) {
+				parseNativeToolStreamLine(iterator.next(), listener, content, partialToolCalls, finishReason);
+			}
+		} catch (JsonProcessingException ex) {
+			throw new ModelClientException("Model provider stream chunk is not valid JSON", ex);
+		}
+		List<ToolCall> calls = partialToolCalls.entrySet().stream()
+				.sorted(Map.Entry.comparingByKey())
+				.map(entry -> entry.getValue().toToolCall(this.objectMapper))
+				.toList();
+		if (!calls.isEmpty()) {
+			String message = content.toString().isBlank() ? "Model requested tool execution." : content.toString();
+			return new ModelResponse(message, ModelFinishReason.TOOL_CALLS, calls);
+		}
+		if ("length".equals(finishReason[0])) {
+			return new ModelResponse(content.toString(), ModelFinishReason.LENGTH, List.of());
+		}
+		if (content.toString().isBlank()) {
+			throw new EmptyModelContentException("Model provider stream did not produce assistant content");
+		}
+		return new ModelResponse(content.toString(), ModelFinishReason.STOP, List.of());
+	}
+
+	private void parseNativeToolStreamLine(String line, ModelStreamListener listener, StringBuilder content,
+			Map<Integer, PartialToolCall> partialToolCalls, String[] finishReason) throws JsonProcessingException {
+		String trimmed = line.trim();
+		if (trimmed.isBlank() || !trimmed.startsWith("data:")) {
+			return;
+		}
+		String data = trimmed.substring("data:".length()).trim();
+		if (data.isBlank() || "[DONE]".equals(data)) {
+			return;
+		}
+		JsonNode root = this.objectMapper.readTree(data);
+		JsonNode choice = root.path("choices").path(0);
+		if (choice.hasNonNull("finish_reason") && !choice.path("finish_reason").asText().isBlank()) {
+			finishReason[0] = choice.path("finish_reason").asText();
+		}
+		JsonNode delta = choice.path("delta");
+		JsonNode contentNode = delta.path("content");
+		if (contentNode.isTextual() && !contentNode.asText().isEmpty()) {
+			String value = contentNode.asText();
+			content.append(value);
+			listener.onTextDelta(value);
+		}
+		JsonNode callsNode = delta.path("tool_calls");
+		if (callsNode.isArray()) {
+			for (JsonNode callNode : callsNode) {
+				int index = callNode.path("index").asInt(partialToolCalls.size());
+				partialToolCalls.computeIfAbsent(index, ignored -> new PartialToolCall()).append(callNode);
+			}
 		}
 	}
 
@@ -240,7 +333,7 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 		return "You are the model inside a local coding agent. "
 				+ "Use the provided function tools when you need workspace information, file changes, or command output. "
 				+ "Call at most one tool at a time, then wait for the tool observation before deciding the next step. "
-				+ "For code edits, prefer replace_text when changing a small known snippet. "
+				+ "For code edits, prefer edit_file or replace_text when changing a small known snippet. "
 				+ "For commands, use run_command with an argv array and no shell syntax, for example {\"command\":[\"python3\",\"-m\",\"unittest\",\"discover\",\"-s\",\"tests\",\"-v\"],\"cwd\":\".\"}. "
 				+ "The application, not you, executes tools, validates arguments, and enforces approvals. "
 				+ "When no more tools are needed, answer the user directly.";
@@ -395,6 +488,41 @@ public class OpenAiCompatibleModelClient implements ModelClient {
 			trimmed = trimmed.substring(0, trimmed.length() - 1);
 		}
 		return trimmed;
+	}
+
+	private static class PartialToolCall {
+
+		private String id;
+		private String name;
+		private final StringBuilder arguments = new StringBuilder();
+
+		void append(JsonNode callNode) {
+			if (callNode.path("id").isTextual() && !callNode.path("id").asText().isBlank()) {
+				this.id = callNode.path("id").asText();
+			}
+			JsonNode function = callNode.path("function");
+			if (function.path("name").isTextual() && !function.path("name").asText().isBlank()) {
+				this.name = function.path("name").asText();
+			}
+			if (function.path("arguments").isTextual()) {
+				this.arguments.append(function.path("arguments").asText());
+			}
+		}
+
+		ToolCall toToolCall(ObjectMapper objectMapper) {
+			if (this.id == null || this.id.isBlank()) {
+				throw new ModelParseException("Native streamed tool call is missing id");
+			}
+			if (this.name == null || this.name.isBlank()) {
+				throw new ModelParseException("Native streamed tool call is missing function name");
+			}
+			try {
+				Map<String, Object> parsed = objectMapper.readValue(this.arguments.toString(), ARGUMENTS_TYPE);
+				return new ToolCall(this.id, this.name, parsed);
+			} catch (JsonProcessingException ex) {
+				throw new ModelParseException("Native streamed tool call arguments must be a JSON object string", ex);
+			}
+		}
 	}
 
 	private static class EmptyModelContentException extends ModelClientException {

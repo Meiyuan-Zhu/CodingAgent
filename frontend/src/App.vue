@@ -5,12 +5,13 @@ import ComposerBox from './components/ComposerBox.vue'
 import InspectorPane from './components/InspectorPane.vue'
 import ProjectSidebar from './components/ProjectSidebar.vue'
 import { fetchHealth, type HealthResponse } from './api/health'
-import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, rejectToolCall, type RunEvent, type RunResponse } from './api/runs'
+import { approveToolCall, cancelRun, createRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
+import { fetchWorkspaceFile, fetchWorkspaceFiles, type WorkspaceFileEntry, type WorkspaceFileResponse } from './api/workspace'
 import { buildToolCards } from './run/toolCards'
 import { buildTimelineItems, pendingApprovalView, type InspectorSelection } from './run/timeline'
 
 const workspacePath = '/Users/zhumeiyuan/Desktop/CodingAgent'
-const defaultPrompt = 'Fix the failing Python pricing tests in the demo workspace, then run the unittest command to verify the fix'
+const defaultPrompt = ''
 const terminalStatuses = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED'])
 
 const health = ref<HealthResponse | null>(null)
@@ -20,6 +21,7 @@ const taskDraft = ref(defaultPrompt)
 const submitting = ref(false)
 const cancelling = ref(false)
 const resolvingApproval = ref(false)
+const undoingToolCallId = ref<string | null>(null)
 const runError = ref<string | null>(null)
 const activeRun = ref<RunResponse | null>(null)
 const activePrompt = ref('')
@@ -31,6 +33,11 @@ const inspectorSelection = ref<InspectorSelection>({ kind: 'welcome' })
 const inspectorOpen = ref(true)
 const inspectorWidth = ref(420)
 const resizingPanel = ref<'inspector' | null>(null)
+const workspaceEntriesByDirectory = ref<Record<string, WorkspaceFileEntry[]>>({})
+const expandedDirectories = ref<string[]>([])
+const selectedWorkspaceFile = ref<WorkspaceFileResponse | null>(null)
+const loadingWorkspacePath = ref<string | null>(null)
+const workspaceError = ref<string | null>(null)
 
 const layoutStyle = computed(() => ({
   gridTemplateColumns: `260px minmax(520px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
@@ -42,20 +49,45 @@ const healthStatus = computed(() => {
   return health.value?.status ?? 'unknown'
 })
 
+const healthLabel = computed(() => {
+  const labels: Record<string, string> = {
+    checking: '检查中',
+    offline: '离线',
+    ok: '在线',
+    unknown: '未知',
+  }
+  return labels[healthStatus.value] ?? healthStatus.value
+})
+
 const canSubmit = computed(() => {
   return !submitting.value && !loadingHealth.value && !healthError.value && taskDraft.value.trim().length > 0
 })
 
 const canCancel = computed(() => {
-  return !cancelling.value && !!activeRun.value && !terminalStatuses.has(activeRun.value.status)
+  return !cancelling.value && !!activeRun.value && !terminalStatuses.has(effectiveRunStatus.value)
 })
 
 const toolCards = computed(() => buildToolCards(events.value))
-const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, activeRun.value))
+const latestFinishedEvent = computed(() => [...events.value].reverse().find((event) => event.type === 'RUN_FINISHED') ?? null)
+const effectiveRunStatus = computed(() => {
+  const finishedStatus = latestFinishedEvent.value?.payload.status
+  return typeof finishedStatus === 'string' ? finishedStatus : activeRun.value?.status ?? ''
+})
+const effectiveActiveRun = computed(() => {
+  if (!activeRun.value) return null
+  return {
+    ...activeRun.value,
+    status: effectiveRunStatus.value || activeRun.value.status,
+    stopReason: typeof latestFinishedEvent.value?.payload.stopReason === 'string'
+      ? latestFinishedEvent.value.payload.stopReason
+      : activeRun.value.stopReason,
+  }
+})
+const timelineItems = computed(() => buildTimelineItems(events.value, activePrompt.value, effectiveActiveRun.value))
 const pendingApproval = computed(() => pendingApprovalView(toolCards.value))
-const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? 'Coding task' : 'CodingAgent')
-const workspaceSubtitle = computed(() => activeRun.value ? workspacePath : 'Local workspace')
-const runStatusLabel = computed(() => activeRun.value ? statusLabel(activeRun.value.status) : '')
+const workspaceTitle = computed(() => activeRun.value ? runTitles.value[activeRun.value.id] ?? '代码任务' : 'CodingAgent')
+const workspaceSubtitle = computed(() => activeRun.value ? workspacePath : '本地 workspace')
+const runStatusLabel = computed(() => activeRun.value ? statusLabel(effectiveRunStatus.value) : '')
 
 watch(inspectorSelection, (next) => {
   if (next.kind !== 'welcome') inspectorOpen.value = true
@@ -78,9 +110,18 @@ onMounted(async () => {
   try {
     health.value = await fetchHealth()
   } catch (caught) {
-    healthError.value = caught instanceof Error ? caught.message : 'Unknown backend error'
+    healthError.value = caught instanceof Error ? caught.message : '后端状态未知'
   } finally {
     loadingHealth.value = false
+  }
+
+  if (!healthError.value) {
+    try {
+      await loadRunHistory()
+      await ensureWorkspaceDirectory('.')
+    } catch (caught) {
+      runError.value = caught instanceof Error ? caught.message : '加载历史任务失败'
+    }
   }
 })
 
@@ -109,7 +150,7 @@ async function submitRun() {
     connectEventStream(run.id)
   } catch (caught) {
     taskDraft.value = prompt
-    runError.value = caught instanceof Error ? caught.message : 'Failed to create run'
+    runError.value = caught instanceof Error ? caught.message : '任务创建失败'
   } finally {
     submitting.value = false
   }
@@ -124,7 +165,7 @@ async function cancelActiveRun() {
     activeRun.value = run
     upsertRun(run)
   } catch (caught) {
-    runError.value = caught instanceof Error ? caught.message : 'Failed to cancel run'
+    runError.value = caught instanceof Error ? caught.message : '任务停止失败'
   } finally {
     cancelling.value = false
   }
@@ -139,9 +180,11 @@ async function approvePendingTool() {
     const run = await approveToolCall(activeRun.value.id, approval.toolCallId)
     activeRun.value = run
     upsertRun(run)
-    inspectorSelection.value = approval.name === 'run_command'
-      ? { kind: 'command', toolCallId: approval.toolCallId }
-      : { kind: 'diff', toolCallId: approval.toolCallId }
+    if (isFileChangeToolName(approval.name)) {
+      inspectorSelection.value = { kind: 'diff', toolCallId: approval.toolCallId }
+    } else {
+      preserveReviewSelection()
+    }
   } catch (caught) {
     runError.value = caught instanceof Error ? caught.message : 'Failed to approve tool call'
   } finally {
@@ -162,6 +205,20 @@ async function rejectPendingTool() {
     runError.value = caught instanceof Error ? caught.message : 'Failed to reject tool call'
   } finally {
     resolvingApproval.value = false
+  }
+}
+
+async function undoChange(toolCallId: string) {
+  if (!activeRun.value || undoingToolCallId.value) return
+  undoingToolCallId.value = toolCallId
+  runError.value = null
+  try {
+    await undoWorkspaceChange(activeRun.value.id, toolCallId)
+    events.value = await fetchRunEvents(activeRun.value.id)
+  } catch (caught) {
+    runError.value = caught instanceof Error ? caught.message : '撤销变更失败'
+  } finally {
+    undoingToolCallId.value = null
   }
 }
 
@@ -190,13 +247,21 @@ function clamp(value: number, min: number, max: number) {
 function selectTool(toolCallId: string) {
   const card = toolCards.value.find((item) => item.id === toolCallId)
   if (!card) return
-  if (card.name === 'run_command') {
-    inspectorSelection.value = { kind: 'command', toolCallId }
-  } else if (card.result && typeof card.result.unifiedDiff === 'string') {
+  if (card.result && typeof card.result.unifiedDiff === 'string') {
     inspectorSelection.value = { kind: 'diff', toolCallId }
   } else {
-    inspectorSelection.value = { kind: 'tool', toolCallId }
+    preserveReviewSelection()
   }
+}
+
+function preserveReviewSelection() {
+  if (inspectorSelection.value.kind === 'tool' || inspectorSelection.value.kind === 'command') {
+    inspectorSelection.value = { kind: 'review' }
+  }
+}
+
+function isFileChangeToolName(name: string) {
+  return name === 'write_file' || name === 'replace_text' || name === 'edit_file'
 }
 
 async function selectRun(run: RunResponse) {
@@ -205,14 +270,84 @@ async function selectRun(run: RunResponse) {
   activePrompt.value = ''
   runError.value = null
   inspectorSelection.value = { kind: 'welcome' }
+  selectedWorkspaceFile.value = null
   upsertRun(run)
   try {
     events.value = await fetchRunEvents(run.id)
+    await ensureWorkspaceDirectory('.')
     const title = titleFromEvents(events.value)
     if (title) runTitles.value = { ...runTitles.value, [run.id]: title }
   } catch (caught) {
     events.value = []
-    runError.value = caught instanceof Error ? caught.message : 'Failed to load run events'
+    runError.value = caught instanceof Error ? caught.message : '加载任务事件失败'
+  }
+}
+
+async function selectInspector(selection: InspectorSelection) {
+  inspectorSelection.value = selection
+  if (selection.kind === 'welcome') {
+    await ensureWorkspaceDirectory('.')
+  }
+}
+
+async function toggleWorkspaceDirectory(path: string) {
+  const normalized = normalizeDirectory(path)
+  if (!workspaceEntriesByDirectory.value[normalized]) {
+    await ensureWorkspaceDirectory(normalized)
+  }
+  const next = new Set(expandedDirectories.value)
+  if (next.has(normalized)) {
+    next.delete(normalized)
+  } else {
+    next.add(normalized)
+  }
+  expandedDirectories.value = [...next]
+}
+
+async function openWorkspaceFile(path: string) {
+  inspectorSelection.value = { kind: 'file', path }
+  selectedWorkspaceFile.value = null
+  loadingWorkspacePath.value = path
+  workspaceError.value = null
+  try {
+    selectedWorkspaceFile.value = await fetchWorkspaceFile(path)
+  } catch (caught) {
+    workspaceError.value = caught instanceof Error ? caught.message : '读取文件失败'
+  } finally {
+    loadingWorkspacePath.value = null
+  }
+}
+
+async function ensureWorkspaceDirectory(path: string) {
+  const normalized = normalizeDirectory(path)
+  if (workspaceEntriesByDirectory.value[normalized]) return
+  workspaceError.value = null
+  try {
+    const listing = await fetchWorkspaceFiles(normalized)
+    workspaceEntriesByDirectory.value = {
+      ...workspaceEntriesByDirectory.value,
+      [normalized]: listing.files,
+    }
+  } catch (caught) {
+    workspaceError.value = caught instanceof Error ? caught.message : '加载 workspace 文件失败'
+  }
+}
+
+function normalizeDirectory(path: string) {
+  return path === '' || path === '.' ? '.' : path.replace(/\/+$/, '')
+}
+
+async function loadRunHistory() {
+  const runs = await fetchRuns()
+  runHistory.value = runs
+  for (const run of runs.slice(0, 20)) {
+    try {
+      const runEvents = await fetchRunEvents(run.id)
+      const title = titleFromEvents(runEvents)
+      if (title) runTitles.value = { ...runTitles.value, [run.id]: title }
+    } catch {
+      // Keep the run row visible even if one history title cannot be reconstructed.
+    }
   }
 }
 
@@ -223,6 +358,7 @@ function resetComposer() {
   runError.value = null
   taskDraft.value = defaultPrompt
   inspectorSelection.value = { kind: 'welcome' }
+  void ensureWorkspaceDirectory('.')
   closeEventStream()
 }
 
@@ -237,10 +373,12 @@ function connectEventStream(runId: string) {
     'approval_required',
     'approval_resolved',
     'model_requested',
+    'model_message_delta',
     'model_message_received',
     'tool_call_requested',
     'tool_call_started',
     'tool_call_finished',
+    'change_undone',
     'run_finished',
   ]
 
@@ -259,8 +397,8 @@ function connectEventStream(runId: string) {
 
   source.onerror = () => {
     source.close()
-    if (!activeRun.value?.status || !terminalStatuses.has(activeRun.value.status)) {
-      runError.value = 'Event stream closed before the run reached a terminal state.'
+    if (!effectiveRunStatus.value || !terminalStatuses.has(effectiveRunStatus.value)) {
+      runError.value = '事件流提前断开，正在刷新任务状态。'
       refreshRun(runId)
     }
   }
@@ -354,7 +492,7 @@ function closeEventStream() {
       @select-run="selectRun"
     />
 
-    <section class="workspace-column" aria-label="Conversation workspace">
+    <section class="workspace-column" aria-label="对话工作区">
       <header class="workspace-header">
         <div class="workspace-titlebar">
           <span class="workspace-folder" aria-hidden="true"></span>
@@ -364,7 +502,7 @@ function closeEventStream() {
           </div>
         </div>
         <div class="run-health">
-          <span class="health-pill" :class="`health-${healthStatus}`">{{ healthStatus }}</span>
+          <span class="health-pill" :class="`health-${healthStatus}`">{{ healthLabel }}</span>
           <span v-if="activeRun" class="run-chip">{{ runStatusLabel }}</span>
         </div>
       </header>
@@ -374,8 +512,10 @@ function closeEventStream() {
         :pending-approval="pendingApproval"
         :selected-tool-call-id="inspectorSelection.kind === 'tool' || inspectorSelection.kind === 'diff' || inspectorSelection.kind === 'command' ? inspectorSelection.toolCallId : null"
         :resolving-approval="resolvingApproval"
+        :undoing-tool-call-id="undoingToolCallId"
         :run-error="runError"
         @select-tool="selectTool"
+        @undo-change="undoChange"
         @approve="approvePendingTool"
         @reject="rejectPendingTool"
       />
@@ -392,14 +532,23 @@ function closeEventStream() {
     </section>
 
     <button v-if="!inspectorOpen" class="inspector-reopen" type="button" aria-label="展开审查面板" @click="inspectorOpen = true">审查</button>
-    <div v-if="inspectorOpen" class="inspector-resize-handle" role="separator" aria-orientation="vertical" title="Drag to resize inspector" @mousedown.prevent="startInspectorResize"></div>
+    <div v-if="inspectorOpen" class="inspector-resize-handle" role="separator" aria-orientation="vertical" title="拖拽调整审查面板宽度" @mousedown.prevent="startInspectorResize"></div>
 
     <InspectorPane
       :open="inspectorOpen"
       :selection="inspectorSelection"
       :events="events"
       :tool-cards="toolCards"
-      @select="inspectorSelection = $event"
+      :undoing-tool-call-id="undoingToolCallId"
+      :workspace-entries-by-directory="workspaceEntriesByDirectory"
+      :expanded-directories="expandedDirectories"
+      :selected-workspace-file="selectedWorkspaceFile"
+      :loading-workspace-path="loadingWorkspacePath"
+      :workspace-error="workspaceError"
+      @select="selectInspector"
+      @toggle-directory="toggleWorkspaceDirectory"
+      @open-file="openWorkspaceFile"
+      @undo-change="undoChange"
       @toggle="inspectorOpen = !inspectorOpen"
     />
 

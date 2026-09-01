@@ -56,8 +56,9 @@ public class WorkspaceWriteTools {
 
 		writeBytes(path, nextBytes, requestedPath);
 		String nextText = decodeUtf8(nextBytes, requestedPath);
-		return new WriteFileResult(target.displayPath(), !existed, existed, previousHash, sha256(nextBytes),
-				previousSize, nextBytes.length, WorkspaceUnifiedDiff.create(target.displayPath(), previousText, nextText));
+			return new WriteFileResult(true, existed ? "Overwrote workspace file." : "Created workspace file.",
+					target.displayPath(), !existed, existed, previousHash, sha256(nextBytes), previousSize, nextBytes.length,
+					WorkspaceUnifiedDiff.create(target.displayPath(), previousText, nextText), existed ? previousText : null);
 	}
 
 	public TextReplacementResult replaceText(String requestedPath, String oldText, String newText, String expectedSha256,
@@ -90,8 +91,59 @@ public class WorkspaceWriteTools {
 		byte[] nextBytes = encodeWithinLimit(replacement.text(), requestedPath);
 		writeBytes(path, nextBytes, requestedPath);
 
-		return new TextReplacementResult(target.displayPath(), replacement.count(), previousHash, sha256(nextBytes),
-				nextBytes.length, WorkspaceUnifiedDiff.create(target.displayPath(), previousText, replacement.text()));
+			return new TextReplacementResult(true, "Replaced text in workspace file.", target.displayPath(),
+					replacement.count(), previousHash, sha256(nextBytes), nextBytes.length,
+					WorkspaceUnifiedDiff.create(target.displayPath(), previousText, replacement.text()), previousText);
+	}
+
+	public WorkspaceChangeUndoResult undoChange(String requestedPath, boolean created, String previousContent,
+			String expectedCurrentSha256) {
+		if (created) {
+			return undoCreatedFile(requestedPath, expectedCurrentSha256);
+		}
+		if (previousContent == null) {
+			throw new IllegalArgumentException("previousContent is required when undoing an edit");
+		}
+		return restorePreviousContent(requestedPath, previousContent, expectedCurrentSha256);
+	}
+
+	private WorkspaceChangeUndoResult undoCreatedFile(String requestedPath, String expectedCurrentSha256) {
+		ResolvedWorkspacePath target = this.resolver.resolveExisting(requestedPath);
+		Path path = target.realPath();
+		if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.NOT_REGULAR_FILE, requestedPath,
+					"Workspace path is not a regular file");
+		}
+		byte[] currentBytes = readBytes(path, requestedPath);
+		String currentText = decodeUtf8(currentBytes, requestedPath);
+		String currentHash = sha256(currentBytes);
+		rejectHashMismatch(requestedPath, currentHash, expectedCurrentSha256);
+		try {
+			Files.delete(path);
+		} catch (IOException ex) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.IO_ERROR, requestedPath, "Cannot delete workspace file",
+					ex);
+		}
+		return new WorkspaceChangeUndoResult(target.displayPath(), true, false, currentHash, null,
+				WorkspaceUnifiedDiff.create(target.displayPath(), currentText, ""));
+	}
+
+	private WorkspaceChangeUndoResult restorePreviousContent(String requestedPath, String previousContent,
+			String expectedCurrentSha256) {
+		ResolvedWorkspacePath target = this.resolver.resolveExisting(requestedPath);
+		Path path = target.realPath();
+		if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+			throw new WorkspaceAccessException(WorkspaceAccessCode.NOT_REGULAR_FILE, requestedPath,
+					"Workspace path is not a regular file");
+		}
+		byte[] currentBytes = readBytes(path, requestedPath);
+		String currentText = decodeUtf8(currentBytes, requestedPath);
+		String currentHash = sha256(currentBytes);
+		rejectHashMismatch(requestedPath, currentHash, expectedCurrentSha256);
+		byte[] previousBytes = encodeWithinLimit(previousContent, requestedPath);
+		writeBytes(path, previousBytes, requestedPath);
+		return new WorkspaceChangeUndoResult(target.displayPath(), false, true, currentHash, sha256(previousBytes),
+				WorkspaceUnifiedDiff.create(target.displayPath(), currentText, previousContent));
 	}
 
 	private Replacement replaceLimited(String source, String oldText, String newText, int maxReplacements) {

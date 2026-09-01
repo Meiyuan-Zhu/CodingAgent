@@ -68,4 +68,4 @@ The Vue workbench now includes a Cancel button and listens for `run_cancelling` 
 
 ## Revisit
 
-Revisit when adding shell command execution. At that point cancellation must manage both the Java Future and any spawned OS process, including stdout/stderr draining, process-tree cleanup, and timeout-specific exit metadata.
+Shell command execution was added later as `run_command`; process-tree cleanup for interrupted commands is covered by [ADR-0032](0032-command-process-tree-cleanup.md). Revisit again if command execution needs interactive processes, long-running background jobs, stronger OS isolation, or timeout-specific exit metadata beyond the current recoverable observation.
