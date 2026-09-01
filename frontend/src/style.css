@@ -669,26 +669,6 @@ button:disabled {
   background: #f3f4f6;
 }
 
-.approval-glyph {
-  position: relative;
-  width: 18px;
-  height: 18px;
-  border: 1.7px solid currentColor;
-  border-radius: 999px;
-}
-
-.approval-glyph::before {
-  position: absolute;
-  top: 4px;
-  left: 5px;
-  width: 5px;
-  height: 7px;
-  border-right: 1.7px solid currentColor;
-  border-bottom: 1.7px solid currentColor;
-  content: "";
-  transform: rotate(35deg);
-}
-
 .approval-caret {
   width: 7px;
   height: 7px;
@@ -727,9 +707,9 @@ button:disabled {
 
 .approval-mode-menu button {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 0;
   width: 100%;
   min-height: 64px;
   border: 0;
@@ -761,46 +741,6 @@ button:disabled {
 .approval-mode-menu b {
   color: #4f5661;
   font-size: 18px;
-}
-
-.mode-icon {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1.6px solid #8b949e;
-  border-radius: 999px;
-}
-
-.mode-icon-hand::before {
-  width: 9px;
-  height: 13px;
-  border: 1.6px solid currentColor;
-  border-radius: 6px 6px 4px 4px;
-  color: #6b7280;
-  content: "";
-}
-
-.mode-icon-agent::before {
-  width: 12px;
-  height: 12px;
-  border: 1.6px solid currentColor;
-  border-radius: 4px;
-  color: #6b7280;
-  content: "";
-}
-
-.mode-icon-agent::after {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: currentColor;
-  color: #6b7280;
-  content: "";
 }
 
 .composer-actions {
@@ -3208,24 +3148,6 @@ body,
   transform: rotate(225deg);
 }
 
-.ui-icon-arrow-up::before {
-  width: 9px;
-  height: 9px;
-  border-top: 1.9px solid currentColor;
-  border-left: 1.9px solid currentColor;
-  content: "";
-  transform: translateY(2px) rotate(45deg);
-}
-
-.ui-icon-arrow-up::after {
-  width: 1.9px;
-  height: 15px;
-  border-radius: 2px;
-  background: currentColor;
-  content: "";
-  transform: translateY(1px);
-}
-
 .send-button,
 .ghost-button,
 .undo-button,
@@ -4377,4 +4299,19 @@ textarea:focus-visible {
 .send-button::before,
 .send-button::after {
   content: none;
+}
+
+.approval-mode-menu button[aria-checked="true"] {
+  background: #f1f3f5;
+}
+
+.approval-mode-menu button[aria-checked="true"] strong {
+  color: #171a1f;
+}
+
+.floating-change-chip {
+  bottom: 10px;
+  z-index: 12;
+  transform: translateY(0);
+  box-shadow: 0 10px 30px rgba(31, 41, 55, 0.1);
 }

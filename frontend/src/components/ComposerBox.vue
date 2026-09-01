@@ -56,27 +56,22 @@ function selectApprovalMode(enabled: boolean) {
             aria-label="选择批准方式"
             @click="approvalMenuOpen = !approvalMenuOpen"
           >
-            <span class="approval-glyph" aria-hidden="true"></span>
             <span>{{ props.autoApprove ? '帮我批准' : '请求批准' }}</span>
             <span class="approval-caret" aria-hidden="true"></span>
           </button>
 
           <div v-if="approvalMenuOpen" class="approval-mode-menu" role="menu" aria-label="批准方式">
             <button type="button" role="menuitemradio" :aria-checked="!props.autoApprove" @click="selectApprovalMode(false)">
-              <span class="mode-icon mode-icon-hand" aria-hidden="true"></span>
               <span>
                 <strong>请求批准</strong>
                 <small>修改文件和执行命令前询问</small>
               </span>
-              <b v-if="!props.autoApprove" aria-hidden="true">✓</b>
             </button>
             <button type="button" role="menuitemradio" :aria-checked="props.autoApprove" @click="selectApprovalMode(true)">
-              <span class="mode-icon mode-icon-agent" aria-hidden="true"></span>
               <span>
                 <strong>帮我批准</strong>
                 <small>自动批准检测到的操作</small>
               </span>
-              <b v-if="props.autoApprove" aria-hidden="true">✓</b>
             </button>
           </div>
         </div>
