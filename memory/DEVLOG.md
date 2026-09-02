@@ -10,6 +10,7 @@
   - 在最终 CSS 覆盖层加入受控 violet accent：用于活跃项目/任务、Markdown 标题/链接/强调、blockquote、代码块、composer focus 和审查选择状态。
   - 保持产品仍是 Codex-like 本地工作台，紫色只作为“智能/当前焦点/Markdown 重点”的信号层，不改成整页单色主题。
   - 按 Frontend Design Premium 严格审计补充 `ProjectSidebar` 手动路径 form 的 `novalidate`，明确应用自行管理验证。
+  - 按用户反馈压缩左侧任务历史行：去掉时间和状态 tag，仅保留单行标题与删除入口，降低列表宽度和高度占用。
 - 验证：见 [UI-020](VERIFICATION.md)。
 
 ## 2026-08-27：按用户要求整理决策和开发记录

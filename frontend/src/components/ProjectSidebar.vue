@@ -37,19 +37,6 @@ function titleFor(run: RunResponse) {
   return props.runTitles[run.id] || shortId(run.id)
 }
 
-function statusFor(status: string) {
-  const labels: Record<string, string> = {
-    CREATED: '已创建',
-    RUNNING: '运行中',
-    WAITING_FOR_APPROVAL: '待批准',
-    CANCELLING: '取消中',
-    CANCELLED: '已取消',
-    FAILED: '失败',
-    SUCCEEDED: '完成',
-  }
-  return labels[status] ?? status.toLowerCase()
-}
-
 function submitProject() {
   const path = projectPath.value.trim()
   if (!path || props.addingProject) return
@@ -139,9 +126,7 @@ function chooseProjectFolder() {
         <button class="run-select-button" type="button" @click="emit('selectRun', run)">
           <span>
             <strong>{{ titleFor(run) }}</strong>
-            <small>{{ new Date(run.createdAt).toLocaleTimeString() }}</small>
           </span>
-          <em :class="`run-status-${run.status.toLowerCase()}`">{{ statusFor(run.status) }}</em>
         </button>
         <button
           class="run-delete-button"

@@ -4767,3 +4767,40 @@ textarea:focus-visible {
   color: #111827;
   background: #ffffff;
 }
+
+/* Compact run history: title-only rows, no timestamp or status chip. */
+.runs-section {
+  gap: 7px;
+}
+
+.run-row {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  gap: 2px;
+}
+
+.run-select-button {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.run-select-button span {
+  min-width: 0;
+}
+
+.run-row strong {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.run-delete-button {
+  width: 22px;
+  height: 22px;
+  font-size: 15px;
+}
