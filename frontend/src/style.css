@@ -4852,3 +4852,35 @@ textarea:focus-visible {
   min-height: 0;
   overflow: auto;
 }
+
+/* Review inspector scroll fix: the changed-file list owns vertical scrolling. */
+.review-surface {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.review-summary {
+  flex: 0 0 auto;
+}
+
+.review-file-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.review-file-item,
+.review-file-diffs,
+.review-diff-block {
+  min-width: 0;
+}
+
+.review-diff-block .diff-lines {
+  overflow: auto;
+}
