@@ -21,6 +21,7 @@ const props = defineProps<{
   expandedDirectories: string[]
   selectedWorkspaceFile: WorkspaceFileResponse | null
   loadingWorkspacePath: string | null
+  loadingWorkspaceDirectory: string | null
   workspaceError: string | null
 }>()
 
@@ -289,8 +290,9 @@ function languageBadge(path: string | null | undefined) {
               <small v-if="node.type === 'DIRECTORY'">{{ node.expanded ? '展开' : '' }}</small>
               <small v-else-if="node.sizeBytes !== null">{{ node.sizeBytes }} B</small>
             </button>
-            <p v-if="visibleWorkspaceNodes.length === 0" class="empty-copy panel-empty">正在加载 workspace 文件。</p>
             <p v-if="props.workspaceError" class="empty-copy panel-empty error-copy">{{ props.workspaceError }}</p>
+            <p v-else-if="visibleWorkspaceNodes.length === 0 && props.loadingWorkspaceDirectory" class="empty-copy panel-empty">正在加载 workspace 文件。</p>
+            <p v-else-if="visibleWorkspaceNodes.length === 0" class="empty-copy panel-empty">这个项目还没有文件。</p>
           </aside>
 
           <article v-if="props.selection.kind === 'file'" class="file-preview-pane">

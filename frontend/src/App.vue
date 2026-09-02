@@ -9,7 +9,7 @@ import { fetchHealth, type HealthResponse } from './api/health'
 import { approveToolCall, cancelRun, createRun, deleteRun, fetchRun, fetchRunEvents, fetchRuns, rejectToolCall, undoWorkspaceChange, type RunEvent, type RunResponse } from './api/runs'
 import { addWorkspaceProject, chooseWorkspaceProjectFolder, fetchWorkspaceFile, fetchWorkspaceFiles, fetchWorkspaceProjects, selectWorkspaceProject, type WorkspaceFileEntry, type WorkspaceFileResponse, type WorkspaceProject } from './api/workspace'
 import { buildToolCards } from './run/toolCards'
-import { buildTimelineItems, pendingApprovalView, type InspectorSelection } from './run/timeline'
+import { buildTimelineItems, diffPreview, pendingApprovalView, type InspectorSelection } from './run/timeline'
 
 const defaultPrompt = ''
 const terminalStatuses = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED'])
@@ -41,9 +41,11 @@ const workspaceEntriesByDirectory = ref<Record<string, WorkspaceFileEntry[]>>({}
 const expandedDirectories = ref<string[]>([])
 const selectedWorkspaceFile = ref<WorkspaceFileResponse | null>(null)
 const loadingWorkspacePath = ref<string | null>(null)
+const loadingWorkspaceDirectory = ref<string | null>(null)
 const workspaceError = ref<string | null>(null)
 const projects = ref<WorkspaceProject[]>([])
 const composer = ref<InstanceType<typeof ComposerBox> | null>(null)
+const refreshedFileToolIds = ref<string[]>([])
 
 const layoutStyle = computed(() => ({
   gridTemplateColumns: `288px minmax(560px, 1fr) ${inspectorOpen.value ? `${inspectorWidth.value}px` : '0px'}`,
@@ -91,6 +93,7 @@ watch(toolCards, (cards) => {
   if (!selectedToolExists) {
     inspectorSelection.value = { kind: 'welcome' }
   }
+  refreshChangedWorkspaceDirectories(cards)
 }, { deep: true })
 
 watch(pendingApproval, (approval) => {
@@ -322,7 +325,13 @@ async function openWorkspaceFile(path: string) {
 async function ensureWorkspaceDirectory(path: string) {
   const normalized = normalizeDirectory(path)
   if (workspaceEntriesByDirectory.value[normalized]) return
+  await refreshWorkspaceDirectory(normalized)
+}
+
+async function refreshWorkspaceDirectory(path: string) {
+  const normalized = normalizeDirectory(path)
   workspaceError.value = null
+  loadingWorkspaceDirectory.value = normalized
   try {
     const listing = await fetchWorkspaceFiles(normalized)
     workspaceEntriesByDirectory.value = {
@@ -331,11 +340,25 @@ async function ensureWorkspaceDirectory(path: string) {
     }
   } catch (caught) {
     workspaceError.value = caught instanceof Error ? caught.message : '加载 workspace 文件失败'
+  } finally {
+    if (loadingWorkspaceDirectory.value === normalized) loadingWorkspaceDirectory.value = null
   }
 }
 
 function normalizeDirectory(path: string) {
   return path === '' || path === '.' ? '.' : path.replace(/\/+$/, '')
+}
+
+function directoriesForPath(path: string) {
+  const parts = path.split('/').filter(Boolean)
+  if (parts.length <= 1) return ['.']
+  const directories = ['.']
+  let current = ''
+  for (const part of parts.slice(0, -1)) {
+    current = current ? `${current}/${part}` : part
+    directories.push(current)
+  }
+  return directories
 }
 
 async function loadRunHistory() {
@@ -534,8 +557,28 @@ function resetWorkspaceBrowser() {
   expandedDirectories.value = []
   selectedWorkspaceFile.value = null
   loadingWorkspacePath.value = null
+  loadingWorkspaceDirectory.value = null
   workspaceError.value = null
+  refreshedFileToolIds.value = []
   inspectorSelection.value = { kind: 'welcome' }
+}
+
+function refreshChangedWorkspaceDirectories(cards: ReturnType<typeof buildToolCards>) {
+  const seen = new Set(refreshedFileToolIds.value)
+  const directories = new Set<string>()
+  for (const card of cards) {
+    if (card.status !== 'finished' || seen.has(card.id)) continue
+    const diff = diffPreview(card)
+    if (!diff) continue
+    seen.add(card.id)
+    for (const directory of directoriesForPath(diff.path)) {
+      directories.add(directory)
+    }
+  }
+  refreshedFileToolIds.value = [...seen]
+  for (const directory of directories) {
+    void refreshWorkspaceDirectory(directory)
+  }
 }
 
 function titleFromEvents(runEvents: RunEvent[]) {
@@ -647,6 +690,7 @@ function editUserMessage(content: string) {
       :expanded-directories="expandedDirectories"
       :selected-workspace-file="selectedWorkspaceFile"
       :loading-workspace-path="loadingWorkspacePath"
+      :loading-workspace-directory="loadingWorkspaceDirectory"
       :workspace-error="workspaceError"
       @select="selectInspector"
       @toggle-directory="toggleWorkspaceDirectory"

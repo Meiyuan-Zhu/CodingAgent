@@ -59,6 +59,13 @@ function submitProject() {
   manualProjectPathOpen.value = false
   addingProjectOpen.value = false
 }
+
+function chooseProjectFolder() {
+  if (props.addingProject || props.choosingProjectFolder) return
+  emit('chooseProjectFolder')
+  manualProjectPathOpen.value = false
+  addingProjectOpen.value = false
+}
 </script>
 
 <template>
@@ -101,7 +108,7 @@ function submitProject() {
           class="project-folder-button"
           type="button"
           :disabled="props.addingProject || props.choosingProjectFolder"
-          @click="emit('chooseProjectFolder')"
+          @click="chooseProjectFolder"
         >
           {{ props.choosingProjectFolder ? '正在打开选择器' : '选择文件夹' }}
         </button>

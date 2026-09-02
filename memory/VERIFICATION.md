@@ -1218,3 +1218,14 @@
   - 命令：`curl http://localhost:18081/api/health`。结果：返回 `{"status":"ok","service":"coding-agent-backend",...}`。
   - 清理：两个临时 Spring Boot 进程均通过 Ctrl-C 优雅停止。
 - 说明：Maven 输出中的 `BUILD FAILURE` 来自 Spring Boot 应用启动失败，不是项目源代码编译失败。
+
+## UI-019 — 新项目文件面板刷新与添加面板收起验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：右侧文件 tab、workspace 文件树缓存刷新、左侧添加项目交互。
+- 修复覆盖：
+  - 文件修改工具完成后，前端从 unified diff 中提取路径并刷新该文件所在目录及祖先目录，避免新项目初始空目录缓存导致文件 tab 看不到 Agent 新建文件。
+  - 文件面板新增 `loadingWorkspaceDirectory` 状态；真正加载中显示“正在加载 workspace 文件”，已加载但为空时显示“这个项目还没有文件”。
+  - 点击“选择文件夹”后，左侧添加项目面板和手动路径区域会立即收起。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 说明：本轮为前端状态修复和构建验证；浏览器端最终行为建议在当前 dev server 上刷新后点击文件 tab 目视确认。
