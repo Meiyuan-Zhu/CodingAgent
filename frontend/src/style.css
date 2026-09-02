@@ -4804,3 +4804,51 @@ textarea:focus-visible {
   height: 22px;
   font-size: 15px;
 }
+
+/* File inspector scroll fix: keep header/tabs fixed and scroll the file surfaces. */
+.inspector-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-file-browser {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.workspace-tree,
+.file-preview-pane {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.workspace-file-browser:not(.previewing) .workspace-tree {
+  height: 100%;
+}
+
+.workspace-file-browser.previewing {
+  height: 100%;
+}
+
+.file-preview-pane {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-preview-pane .review-toolbar {
+  flex: 0 0 auto;
+}
+
+.file-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
