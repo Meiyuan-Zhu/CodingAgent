@@ -115,7 +115,7 @@ function chooseProjectFolder() {
         <button class="manual-path-toggle" type="button" @click="manualProjectPathOpen = !manualProjectPathOpen">
           {{ manualProjectPathOpen ? '收起手动路径' : '手动输入路径' }}
         </button>
-        <form v-if="manualProjectPathOpen" class="manual-project-form" @submit.prevent="submitProject">
+        <form v-if="manualProjectPathOpen" class="manual-project-form" novalidate @submit.prevent="submitProject">
           <input v-model="projectPath" type="text" placeholder="/Users/me/code/my-project" :disabled="props.addingProject">
           <label>
             <input v-model="createProjectDirectory" type="checkbox" :disabled="props.addingProject">

@@ -2,6 +2,16 @@
 
 按实际阶段追加。记录发生了什么、原因和证据，不复制完整聊天，不补造时间、代码或提交。当前进度看 [STATUS.md](STATUS.md)。
 
+## 2026-09-02：Frontend Design Premium Markdown 与紫色强调层
+
+- 背景：用户希望继续美化整体界面，并让聊天支持更完整 Markdown 与不同颜色强调，例如紫色元素。
+- 实现：
+  - 扩展 `MarkdownBlock.vue` 的安全 Markdown 子集，新增一级标题、有序列表、引用块、分隔线、简单表格、强调和安全链接，继续避免 `v-html`。
+  - 在最终 CSS 覆盖层加入受控 violet accent：用于活跃项目/任务、Markdown 标题/链接/强调、blockquote、代码块、composer focus 和审查选择状态。
+  - 保持产品仍是 Codex-like 本地工作台，紫色只作为“智能/当前焦点/Markdown 重点”的信号层，不改成整页单色主题。
+  - 按 Frontend Design Premium 严格审计补充 `ProjectSidebar` 手动路径 form 的 `novalidate`，明确应用自行管理验证。
+- 验证：见 [UI-020](VERIFICATION.md)。
+
 ## 2026-08-27：按用户要求整理决策和开发记录
 
 - 请求：保证可维护性与决策可追踪性；决策放 decisions/，开发文档及后续实现情况放 memory/。

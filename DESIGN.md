@@ -20,7 +20,7 @@ Runtime CSS variables and component styles in `frontend/src/style.css` are curre
 
 - Background: white and very light neutral gray surfaces with a barely visible technical grid under the main shell. The texture should feel precise and quiet, not decorative.
 - Text: near-black body text with muted gray secondary text.
-- Accent: green for healthy/successful state, amber for permission-needed state, red for failures, blue only for selected review affordances.
+- Accent: green for healthy/successful state, amber for permission-needed state, red for failures, blue/violet for selected review affordances, active work, and Markdown emphasis. Violet should be a controlled signal layer, not a full-page purple theme.
 - Shape: rounded but controlled. Composer and empty-state cards are softer; action rows are flatter.
 - Elevation: the composer, active change card, and inspector diff block may use visible but soft shadow. Operational rows should stay quiet.
 - Iconography: use the shared line-style UI icon component for tool rows, tabs, run/stop, and undo affordances instead of one-off text glyphs.
@@ -49,7 +49,7 @@ Primary user-facing labels on the workbench use concise Chinese where the user c
 
 ## Markdown rendering and final answer behavior
 
-Assistant narrative content supports a small safe Markdown subset rendered as Vue nodes, not raw HTML. During an active run, progress messages can appear as lightweight narrative. After the run finishes, intermediate assistant narration is collapsed and only the final assistant answer remains in the main transcript, with tool/action evidence preserved as action rows and review cards.
+Assistant narrative content supports a small safe Markdown subset rendered as Vue nodes, not raw HTML. It includes headings, ordered and unordered lists, blockquotes, horizontal rules, simple tables, fenced code, inline code, emphasis, strong text, and safe links. Markdown styling may use restrained violet accents to improve scanability without turning the workspace into a colorful document editor. During an active run, progress messages can appear as lightweight narrative. After the run finishes, intermediate assistant narration is collapsed and only the final assistant answer remains in the main transcript, with tool/action evidence preserved as action rows and review cards.
 
 ## Composer behavior
 
