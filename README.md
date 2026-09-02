@@ -67,7 +67,7 @@ The system prompt is intentionally short and policy-focused. It tells the model 
 
 ## Local Persistence
 
-The backend uses H2 file mode with Spring JDBC for local persistence. Runtime data is stored under `backend/data/` and is intentionally ignored by Git.
+The backend uses H2 file mode with Spring JDBC for local persistence. Runtime data is stored under `backend/data/` and is intentionally ignored by Git. The default datasource enables H2 `AUTO_SERVER` mode so local restarts or temporary parallel backend instances do not fail on the same database file lock.
 
 Persisted state includes:
 

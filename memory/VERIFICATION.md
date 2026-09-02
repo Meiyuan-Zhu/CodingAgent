@@ -1201,3 +1201,20 @@
 - 命令：`cd backend && mvn test`。结果：通过，151 tests, 0 failures, 0 errors。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 说明：自动化测试验证编译、Spring 上下文和前端类型构建；系统文件夹选择器涉及 macOS GUI，最终交互仍建议在浏览器里点击“选择文件夹”做一次目视确认。
+
+## BUGFIX-005 — H2 文件锁导致后端启动失败修复验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：后端启动、H2 本地持久化 datasource、Spring Boot run。
+- 问题复现：
+  - `cd backend && mvn clean test` 通过，说明不是 Java 编译或单元测试失败。
+  - `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080` 初次失败，根因是旧 Java 进程占用 `backend/data/coding-agent.mv.db`，H2 报 `Database may be already in use` / `The file is locked`。
+- 修复：
+  - 默认 datasource 调整为 `jdbc:h2:file:./data/coding-agent;AUTO_SERVER=TRUE`。
+  - 验证中确认 H2 2.3 不支持 `AUTO_SERVER=TRUE` 和 `DB_CLOSE_ON_EXIT=FALSE` 组合，因此移除 `DB_CLOSE_ON_EXIT=FALSE`。
+- 验证：
+  - 命令：`cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18080`。结果：启动成功。
+  - 命令：在 18080 保持运行时执行 `cd backend && mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=18081`。结果：第二实例也启动成功，没有再触发 H2 file lock。
+  - 命令：`curl http://localhost:18081/api/health`。结果：返回 `{"status":"ok","service":"coding-agent-backend",...}`。
+  - 清理：两个临时 Spring Boot 进程均通过 Ctrl-C 优雅停止。
+- 说明：Maven 输出中的 `BUILD FAILURE` 来自 Spring Boot 应用启动失败，不是项目源代码编译失败。

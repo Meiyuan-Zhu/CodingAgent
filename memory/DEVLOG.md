@@ -619,3 +619,11 @@
 - 用户消息气泡新增轻量 hover 操作：`复制` 将消息写入剪贴板，`修改` 将原用户 prompt 放回 composer 并聚焦输入框，方便基于历史任务快速改写后重新运行。
 - `ComposerBox` 暴露 `focus()`，App 层接收 timeline 的消息操作事件并更新 draft。
 - 验证：`cd backend && mvn test` 通过 151 tests；`cd frontend && npm run build` 通过。
+
+## 2026-09-02：H2 启动锁修复
+
+- 根据用户反馈排查后端 `spring-boot:run` 的 build failure；`mvn clean test` 可通过，实际失败点在应用启动阶段。
+- 启动日志显示 `backend/data/coding-agent.mv.db` 被旧 Java 进程锁住，H2 报 `Database may be already in use`，导致 Spring datasource 初始化失败并被 Maven 标记为 `BUILD FAILURE`。
+- 默认 datasource 从普通 H2 file mode 调整为 `jdbc:h2:file:./data/coding-agent;AUTO_SERVER=TRUE`，允许本地开发中临时并发/残留实例共享同一个 H2 文件库，降低重启时锁库概率。
+- 验证过程中发现 H2 2.3 不支持 `AUTO_SERVER=TRUE` 与 `DB_CLOSE_ON_EXIT=FALSE` 同时使用，因此最终移除 `DB_CLOSE_ON_EXIT=FALSE`。
+- 停止残留锁库进程后，用 18080 和 18081 两个临时端口并发启动后端，两个实例均能启动；18081 健康检查返回 `{"status":"ok"}`。
