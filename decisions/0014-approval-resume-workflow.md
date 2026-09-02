@@ -76,7 +76,7 @@ Runner 遇到需要审批的工具时：
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/PendingToolApproval.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunStore.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunService.java`
-  - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`
+  - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/api/RunController.java`
   - `frontend/src/App.vue`
   - `frontend/src/api/runs.ts`

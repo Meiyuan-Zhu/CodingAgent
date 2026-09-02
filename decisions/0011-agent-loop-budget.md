@@ -18,7 +18,7 @@ Connecting a real model before these guardrails would make failures harder to di
 
 ## Decision
 
-Add `RunBudget` and upgrade `MockAgentRunner` into a bounded multi-round loop:
+Add `RunBudget` and upgrade `AgentRunner` into a bounded multi-round loop:
 
 1. Start the run and emit the configured budget.
 2. Build model context with a system message and the user prompt.
@@ -55,7 +55,7 @@ When the context grows beyond the message window, the runner keeps the system pr
 
 ## Costs
 
-- The class is still named `MockAgentRunner`; it now contains real loop mechanics but still uses a mock model provider by default.
+- At this stage the runner still used the heuristic mock model provider by default; it has since been renamed to the provider-agnostic `AgentRunner`.
 - Message-count trimming is coarser than token-count trimming.
 - There is no cancellation or timeout yet, so long-running tools still need a separate lifecycle policy.
 - The current tool observation format is plain text; a future provider adapter may benefit from structured native tool result messages.
@@ -63,7 +63,7 @@ When the context grows beyond the message window, the runner keeps the system pr
 ## Evidence
 
 - `RunBudget` exists under `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/`.
-- `MockAgentRunner` now performs multiple model rounds and appends tool observations to the next request.
+- `AgentRunner` now performs multiple model rounds and appends tool observations to the next request.
 - `StopReason` includes `TOOL_CALL_LIMIT` for explicit tool budget failures.
 - Tests cover multi-round success, model parse failure, tool failure, length failure, round limit, tool-call limit, and context-window trimming.
 - `mvn test` passed on 2026-08-27 with 85 tests.
@@ -73,4 +73,4 @@ When the context grows beyond the message window, the runner keeps the system pr
 
 ## Revisit
 
-Revisit when cancellation, timeouts, real command execution, or a real model provider are added. Those features may require moving the runner name from `MockAgentRunner` to a provider-agnostic `AgentRunner`, introducing configurable budgets, and changing tool observations to provider-native structures.
+Revisit when cancellation, timeouts, real command execution, or a real model provider are added. Those features may require configurable budgets and changing tool observations to provider-native structures.

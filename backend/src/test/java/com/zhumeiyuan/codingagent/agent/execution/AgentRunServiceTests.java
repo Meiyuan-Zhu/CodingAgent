@@ -44,7 +44,7 @@ class AgentRunServiceTests {
 	void cancelRunMovesNonTerminalRunToCancelledAndEmitsEvents() {
 		AgentRunStore store = new AgentRunStore();
 		RunEventStream stream = new RunEventStream();
-		MockAgentRunner runner = new MockAgentRunner(store, stream,
+		AgentRunner runner = new AgentRunner(store, stream,
 				new ToolRegistry(List.of(), this.clock), new ToolApprovalPolicy(), request -> {
 					try {
 						Thread.sleep(Duration.ofSeconds(10));
@@ -77,7 +77,7 @@ class AgentRunServiceTests {
 					return ToolExecutionResult.of("{\"path\":\"x.txt\",\"unifiedDiff\":\"+x\"}",
 							Map.of("path", "x.txt"));
 				})), this.clock);
-		MockAgentRunner runner = new MockAgentRunner(store, stream, registry, new ToolApprovalPolicy(), request -> {
+		AgentRunner runner = new AgentRunner(store, stream, registry, new ToolApprovalPolicy(), request -> {
 			if (request.messages().get(request.messages().size() - 1).role().name().equals("TOOL")) {
 				return new ModelResponse("done", ModelFinishReason.STOP, List.of());
 			}
@@ -109,7 +109,7 @@ class AgentRunServiceTests {
 					toolExecuted.set(true);
 					return ToolExecutionResult.of("{}", Map.of());
 				})), this.clock);
-		MockAgentRunner runner = new MockAgentRunner(store, stream, registry, new ToolApprovalPolicy(),
+		AgentRunner runner = new AgentRunner(store, stream, registry, new ToolApprovalPolicy(),
 				request -> new ModelResponse("write", ModelFinishReason.TOOL_CALLS,
 						List.of(new ToolCall("call-1", "write_file", Map.of("path", "x.txt", "content", "x")))),
 				new RunBudget(4, 12, 30), this.toolExecutor, this.clock);
@@ -131,7 +131,7 @@ class AgentRunServiceTests {
 	void cancellingTerminalRunIsIdempotent() {
 		AgentRunStore store = new AgentRunStore();
 		RunEventStream stream = new RunEventStream();
-		MockAgentRunner runner = new MockAgentRunner(store, stream,
+		AgentRunner runner = new AgentRunner(store, stream,
 				new ToolRegistry(List.of(), this.clock), new ToolApprovalPolicy(),
 				request -> new ModelResponse("done", ModelFinishReason.STOP, List.of()),
 				new RunBudget(4, 12, 30), this.toolExecutor, this.clock);

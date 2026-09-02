@@ -26,7 +26,7 @@ Add a backend task lifecycle boundary:
 - Cancellation transitions non-terminal runs through `RUN_CANCELLING` and then `CANCELLED` with `USER_CANCELLED`.
 - Terminal run cancellation is idempotent and does not append new events.
 - The run executor and tool executor are separate `ExecutorService` beans and are shut down by Spring with `shutdownNow`.
-- `MockAgentRunner` checks for cancellation before starting, before each model request, after model response, and before/after tool calls.
+- `AgentRunner` checks for cancellation before starting, before each model request, after model response, and before/after tool calls.
 - Tool execution runs through a separate tool executor and waits up to `RunBudget.toolTimeout`.
 - Timed-out tools return a failed `ToolResult` with `TOOL_TIMEOUT` metadata and fail the run with `TIME_LIMIT`.
 
@@ -59,7 +59,7 @@ The Vue workbench now includes a Cancel button and listens for `run_cancelling` 
 - `RunTaskManager` exists under `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/`.
 - `AgentRunService` exposes `cancelRun` and dispatches runs through `RunTaskManager`.
 - `RunController` exposes `POST /api/runs/{runId}/cancel`.
-- `MockAgentRunner` checks cancellation and applies tool timeout via `RunBudget.toolTimeout`.
+- `AgentRunner` checks cancellation and applies tool timeout via `RunBudget.toolTimeout`.
 - Vue workbench calls the cancel endpoint and listens to `run_cancelling` SSE events.
 - `mvn test` passed on 2026-08-27 with 94 tests.
 - `npm run build` passed on 2026-08-27.

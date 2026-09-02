@@ -28,5 +28,5 @@ def calculate_total(items: Iterable[LineItem], discount_percent: float = 0.0, ta
 
     base = subtotal(items)
     discounted = base * (1 - discount_percent / 100)
-    taxed = discounted * (1 + tax_rate)
+    taxed = discounted + base * tax_rate
     return round(taxed, 2)

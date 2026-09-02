@@ -35,7 +35,7 @@
 - `run_command`：预留为需要用户审批，即使命令工具尚未注册。
 - 其他工具：自动通过审批策略，继续交给工具注册表做存在性和参数校验。
 
-`MockAgentRunner` 在执行工具前先产出 `TOOL_CALL_REQUESTED`，其中包含审批模式和原因。若工具需要审批，则进入 `WAITING_FOR_APPROVAL`，发出 `APPROVAL_REQUIRED`；由于完整 approve/resume endpoint 尚未实现，当前阶段立即发出 `APPROVAL_RESOLVED`（`approved=false`，原因是 `approval_resume_api_not_implemented`），随后以 `APPROVAL_REJECTED` 结束 run，且不执行工具。
+`AgentRunner` 在执行工具前先产出 `TOOL_CALL_REQUESTED`，其中包含审批模式和原因。若工具需要审批，则进入 `WAITING_FOR_APPROVAL`，发出 `APPROVAL_REQUIRED`；由于完整 approve/resume endpoint 尚未实现，当前阶段立即发出 `APPROVAL_RESOLVED`（`approved=false`，原因是 `approval_resume_api_not_implemented`），随后以 `APPROVAL_REJECTED` 结束 run，且不执行工具。
 
 `WorkspaceWriteTools` 在 `write_file` 与 `replace_text` 成功时返回 `unifiedDiff` 字段；前端从 `TOOL_CALL_FINISHED` 的 JSON content 中提取 `unifiedDiff` 并在 Diff 面板展示。这使未来审批后执行和历史回看能复用同一个展示入口。
 
@@ -50,7 +50,7 @@
 
 - 代码位置：
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolApprovalPolicy.java`
-  - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`
+  - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/WorkspaceUnifiedDiff.java`
   - `backend/src/main/java/com/zhumeiyuan/codingagent/agent/workspace/WorkspaceWriteTools.java`
   - `frontend/src/App.vue`

@@ -19,26 +19,26 @@ public class AgentRunService {
 
 	private final AgentRunStore store;
 	private final RunEventStream runEventStream;
-	private final MockAgentRunner mockAgentRunner;
+	private final AgentRunner agentRunner;
 	private final RunTaskManager runTaskManager;
 	private final WorkspaceChangeJournal workspaceChangeJournal;
 	private final Clock clock;
 
-	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
+	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, AgentRunner agentRunner,
 			RunTaskManager runTaskManager, WorkspaceChangeJournal workspaceChangeJournal, Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
-		this.mockAgentRunner = Objects.requireNonNull(mockAgentRunner, "mockAgentRunner");
+		this.agentRunner = Objects.requireNonNull(agentRunner, "agentRunner");
 		this.runTaskManager = Objects.requireNonNull(runTaskManager, "runTaskManager");
 		this.workspaceChangeJournal = Objects.requireNonNull(workspaceChangeJournal, "workspaceChangeJournal");
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
-	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
+	public AgentRunService(AgentRunStore store, RunEventStream runEventStream, AgentRunner agentRunner,
 			RunTaskManager runTaskManager, Clock clock) {
 		this.store = Objects.requireNonNull(store, "store");
 		this.runEventStream = Objects.requireNonNull(runEventStream, "runEventStream");
-		this.mockAgentRunner = Objects.requireNonNull(mockAgentRunner, "mockAgentRunner");
+		this.agentRunner = Objects.requireNonNull(agentRunner, "agentRunner");
 		this.runTaskManager = Objects.requireNonNull(runTaskManager, "runTaskManager");
 		this.workspaceChangeJournal = null;
 		this.clock = Objects.requireNonNull(clock, "clock");
@@ -49,7 +49,7 @@ public class AgentRunService {
 		AgentRun run = this.store.create(this.clock);
 		emit(run.id(), RunEventType.RUN_CREATED, Map.of("runId", run.id().value()));
 		emit(run.id(), RunEventType.USER_MESSAGE_ACCEPTED, Map.of("prompt", normalizedPrompt));
-		this.runTaskManager.start(run.id(), () -> this.mockAgentRunner.run(run.id(), normalizedPrompt));
+		this.runTaskManager.start(run.id(), () -> this.agentRunner.run(run.id(), normalizedPrompt));
 		return getRun(run.id());
 	}
 
@@ -90,7 +90,7 @@ public class AgentRunService {
 				"name", approval.toolCall().name(),
 				"approved", true,
 				"reason", "user_approved"));
-		this.runTaskManager.start(runId, () -> this.mockAgentRunner.resumeAfterApproval(approval));
+		this.runTaskManager.start(runId, () -> this.agentRunner.resumeAfterApproval(approval));
 		return getRun(runId);
 	}
 

@@ -37,8 +37,8 @@ tool(result for that tool_call)
 
 ## 实现与验证证据
 
-- 代码位置：[MockAgentRunner](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java)。
-- 测试位置：[MockAgentRunnerTests](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunnerTests.java)。
+- 代码位置：[AgentRunner](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java)。
+- 测试位置：[AgentRunnerTests](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunnerTests.java)。
 - 验证记录：[BUGFIX-002](../memory/VERIFICATION.md)。
 - 关联提交/运行：尚无，提交后补充。
 

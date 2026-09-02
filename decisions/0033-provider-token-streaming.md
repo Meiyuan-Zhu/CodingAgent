@@ -33,7 +33,7 @@ OpenAI-compatible native tools 请求增加 `stream=true`，HTTP transport 读�
 
 ## 实现与验证证据
 
-- 代码位置：[OpenAiCompatibleModelClient](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java)、[StreamingModelClient](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/StreamingModelClient.java)、[MockAgentRunner](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java)、[RunEventType](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/run/RunEventType.java)、[frontend timeline](../frontend/src/run/timeline.ts)。
+- 代码位置：[OpenAiCompatibleModelClient](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java)、[StreamingModelClient](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/StreamingModelClient.java)、[AgentRunner](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java)、[RunEventType](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/run/RunEventType.java)、[frontend timeline](../frontend/src/run/timeline.ts)。
 - 验证记录：[STREAM-001](../memory/VERIFICATION.md)。
 - 关联提交/运行：尚无，提交后补充。
 

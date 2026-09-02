@@ -40,8 +40,8 @@ Runtime 的退出语义划分为：
 
 ## 实现与验证证据
 
-- 代码位置：[MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java)。
-- 测试位置：[MockAgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunnerTests.java)。
+- 代码位置：[AgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java)。
+- 测试位置：[AgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunnerTests.java)。
 - 验证记录：[RUNTIME-001](../memory/VERIFICATION.md)。
 - 关联提交/运行：尚未提交。
 

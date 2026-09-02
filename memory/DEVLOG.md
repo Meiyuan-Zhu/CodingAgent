@@ -100,7 +100,7 @@
 - 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/`：
   - `AgentRunStore` 保存进程内 run 状态和有序事件。
   - `AgentRunService` 校验 prompt、创建 run、发初始事件并启动 runner。
-  - `MockAgentRunner` 模拟模型选择，只通过 `ToolRegistry` 执行一个只读 workspace 工具。
+  - `AgentRunner` 模拟模型选择，只通过 `ToolRegistry` 执行一个只读 workspace 工具。
   - `RunEventStream` 使用 `SseEmitter` 做事件 replay 和实时发布。
 - 新增 `backend/src/main/java/com/zhumeiyuan/codingagent/agent/api/`：
   - `POST /api/runs` 创建 run。
@@ -136,7 +136,7 @@
   - `ModelRequest`、`ModelMessage`、`ModelRole`、`ModelResponse`、`ModelFinishReason` 表达 provider-neutral 的内部协议。
   - `ModelResponseParser` 将模型原始 JSON 文本解析为内部响应，并校验 finish reason、工具调用数组、参数对象、重复 call id 和消息长度。
   - `HeuristicMockModelClient` 继续提供可重复 demo，但现在先生成原始 JSON，再走解析器。
-- 更新 `MockAgentRunner`：通过 `ModelClient` 获取响应；模型解析错误以 `MODEL_PARSE_ERROR` 结束 run；工具执行失败仍以 `TOOL_ERROR` 结束。
+- 更新 `AgentRunner`：通过 `ModelClient` 获取响应；模型解析错误以 `MODEL_PARSE_ERROR` 结束 run；工具执行失败仍以 `TOOL_ERROR` 结束。
 - 增加模型解析器、模型请求、mock 模型客户端和 runner 解析失败测试。
 - 执行 MODEL-001 验证：`cd backend && mvn test` 通过，78 tests, 0 failures, 0 errors。
 - 限制：仍未接入真实模型 API；runner 仍是单轮请求，不包含上下文裁剪、预算、取消或多轮 observe-think-act 循环。
@@ -146,7 +146,7 @@
 
 - 目标：在接入真实模型前先把核心循环和预算控制做出来，避免真实 provider 行为与 loop bug 混在一起。
 - 新增 `RunBudget`，默认限制为 4 轮、12 次工具调用、30 条上下文消息。
-- 更新 `MockAgentRunner`：
+- 更新 `AgentRunner`：
   - 每轮通过 `ModelClient` 请求模型，并在事件中记录 round、contextMessages 和 toolCallsUsed。
   - `TOOL_CALLS` 响应先检查工具调用预算，再通过 `ToolRegistry` 执行工具。
   - 工具结果作为 tool observation message 追加到上下文，进入下一轮模型请求。
@@ -163,7 +163,7 @@
 - 新增 `RunTaskManager`：按 `RunId` 保存 active `Future`，支持启动、取消和完成后清理。
 - 后端 executor 调整：run executor 和 tool executor 分离，均由 Spring 负责 `shutdownNow`。
 - 更新 `AgentRunService` 与 `RunController`：新增 `POST /api/runs/{runId}/cancel`，非终态 run 先发 `RUN_CANCELLING`，再以 `USER_CANCELLED` 结束；终态取消保持幂等。
-- 更新 `MockAgentRunner`：启动前、每轮模型请求前后、工具执行前后检查取消状态；工具执行通过 tool executor 和 `RunBudget.toolTimeout` 限时等待，超时转为 `TIME_LIMIT`。
+- 更新 `AgentRunner`：启动前、每轮模型请求前后、工具执行前后检查取消状态；工具执行通过 tool executor 和 `RunBudget.toolTimeout` 限时等待，超时转为 `TIME_LIMIT`。
 - 更新前端：新增 Cancel 按钮，调用 cancel endpoint，并订阅 `run_cancelling` SSE 事件。
 - 执行 LIFE-001 验证：`cd backend && mvn test` 通过，94 tests, 0 failures, 0 errors；`cd frontend && npm run build` 通过；本地 HTTP cancel run `844f0b97-1a46-4955-bf44-2bc47e8b2802` 最终 `CANCELLED / USER_CANCELLED`。
 - 限制：Java Future 取消依赖线程中断；未来 shell 命令工具还需要显式销毁 OS 子进程和进程树。
@@ -172,7 +172,7 @@
 
 - 目标：在接入真实模型和命令工具之前，先把可变更工具的安全审批边界和变更可视化做出来。
 - 新增 `ToolApprovalPolicy`、`ToolApprovalDecision`、`ToolApprovalMode`：`write_file`、`replace_text` 和预留的 `run_command` 均要求用户审批；其他工具继续交由注册表做正常校验。
-- 更新 `MockAgentRunner`：工具执行前发出带审批信息的 `TOOL_CALL_REQUESTED`；遇到需审批工具时发出 `APPROVAL_REQUIRED`，当前因 approve/resume API 未实现而发出 `APPROVAL_RESOLVED approved=false`，随后以 `APPROVAL_REJECTED` 结束 run，且不执行工具。
+- 更新 `AgentRunner`：工具执行前发出带审批信息的 `TOOL_CALL_REQUESTED`；遇到需审批工具时发出 `APPROVAL_REQUIRED`，当前因 approve/resume API 未实现而发出 `APPROVAL_RESOLVED approved=false`，随后以 `APPROVAL_REJECTED` 结束 run，且不执行工具。
 - 新增 `WorkspaceUnifiedDiff`，让 `write_file` 和 `replace_text` 返回 `unifiedDiff`，同时保留已有 hash、大小和冲突校验。
 - 更新前端：订阅审批事件，从工具结果中提取 `unifiedDiff`，在 Diff 面板展示文件变更。
 - 更新 `HeuristicMockModelClient`：包含 write/create/写入/创建 的 prompt 会请求 `write_file`，用于验证审批拦截路径。
@@ -184,7 +184,7 @@
 - 目标：把上一阶段的“审批拦截”推进为完整 approve/reject/resume 闭环，让可变更工具能在用户批准后继续执行并展示 diff。
 - 新增 `PendingToolApproval`：保存单个挂起工具调用的 run id、round、tool call、审批决策、上下文消息和已使用工具调用数。
 - 扩展 `AgentRunStore`：在 run 旁保存和消费 pending approval，不把开发文档或聊天历史注入 Agent 上下文。
-- 重构 `MockAgentRunner`：遇到需审批工具时保存 continuation、进入 `WAITING_FOR_APPROVAL` 并返回；Approve 后执行已批准工具，将结果回填上下文并进入下一轮模型请求。
+- 重构 `AgentRunner`：遇到需审批工具时保存 continuation、进入 `WAITING_FOR_APPROVAL` 并返回；Approve 后执行已批准工具，将结果回填上下文并进入下一轮模型请求。
 - 扩展 `AgentRunService` 与 `RunController`：新增 approve/reject endpoint；reject 以 `APPROVAL_REJECTED` 结束且不执行工具；cancel 会清理 pending approval。
 - 更新 `RunTaskManager`：允许替换已完成但尚未从 active map 移除的旧 task，降低用户快速点击 Approve 时的竞态风险。
 - 更新 Vue 前端：根据审批事件计算 pending approval，展示工具名、参数、审批原因，以及 Approve and run / Reject 按钮；批准后继续展示同一 run 的工具事件和 diff。
@@ -199,7 +199,7 @@
 - 新增 `OpenAiCompatibleModelClient`，通过 Java 21 `HttpClient` 调用 `/chat/completions`，请求中启用 JSON response format，并把项目内部 JSON 响应协议和工具定义注入 system message。
 - 新增 `ModelHttpTransport`、`ModelHttpRequest`、`ModelHttpResponse` 和 `JavaHttpModelTransport`，用于隔离真实 HTTP 调用和单元测试替身。
 - 更新 runner 事件 payload：不再把 provider 写死为 `mock`，由 `ModelClient.providerName()` 报告当前模型来源。
-- 更新前端文案和检查项，从 “mock runner” 改为 “backend agent runner”，避免真实模型模式下的界面描述不一致。
+- 更新前端文案和检查项，从 “mock runner” 改为 “agent runner”，避免真实模型模式下的界面描述不一致。
 - 新增 ADR-0015，记录为什么使用 OpenAI-compatible HTTP 适配器而不是 DeepSeek SDK 或写死 DeepSeek。
 - 执行 MODELAPI-001 验证：后端 `mvn test` 通过 106 tests；前端 `npm run build` 通过；真实 DeepSeek 端到端调用因会向外部服务发送 prompt、工具定义和后续工具观察，待用户明确授权后执行。
 - 限制：当前不使用 provider-native tool calls，不做流式 token 输出或 usage 统计；真实 DeepSeek V4 Flash 任务尚未验证成功。
@@ -427,7 +427,7 @@
 ## 2026-08-30：Agent Runtime 退出语义与工具失败恢复
 
 - 根据用户对 Agent Runtime 子任务的拆分，保持现有 loop 架构不大改，只收紧三类退出语义：模型最终回答为正常完成；round/tool/token/cancel 等预算或用户动作属于系统强制终止；模型 API、provider 响应解析和内部 runtime 异常属于不可恢复失败。
-- 修正 `MockAgentRunner` 对 `ToolResult.success=false` 的处理：工具失败不再直接 `TOOL_ERROR`/`TIME_LIMIT` 结束 run，而是作为 `success=false` tool observation 加回 `List<ModelMessage>`，继续下一轮 LLM，让模型有机会修正路径、参数、替换内容或命令。
+- 修正 `AgentRunner` 对 `ToolResult.success=false` 的处理：工具失败不再直接 `TOOL_ERROR`/`TIME_LIMIT` 结束 run，而是作为 `success=false` tool observation 加回 `List<ModelMessage>`，继续下一轮 LLM，让模型有机会修正路径、参数、替换内容或命令。
 - 审批恢复路径同步使用相同语义：用户批准后若工具执行失败，也回填 observation 并继续下一轮，而不是直接 failed。
 - 新增 ADR-0027 记录“工具失败作为可恢复 Observation”的决策和代价。
 - 验证：`cd backend && mvn test` 通过 131 tests；新增/更新测试覆盖普通工具失败和工具 timeout 都会进入下一轮模型请求。
@@ -444,7 +444,7 @@
 ## 2026-08-30：Context Management 配对感知裁剪
 
 - 根据用户对子任务 3 Context Management 的要求，修复上下文窗口可能从中间截断 assistant tool call 与 tool result 的风险。
-- `MockAgentRunner` 的 context window 继续保留 system prompt 和初始 user task；最近历史改为从尾部按消息组纳入窗口。
+- `AgentRunner` 的 context window 继续保留 system prompt 和初始 user task；最近历史改为从尾部按消息组纳入窗口。
 - 普通 user/assistant 消息按单条处理；assistant tool_calls 与其后连续 tool results 作为不可拆分组处理。
 - 若裁剪过程中遇到孤立 tool result，则跳过该消息，避免向 native tool calling provider 发送缺少对应 assistant tool_calls 的 `role=tool` 消息。
 - 新增 ADR-0029 记录这一 context strategy 的边界和限制。
@@ -455,7 +455,7 @@
 - 根据用户对子任务 4 的要求，将错误恢复正式拆成三类：recoverable tool error、resource/policy termination、infrastructure failure。
 - `ToolRegistry` 的失败 JSON 增加 `failureKind=RECOVERABLE_TOOL_ERROR`、`recoverable=true` 和 `recoveryHint`，让 LLM 下一轮知道该如何修正。
 - Workspace 错误码从泛化 access denied 细分为 `WORKSPACE_NOT_FOUND`、`WORKSPACE_INVALID_PATH`、`WORKSPACE_PERMISSION_DENIED`、`WORKSPACE_CONFLICT`、`WORKSPACE_EDIT_MISS` 和 `WORKSPACE_ACCESS_DENIED`。
-- `MockAgentRunner` 的 system prompt 增加恢复策略：工具失败是 observation，模型应读取 `errorCode/message/recoveryHint` 后调整计划继续，而不是直接最终失败。
+- `AgentRunner` 的 system prompt 增加恢复策略：工具失败是 observation，模型应读取 `errorCode/message/recoveryHint` 后调整计划继续，而不是直接最终失败。
 - 新增端到端式单元测试：模型先 `read_file("src/foo.py")` 失败，随后 `list_files(".")` 找到文件，再 `read_file("README.md")` 并正常完成。
 - 验证：`cd backend && mvn test` 通过 135 tests；`git diff --check` 通过；测试生成的本地 H2 数据库文件已清理。
 
@@ -464,7 +464,7 @@
 - 根据用户对子任务 5 System Prompt 的建议，将 runner system prompt 从临时“local coding agent + JSON 格式”提示升级为简短 operating policy。
 - 新 prompt 明确 role、workspace awareness、Inspect → Understand → Modify → Verify → Recover 工作流、避免无关探索、避免重复失败动作、完成时总结修改与验证。
 - 保持 prompt 克制，不写成长篇编程教程；provider adapter 仍只负责 JSON/native tool calling 输出协议和单工具轮次规则。
-- 新增 `MockAgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`，锁定关键 prompt 约束已注入模型请求。
+- 新增 `AgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`，锁定关键 prompt 约束已注入模型请求。
 - 验证：`cd backend && mvn test` 通过 136 tests；`git diff --check` 通过；测试生成的本地 H2 数据库文件已清理。
 
 ## 2026-08-30：Process timeout cleanup
@@ -484,7 +484,7 @@
 - `JavaHttpModelTransport` 增加 streaming response 支持，普通 mock/JSON content 路径保持同步 complete 行为。
 - 前端 SSE 订阅新增 `model_message_delta`，timeline 会按 round 拼接 delta，在最终 `MODEL_MESSAGE_RECEIVED` 到达后使用完整消息替换临时流式内容，历史回放仍由持久化事件重建。
 - 新增 ADR-0033 记录流式协议边界。
-- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test` 通过，26 tests；完整 `cd backend && mvn test` 通过，140 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,AgentRunnerTests test` 通过，26 tests；完整 `cd backend && mvn test` 通过，140 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
 
 ## 2026-08-30：全项目提交前检查与文档更新
 
@@ -511,11 +511,11 @@
 
 - 根据用户第二张截图继续排查 H2 事件库快照，最新 run 以 `MODEL_ERROR` 失败，完整 provider 响应为 HTTP 400：`An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'`。
 - 事件序列显示 DeepSeek 在第 2 轮无视 prompt，一次返回了 4 个只读 tool calls；后续这类多工具 assistant message 进入 native tools 历史后触发 provider 校验错误。
-- 修复 `MockAgentRunner`：每次 `TOOL_CALLS` 响应只接收第一个 tool call 写入 transcript 并执行，其他同批 tool calls 丢弃，让后续请求始终保持 `assistant(one tool_call) -> tool(result)` 的稳定形态。
+- 修复 `AgentRunner`：每次 `TOOL_CALLS` 响应只接收第一个 tool call 写入 transcript 并执行，其他同批 tool calls 丢弃，让后续请求始终保持 `assistant(one tool_call) -> tool(result)` 的稳定形态。
 - 调整 tool-call budget 测试语义，并新增 `acceptsOnlyFirstToolCallFromEachModelResponse` 锁定单工具强制策略。
 - 前端 `RUN_FINISHED` 展示补充精简后的 `errorMessage`，以后 model/provider 错误不再只显示 `model_error`。
 - 新增 ADR-0035 记录 Runtime 单工具调用强制策略。
-- 验证：`cd backend && mvn -Dtest=MockAgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test` 通过，42 tests；`cd backend && mvn test` 通过，144 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+- 验证：`cd backend && mvn -Dtest=AgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test` 通过，42 tests；`cd backend && mvn test` 通过，144 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
 
 ## 2026-09-01：Streaming fallback 与真实端到端流程复核
 
@@ -525,7 +525,7 @@
 - 修复 `OpenAiCompatibleModelClient`：native tools streaming 遇到 `IOException` cause 的 `ModelClientException` 时，降级为非 streaming native completion；HTTP 400/429 等 provider 错误继续显式失败。
 - 新增 `OpenAiCompatibleModelClientTests.fallsBackToNonStreamingNativeRequestWhenProviderStreamTransportFails`，锁定 streaming transport failure fallback 行为。
 - 真实 Python 端到端 run `2c110940-e4d7-4e42-b376-4ec0529046c3` 成功：模型写入 `selftest_factorial.py`，用户审批后运行 `echo 5 | python3 selftest_factorial.py`，命令返回 exit 0/stdout `120`，模型最终总结完成。
-- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test` 通过，29 tests；`cd backend && mvn test` 通过，145 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
+- 验证：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,AgentRunnerTests test` 通过，29 tests；`cd backend && mvn test` 通过，145 tests；`cd frontend && npm run build` 通过；`git diff --check` 通过。
 
 ## 2026-09-01：Command Line Tools 修复后真实 C++ Agent flow
 
@@ -647,3 +647,34 @@
 - 前端在检测到文件修改工具完成并产生 unified diff 后，会刷新该文件所在目录及其祖先目录，让新文件立即进入文件树。
 - 文件面板新增独立的目录 loading 状态，空目录显示“这个项目还没有文件”，不再把已加载的空目录误显示成加载中。
 - 左侧添加项目区域在点击“选择文件夹”后立即收起，并关闭手动路径兜底区域，选择完成后不再保持展开。
+
+## 2026-09-02：AgentRunner 命名清理
+
+- 将真实运行时类从 `MockAgentRunner` 重命名为 `AgentRunner`，消除真实模型模式下的误导性命名。
+- 同步更新 `AgentRunService`、`ExecutionConfiguration`、执行层测试类和当前文档中的代码位置引用；`HeuristicMockModelClient` 保持原名，因为它仍是测试和离线模式的模型替身。
+
+## 2026-09-02：提交版 README.txt 完善
+
+- 根据题目 PDF 的 README 要求，重写提交版 `README.txt`：保留 Git 仓库地址、运行方式、特色功能、安全边界和验证命令。
+- 文案突出自研 Agent Runtime、原生 tool calling、本地 workspace 工具、审批、diff、撤销、命令执行约束、SSE 流式输出和 H2 本地持久化。
+- 按用户澄清将篇幅控制口径调整为“1000 个汉字以内”，扩展项目说明、核心流程、错误恢复和 UI 亮点。
+- 继续扩展为 8 项特色功能说明，覆盖自研 Agent Runtime、本地工具注册表、workspace 安全、命令执行约束、可恢复错误、上下文管理、Codex-like 界面和本地持久化 demo。
+- 当前控制篇幅：总字符 2026，非空白总字符 1848，CJK 字符 808；未写入任何真实 API key。
+
+## 2026-09-02：录屏 demo workspace 清理
+
+- 按用户录屏准备要求，将 `workspaces/demo` 收敛为单一 Python pricing bugfix 示例，只保留 `README.md`、`src/price_calculator.py`、`src/__init__.py` 和 `tests/test_price_calculator.py`。
+- 删除 `workspaces/demo` 中历史 C++ 演示文件、编译产物、selftest 文件、`__pycache__`、旧 `src/hello.txt`，并删除临时 `workspace2`。
+- 将 `calculate_total` 预置为适合录屏的故意 bug：折扣金额计算正确，但税额错误地基于折扣前 subtotal 计算；测试会显示折扣税费顺序问题，便于 Agent 自主定位和修复。
+
+## 2026-09-02：demo2 录屏项目清理
+
+- 按用户要求，从本地 H2 `workspace_projects` 中删除 `demo2` project 记录，并将 active project 切回 `demo`。
+- 删除 `workspaces/demo2` 文件夹；再次恢复 `workspaces/demo/src/price_calculator.py` 中用于录屏的故意税费计算 bug。
+
+## 2026-09-02：最终输出阶段前端卡死修复
+
+- 根据用户反馈排查“模型最终输出后前端卡住/崩溃”的问题；后端最近 run 状态均为 `SUCCEEDED`，说明任务完成，问题集中在前端展示层。
+- 根因定位到 `ChatTimeline` 的流式文本 watcher：同一个 assistant 最终消息从 `streaming=true` 切换为 `streaming=false` 时，旧逻辑会先命中 `streamTimers.has(id)` 并跳过非流式收尾，导致最终内容不能立即落定、旧 timer 继续驱动渲染。
+- 修复为非流式状态优先：先停止对应 timer，并直接设置完整最终内容；若 streaming 内容变化且已有 timer，则停止旧 timer 后按新内容重启。
+- 去掉 `props.items` watcher 的 deep 模式，减少大量 `MODEL_MESSAGE_DELTA` 到达和最终回答渲染时的额外扫描与重绘。

@@ -15,6 +15,7 @@ coverage/
 /.runtime/
 /backend/data/
 /workspaces/*
+/workspace2
 !/workspaces/demo/
 /workspaces/demo/*
 !/workspaces/demo/README.md

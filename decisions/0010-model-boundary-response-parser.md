@@ -54,7 +54,7 @@ The parser validates blank/non-JSON responses, non-object roots, message length,
 
 ## Alternatives Considered
 
-- Call a real model API immediately from `MockAgentRunner`: rejected because it would mix network/config concerns with core loop behavior and make tests require secrets.
+- Call a real model API immediately from `AgentRunner`: rejected because it would mix network/config concerns with core loop behavior and make tests require secrets.
 - Let each provider adapter parse its own output directly into tool execution: rejected because validation rules would drift and parser failures would be harder to observe.
 - Use a model API client's native tool-calling DTOs as the internal domain model: deferred because native tool calling may be useful later, but internal core state should remain provider-neutral.
 - Parse free-form Markdown tool calls: rejected for this stage because JSON is easier to validate and explain.
@@ -69,8 +69,8 @@ The parser validates blank/non-JSON responses, non-object roots, message length,
 ## Evidence
 
 - Model boundary code exists under `backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`.
-- `MockAgentRunner` now depends on `ModelClient` and handles `ModelParseException` as `MODEL_PARSE_ERROR`.
-- Tests exist under `backend/src/test/java/com/zhumeiyuan/codingagent/agent/model/` and `backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunnerTests.java`.
+- `AgentRunner` now depends on `ModelClient` and handles `ModelParseException` as `MODEL_PARSE_ERROR`.
+- Tests exist under `backend/src/test/java/com/zhumeiyuan/codingagent/agent/model/` and `backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunnerTests.java`.
 - `mvn test` passed on 2026-08-27 with 78 tests.
 - Implementation commit: `a58e31b feat: add model response parsing boundary`.
 

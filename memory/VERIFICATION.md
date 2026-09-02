@@ -4,6 +4,63 @@
 
 每条记录包含日期、范围、方法/命令、结果、限制、相关决策，以及实际存在的代码版本或运行 ID。后续修改影响结果时追加新验证，或注明旧结果已过期，不静默沿用。
 
+## REFACTOR-001：AgentRunner 命名清理验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`、`AgentRunService`、`ExecutionConfiguration`、执行层测试、当前状态/决策文档链接。
+- 方法：重命名真实运行时类和测试类，更新注入字段及当前代码位置引用；扫描 `backend/src`、`README`、`decisions`、`memory` 中的旧符号名。
+- 命令：`rg -n "MockAgentRunner|mockAgentRunner|MockAgentRunnerTests" backend/src README.md README.txt decisions/0027-recoverable-tool-failure-observations.md decisions/0029-context-window-tool-pair-trimming.md decisions/0030-failure-recovery-taxonomy.md decisions/0031-agent-operating-policy-system-prompt.md decisions/0033-provider-token-streaming.md decisions/0035-single-tool-call-runtime-enforcement.md memory/STATUS.md`。结果：无匹配。
+- 命令：`cd backend && mvn test`。结果：通过，151 tests, 0 failures, 0 errors, 0 skipped；`AgentRunnerTests` 被正常发现并执行 16 个测试。
+- 限制：未重新运行前端构建；本次改动只涉及后端 Java 命名和文档引用。
+
+## DOC-README-001：提交版 README.txt 检查
+
+- 日期：2026-09-02（北京时间）。
+- 范围：`README.txt`。
+- 方法：对照题目 PDF 的 README 要求检查 Git 仓库地址、运行方式、特色功能说明、核心流程、安全边界和凭据安全提示；按用户澄清以“1000 个汉字以内”为篇幅口径。
+- 命令：使用 Python 统计字符数。结果：总字符 2026，非空白字符 1848，CJK 字符 808。
+- 命令：`rg -n "(sk-[A-Za-z0-9_-]{20,}|DEEPSEEK_API_KEY\\s*=|api[_-]?key\\s*[:=]\\s*['\\\"][^'\\\"]{8,})" README.txt`。结果：无疑似真实凭据。
+- 命令：`git diff --check -- README.txt`。结果：通过，无空白错误。
+- 限制：这是提交说明文档检查，不证明应用运行；本次未重新跑后端/前端测试。
+
+## DEMO-PREP-001：录屏 demo workspace 清理与故意 bug 验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：`workspaces/demo`、`workspace2`。
+- 方法：将 `workspaces/demo` 收敛为 Python pricing bugfix 示例，删除历史 C++ 演示文件、编译产物、selftest 文件、`__pycache__` 和旧 `src/hello.txt`；删除临时 `workspace2`。
+- 命令：`find workspaces -maxdepth 3 -print | sort`。结果：仅剩 `workspaces/demo/README.md`、`src/__init__.py`、`src/price_calculator.py`、`tests/test_price_calculator.py`。
+- 命令：`test ! -e workspace2 && echo 'workspace2 removed'`。结果：`workspace2 removed`。
+- 命令：`cd workspaces/demo && python3 -m unittest discover -s tests -v`。结果：预期失败，4 tests 中 2 failures；`test_discount_is_applied_before_tax` 得到 `58.8 != 58.32`，`test_full_discount_leaves_only_zero_taxable_amount` 得到 `1.6 != 0.0`。
+- 说明：失败是录屏前预置的演示状态，用于让 Agent 展示读文件、跑测试、定位税费计算 bug、申请修改、再次验证通过的闭环。
+
+## DEMO-PREP-002：demo2 project 删除与 demo bug 恢复验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：本地 H2 `workspace_projects`、`workspaces/demo2`、`workspaces/demo/src/price_calculator.py`。
+- 方法：通过 H2 shell 删除 `demo2` project 记录并将 `demo` 设置为 active；通过后端 select API 让运行中的后端进程也切换到 `demo`；删除 `workspaces/demo2` 文件夹。
+- 命令：`SELECT project_id, name, path, active FROM workspace_projects ORDER BY created_at;`。结果：仅剩 `demo`，路径为 `/Users/zhumeiyuan/Desktop/CodingAgent/workspaces/demo`，`active=true`。
+- 命令：`POST /api/workspace/projects/73b2d165-8aef-4cc7-b25f-e2079a2b709a/select`。结果：返回 `demo` project 且 `active=true`。
+- 命令：`GET /api/workspace/projects`。结果：前端可见项目列表仅包含 `demo`。
+- 命令：`test ! -e workspaces/demo2 && echo 'workspaces/demo2 removed'`。结果：`workspaces/demo2 removed`。
+- 命令：`git diff --check -- workspaces`。结果：通过，无空白错误。
+- 说明：`demo` 中故意 bug 已恢复为“折扣后金额正确，但 tax 错误地基于折扣前 subtotal 计算”，供录屏时 Agent 修复。
+
+## BUGFIX-006：最终输出阶段前端流式收尾修复验证
+
+- 日期：2026-09-02（北京时间）。
+- 范围：`frontend/src/components/ChatTimeline.vue`。
+- 问题现象：用户反馈向模型提问后，前端在最后输出阶段卡住并崩溃。
+- 排查：
+  - 命令：`GET /api/runs`。结果：最近 3 个 run 均为 `SUCCEEDED / COMPLETED`，后端任务已正常结束。
+  - 命令：`GET /api/runs/0844b8a7-e7bb-427e-9d14-0bf07b4d0974/events`。结果：该 run 有大量 `MODEL_MESSAGE_DELTA`，最后出现完整 `MODEL_MESSAGE_RECEIVED` 和 `RUN_FINISHED`，符合前端最终流式收尾问题。
+- 修复：
+  - `ChatTimeline` watcher 在 `item.streaming=false` 时优先停止旧 timer 并直接填入完整内容。
+  - streaming 内容变化且已有 timer 时，停止旧 timer 后重启，避免旧目标内容继续驱动渲染。
+  - 移除 `props.items` watcher 的 deep 模式，降低大量 delta 场景下的重复渲染成本。
+- 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
+- 命令：`git diff --check -- frontend/src/components/ChatTimeline.vue`。结果：通过，无空白错误。
+- 限制：本次验证确认构建与后端事件形态；受当前工具可用性限制，未直接抓取浏览器 console。运行中的 Vite dev server 可通过 HMR 应用修复，若页面已崩溃建议刷新一次。
+
 ## UI-020：Markdown 与紫色视觉强调验证
 
 - 日期：2026-09-02（北京时间）。
@@ -294,7 +351,7 @@
 
 - 日期：2026-08-27。
 - 类型：后端核心单元测试与 Spring 上下文测试。
-- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`。
 - 方法：实现模型请求/响应边界、JSON 响应解析器、mock 模型客户端和 runner 接入后执行 `cd backend && mvn test`。
 - 结果：通过。78 tests, 0 failures, 0 errors。
 - 覆盖：
@@ -302,7 +359,7 @@
   - `ModelResponseParser` 可解析 `stop` 响应和 `tool_calls` 响应。
   - 非 JSON、非对象根、未知 finish reason、`stop` 携带工具调用、缺失或非对象 arguments、重复 tool call id、过多 tool calls 均被拒绝。
   - `HeuristicMockModelClient` 对 README、搜索和默认 prompt 生成确定性的工具调用，并经过 parser。
-  - `MockAgentRunner` 通过 `ModelClient` 执行工具，工具失败以 `TOOL_ERROR` 结束，模型解析失败以 `MODEL_PARSE_ERROR` 结束。
+  - `AgentRunner` 通过 `ModelClient` 执行工具，工具失败以 `TOOL_ERROR` 结束，模型解析失败以 `MODEL_PARSE_ERROR` 结束。
   - Spring Boot 上下文能加载 `ModelClient`、`ModelResponseParser`、`ToolRegistry` 和 run API 相关 bean。
 - 观察：Maven 仍提示用户全局 settings 中 `repositories` 标签位置警告；Mockito/ByteBuddy 动态 agent 仍有 JDK 未来兼容警告，目前不影响测试。
 - 关联：ADR-0010。
@@ -326,7 +383,7 @@
 
 - 日期：2026-08-27。
 - 类型：后端核心单元测试、Spring 上下文测试、前端构建、本地 HTTP 集成测试。
-- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/HeuristicMockModelClient.java`、`frontend/src/App.vue`。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunBudget.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/HeuristicMockModelClient.java`、`frontend/src/App.vue`。
 - 方法：实现多轮模型/工具循环、预算限制、上下文消息窗口和 mock 模型 stop 行为后执行以下检查：
   - `cd backend && mvn test`。
   - `cd frontend && npm run build`。
@@ -367,7 +424,7 @@
 
 - 日期：2026-08-27。
 - 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
-- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunTaskManager.java`、`AgentRunService`、`MockAgentRunner`、`RunBudget`、`RunController`、`frontend/src/App.vue`、`frontend/src/api/runs.ts`。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/RunTaskManager.java`、`AgentRunService`、`AgentRunner`、`RunBudget`、`RunController`、`frontend/src/App.vue`、`frontend/src/api/runs.ts`。
 - 方法：实现 run task 管理、cancel endpoint、runner 取消检查、工具 timeout 和前端 Cancel 按钮后执行以下检查：
   - `cd backend && mvn test`。
   - `cd frontend && npm run build`。
@@ -382,7 +439,7 @@
   - `RunTaskManager` 可跟踪 active task，完成后清理，并用 interrupt 取消 active task。
   - `AgentRunService.cancelRun` 可将非终态 run 转为 `CANCELLED / USER_CANCELLED` 并发事件；终态取消保持幂等。
   - `POST /api/runs/{runId}/cancel` endpoint 可返回 run state。
-  - `MockAgentRunner` 启动前遇到 `CANCELLING` 会跳过模型并完成取消。
+  - `AgentRunner` 启动前遇到 `CANCELLING` 会跳过模型并完成取消。
   - 工具执行超时会返回 `TOOL_TIMEOUT` metadata，并让 run 以 `TIME_LIMIT` 失败。
   - 前端 TypeScript 构建覆盖 cancel API 封装、Cancel 按钮和 `run_cancelling` 事件订阅。
 - 修正记录：
@@ -410,7 +467,7 @@
 
 - 日期：2026-08-27。
 - 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
-- 范围：`ToolApprovalPolicy`、`MockAgentRunner` 审批拦截、`WorkspaceUnifiedDiff`、`WorkspaceWriteTools` diff 返回、`HeuristicMockModelClient` 写入触发、`frontend/src/App.vue` 和 `frontend/src/style.css`。
+- 范围：`ToolApprovalPolicy`、`AgentRunner` 审批拦截、`WorkspaceUnifiedDiff`、`WorkspaceWriteTools` diff 返回、`HeuristicMockModelClient` 写入触发、`frontend/src/App.vue` 和 `frontend/src/style.css`。
 - 方法：实现审批策略、审批事件、写入/替换 diff 元数据和前端 Diff 面板后执行以下检查：
   - `cd backend && mvn test`。
   - `cd frontend && npm run build`。
@@ -454,7 +511,7 @@
 
 - 日期：2026-08-28。
 - 类型：后端核心单元测试、Spring MVC 测试、前端构建、本地 HTTP 集成测试。
-- 范围：`PendingToolApproval`、`AgentRunStore` pending approval 管理、`AgentRunService` approve/reject、`MockAgentRunner` 审批后恢复、`RunController` approve/reject endpoint、`RunTaskManager` 已完成任务替换、`frontend/src/App.vue` 和 `frontend/src/api/runs.ts`。
+- 范围：`PendingToolApproval`、`AgentRunStore` pending approval 管理、`AgentRunService` approve/reject、`AgentRunner` 审批后恢复、`RunController` approve/reject endpoint、`RunTaskManager` 已完成任务替换、`frontend/src/App.vue` 和 `frontend/src/api/runs.ts`。
 - 方法：实现完整 approve/reject/resume 工作流后执行以下检查：
   - `cd backend && mvn test`。
   - `cd frontend && npm run build`。
@@ -499,7 +556,7 @@
 
 - 日期：2026-08-28。
 - 类型：后端模型适配器单元测试、Spring 上下文测试、前端构建检查。
-- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java`、`backend/src/main/resources/application.properties`、`frontend/src/App.vue`。
+- 范围：`backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/`、`backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java`、`backend/src/main/resources/application.properties`、`frontend/src/App.vue`。
 - 方法：
   - 新增 OpenAI-compatible 模型客户端与配置后执行 `cd backend && mvn test`。
   - 使用替身 `ModelHttpTransport` 捕获请求体和 headers，模拟 provider 返回 Chat Completions JSON。
@@ -522,7 +579,7 @@
 - 日期：2026-08-28。
 - 类型：真实模型 API 端到端验证、后端回归测试。
 - 用户授权：用户明确授权向 DeepSeek 发送 demo workspace 测试上下文，执行一次真实模型验证。
-- 范围：`OpenAiCompatibleModelClient`、`ModelResponseParser`、`MockAgentRunner`、run API、工具注册表、`list_files`、`read_file`、demo workspace。
+- 范围：`OpenAiCompatibleModelClient`、`ModelResponseParser`、`AgentRunner`、run API、工具注册表、`list_files`、`read_file`、demo workspace。
 - 方法：
   - 使用 `source ~/.zshrc` 读取本机 `DEEPSEEK_API_KEY`，未打印 key。
   - 启动后端：`cd backend && mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=18080 --agent.model.provider=openai-compatible --agent.model.name=deepseek-v4-flash"`。
@@ -898,11 +955,11 @@
 ## RUNTIME-001 — 工具失败作为可恢复 Observation 验证
 
 - 日期：2026-08-30（北京时间）。
-- 范围：`MockAgentRunner` 普通 loop、审批恢复后的 loop、tool timeout observation、运行终止语义。
+- 范围：`AgentRunner` 普通 loop、审批恢复后的 loop、tool timeout observation、运行终止语义。
 - 命令：`cd backend && mvn test`。结果：通过，131 tests, 0 failures, 0 errors。
 - 覆盖：
-  - `MockAgentRunnerTests.failedToolResultIsReturnedToModelAsObservation`：工具返回 `success=false` 后，run 不直接 failed；下一轮 `ModelRequest` 包含 `ModelRole.TOOL` 消息，内容含 `tool_call_id`、`tool_name`、`success=false` 和失败文本；随后模型 STOP，run 以 `SUCCEEDED / COMPLETED` 结束。
-  - `MockAgentRunnerTests.toolTimeoutIsReturnedToModelAsObservation`：工具超时产生 `TOOL_TIMEOUT` metadata 和 `success=false` observation；runner 继续向模型发起下一轮请求，模型 STOP 后 run 成功结束。
+  - `AgentRunnerTests.failedToolResultIsReturnedToModelAsObservation`：工具返回 `success=false` 后，run 不直接 failed；下一轮 `ModelRequest` 包含 `ModelRole.TOOL` 消息，内容含 `tool_call_id`、`tool_name`、`success=false` 和失败文本；随后模型 STOP，run 以 `SUCCEEDED / COMPLETED` 结束。
+  - `AgentRunnerTests.toolTimeoutIsReturnedToModelAsObservation`：工具超时产生 `TOOL_TIMEOUT` metadata 和 `success=false` observation；runner 继续向模型发起下一轮请求，模型 STOP 后 run 成功结束。
 - 说明：工具执行失败现在被视为可恢复 observation；不可恢复失败仍包括 `ModelClientException`、`ModelParseException` 和 runner 内部异常；系统强制结束仍包括 round limit、tool call limit、length/token limit 和用户取消。
 - 限制：本次验证使用替身模型和单元测试，未启动真实 DeepSeek run 专门验证“工具失败后自修”；context window 仍是简单尾部裁剪，尚未按 tool-call/tool-result pair 做成组裁剪。
 
@@ -924,23 +981,23 @@
 ## CONTEXT-001 — Context window 配对感知裁剪验证
 
 - 日期：2026-08-30（北京时间）。
-- 范围：`MockAgentRunner.contextWindow`、assistant tool_calls 与 tool result 的上下文配对、运行预算下的历史消息裁剪。
+- 范围：`AgentRunner.contextWindow`、assistant tool_calls 与 tool result 的上下文配对、运行预算下的历史消息裁剪。
 - 命令：`cd backend && mvn test`。结果：通过，133 tests, 0 failures, 0 errors。
 - 命令：`git diff --check`。结果：通过。
 - 覆盖：
-  - `MockAgentRunnerTests.contextWindowKeepsSystemPromptAndRecentMessages`：裁剪后仍保留 system prompt 和初始 user task，且保留的 tool result 前一条是包含对应 tool call id 的 assistant 消息。
-  - `MockAgentRunnerTests.contextWindowDoesNotKeepOrphanToolMessagesWhenTrimming`：小上下文窗口下只保留完整的最近 assistant/tool pair，不会留下孤立 `ModelRole.TOOL` 消息。
+  - `AgentRunnerTests.contextWindowKeepsSystemPromptAndRecentMessages`：裁剪后仍保留 system prompt 和初始 user task，且保留的 tool result 前一条是包含对应 tool call id 的 assistant 消息。
+  - `AgentRunnerTests.contextWindowDoesNotKeepOrphanToolMessagesWhenTrimming`：小上下文窗口下只保留完整的最近 assistant/tool pair，不会留下孤立 `ModelRole.TOOL` 消息。
 - 说明：当前仍是 message-count 窗口，不是真实 token-aware compression；但 provider-facing context 已避免拆散 native tool calling 所需的 assistant/tool 对应关系。
 - 清理：测试生成的 `backend/data/coding-agent.mv.db` 和 `backend/data/coding-agent.trace.db` 已删除。
 
 ## FAILURE-001 — Failure Recovery 可恢复工具错误验证
 
 - 日期：2026-08-30（北京时间）。
-- 范围：`ToolRegistry` 失败 observation schema、workspace error code 映射、`MockAgentRunner` 工具失败后继续 loop、system prompt 恢复策略。
+- 范围：`ToolRegistry` 失败 observation schema、workspace error code 映射、`AgentRunner` 工具失败后继续 loop、system prompt 恢复策略。
 - 命令：`cd backend && mvn test`。结果：通过，135 tests, 0 failures, 0 errors。
 - 命令：`git diff --check`。结果：通过。
 - 覆盖：
-  - `MockAgentRunnerTests.recoverableWorkspaceErrorCanDriveTheNextToolAttempt`：模型先调用 `read_file("src/foo.py")`，工具返回 `WORKSPACE_NOT_FOUND`、`failureKind=RECOVERABLE_TOOL_ERROR`、`recoverable=true` 和包含 `list_files` 的 `recoveryHint`；runner 没有失败，而是继续下一轮 `list_files(".")`，再 `read_file("README.md")`，最终 `SUCCEEDED / COMPLETED`。
+  - `AgentRunnerTests.recoverableWorkspaceErrorCanDriveTheNextToolAttempt`：模型先调用 `read_file("src/foo.py")`，工具返回 `WORKSPACE_NOT_FOUND`、`failureKind=RECOVERABLE_TOOL_ERROR`、`recoverable=true` 和包含 `list_files` 的 `recoveryHint`；runner 没有失败，而是继续下一轮 `list_files(".")`，再 `read_file("README.md")`，最终 `SUCCEEDED / COMPLETED`。
   - `WorkspaceToolFactoryTests.missingWorkspacePathReturnsRecoverableNotFoundFailure`：缺失文件映射为 `WORKSPACE_NOT_FOUND`，失败 JSON 包含可恢复标记和恢复提示。
   - `ToolRegistryTests.toolExecutionExceptionReturnsStructuredFailureResult`：参数错误等 `ToolExecutionException` 返回结构化 recoverable failure，不抛出到 runner。
   - 既有 `toolTimeoutIsReturnedToModelAsObservation` 继续验证 timeout 作为失败 observation 回填，而不是直接终止。
@@ -951,11 +1008,11 @@
 ## PROMPT-001 — Agent Operating Policy Prompt 验证
 
 - 日期：2026-08-30（北京时间）。
-- 范围：`MockAgentRunner.SYSTEM_PROMPT`、OpenAI-compatible JSON protocol instruction formatting、模型请求中的 system message。
+- 范围：`AgentRunner.SYSTEM_PROMPT`、OpenAI-compatible JSON protocol instruction formatting、模型请求中的 system message。
 - 命令：`cd backend && mvn test`。结果：通过，136 tests, 0 failures, 0 errors。
 - 命令：`git diff --check`。结果：通过。
 - 覆盖：
-  - `MockAgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`：首轮 `ModelRequest` 的 system message 包含 autonomous coding agent、本地 workspace、无直接 filesystem/terminal 访问、修改前检查、工具错误作为 observation、避免重复失败动作、合理验证后再完成等关键 operating policy。
+  - `AgentRunnerTests.systemPromptDefinesAgentOperatingPolicy`：首轮 `ModelRequest` 的 system message 包含 autonomous coding agent、本地 workspace、无直接 filesystem/terminal 访问、修改前检查、工具错误作为 observation、避免重复失败动作、合理验证后再完成等关键 operating policy。
 - 说明：runner prompt 负责 Agent 行为策略；OpenAI-compatible adapter 继续负责 JSON/native tool calling provider 协议说明。
 - 清理：测试生成的 `backend/data/coding-agent.mv.db` 已删除；未发现残留 H2 trace 文件。
 - 限制：本次没有跑真实 DeepSeek 专项验证 prompt 对模型行为的影响；真实录屏前仍需做一次端到端 demo 检查。
@@ -977,14 +1034,14 @@
 
 - 日期：2026-08-30（北京时间）。
 - 范围：OpenAI-compatible native tools streaming request、provider SSE chunk 解析、fragmented tool call arguments 累计、runner delta event、前端 timeline 拼接。
-- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test`。结果：通过，26 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,AgentRunnerTests test`。结果：通过，26 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd backend && mvn test`。结果：通过，140 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
 - 覆盖：
   - `OpenAiCompatibleModelClientTests.streamsNativeTextDeltasAndReturnsFinalResponse`：native tools 请求包含 `stream=true`，provider SSE 中的 `"Hel"`、`"lo"` 被逐段回调，并最终组装为完整 `ModelResponse("Hello")`。
   - `OpenAiCompatibleModelClientTests.parsesFragmentedNativeToolCallsFromStream`：streamed `delta.tool_calls` 的 id、name 和 arguments 跨 chunk 拼接后，仍能生成 `ToolCall("call-1", "list_files", {"path":"."})`。
-  - `MockAgentRunnerTests.emitsModelMessageDeltaEventsForStreamingClients`：runner 对 streaming client 发出两个 `MODEL_MESSAGE_DELTA` 事件，并保留最终 `MODEL_MESSAGE_RECEIVED`。
+  - `AgentRunnerTests.emitsModelMessageDeltaEventsForStreamingClients`：runner 对 streaming client 发出两个 `MODEL_MESSAGE_DELTA` 事件，并保留最终 `MODEL_MESSAGE_RECEIVED`。
   - 前端 `npm run build` 覆盖 `model_message_delta` SSE 监听和 timeline delta 拼接类型检查。
 - 说明：当前 JSON content fallback 不做 token-level streaming；真实 provider stream 尚未在浏览器录屏路径中专项验证。
 
@@ -1024,18 +1081,18 @@
 ## BUGFIX-002 — 多 tool calls native history 400 定位与修复验证
 
 - 日期：2026-09-01（北京时间）。
-- 范围：`MockAgentRunner` 单工具调用强制、native tools transcript 稳定性、失败 run 错误详情展示。
+- 范围：`AgentRunner` 单工具调用强制、native tools transcript 稳定性、失败 run 错误详情展示。
 - 现场定位：
   - 从 `backend/data/coding-agent.mv.db` 复制快照后读取最新 run：`d2771827-317b-4906-b2d4-3f285c83754e`。
   - 该 run 在 `which clang++` 成功后进入下一轮模型请求，随后 `RUN_FINISHED` 为 `FAILED / MODEL_ERROR`。
   - 完整错误：`Model provider returned HTTP 400: {"error":{"message":"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. (insufficient tool messages following tool_calls message)"...}}`。
   - 事件序列显示第 2 轮模型一次返回 4 个只读 tool calls，说明仅靠 prompt 的“一次最多一个工具”不足以约束真实 provider。
 - 修复覆盖：
-  - `MockAgentRunner.acceptedToolCalls` 在 `TOOL_CALLS` 响应中只接收第一个 tool call，进入 transcript 的 assistant message 不再携带多个 tool calls。
-  - `MockAgentRunnerTests.acceptsOnlyFirstToolCallFromEachModelResponse`：模型一次返回 `call-1` 与 `call-2` 时，runner 只执行 `call-1`，下一轮上下文只包含 `assistant(call-1)` 与 `tool(call-1)`。
+  - `AgentRunner.acceptedToolCalls` 在 `TOOL_CALLS` 响应中只接收第一个 tool call，进入 transcript 的 assistant message 不再携带多个 tool calls。
+  - `AgentRunnerTests.acceptsOnlyFirstToolCallFromEachModelResponse`：模型一次返回 `call-1` 与 `call-2` 时，runner 只执行 `call-1`，下一轮上下文只包含 `assistant(call-1)` 与 `tool(call-1)`。
   - `toolCallLimitStopsBeforeExecutingTooManyCalls` 更新为新语义：已用完工具预算后，下一轮工具请求才触发 `TOOL_CALL_LIMIT`。
   - 前端 `runFinishedContent` 展示 `errorMessage` 的精简版本，方便从 UI 直接看到 provider 错误。
-- 命令：`cd backend && mvn -Dtest=MockAgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test`。结果：通过，42 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn -Dtest=AgentRunnerTests,OpenAiCompatibleModelClientTests,WorkspaceToolFactoryTests test`。结果：通过，42 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd backend && mvn test`。结果：通过，144 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。
@@ -1052,7 +1109,7 @@
   - `OpenAiCompatibleModelClient.completeNativeToolStream` 在 native tools streaming 抛出由 `IOException` 引起的 `ModelClientException` 时，降级为同请求的非 streaming native completion。
   - HTTP 非 2xx、provider 协议错误、鉴权/额度错误和非 IO 类异常不走该 fallback，仍暴露为真实 model/provider failure。
   - `OpenAiCompatibleModelClientTests.fallsBackToNonStreamingNativeRequestWhenProviderStreamTransportFails` 验证第一次 streaming 请求失败后，会发送第二次 `stream=false` native request 并返回模型最终消息。
-- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,MockAgentRunnerTests test`。结果：通过，29 tests, 0 failures, 0 errors, 0 skipped。
+- 命令：`cd backend && mvn -Dtest=OpenAiCompatibleModelClientTests,AgentRunnerTests test`。结果：通过，29 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd backend && mvn test`。结果：通过，145 tests, 0 failures, 0 errors, 0 skipped。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`git diff --check`。结果：通过。

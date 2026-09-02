@@ -49,8 +49,8 @@ Workspace 错误进一步拆成更利于恢复的类型：`WORKSPACE_NOT_FOUND`�
 
 ## 实现与验证证据
 
-- 代码位置：[ToolExecutionErrorCode.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolExecutionErrorCode.java)、[ToolRegistry.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolRegistry.java)、[WorkspaceToolFactory.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/WorkspaceToolFactory.java)、[MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java)。
-- 测试位置：[MockAgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunnerTests.java)、[WorkspaceToolFactoryTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/tool/workspace/WorkspaceToolFactoryTests.java)、[ToolRegistryTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/tool/ToolRegistryTests.java)。
+- 代码位置：[ToolExecutionErrorCode.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolExecutionErrorCode.java)、[ToolRegistry.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/ToolRegistry.java)、[WorkspaceToolFactory.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/tool/workspace/WorkspaceToolFactory.java)、[AgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java)。
+- 测试位置：[AgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunnerTests.java)、[WorkspaceToolFactoryTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/tool/workspace/WorkspaceToolFactoryTests.java)、[ToolRegistryTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/tool/ToolRegistryTests.java)。
 - 验证记录：[FAILURE-001](../memory/VERIFICATION.md)。
 - 关联提交/运行：尚未提交。
 

@@ -30,7 +30,7 @@ Agent Runtime、tools、context 和 failure recovery 已经具备基础闭环，
 
 采用方案 3：
 
-- `MockAgentRunner.SYSTEM_PROMPT` 描述 agent role、workspace awareness、核心 workflow、failure recovery、探索约束和最终回答要求。
+- `AgentRunner.SYSTEM_PROMPT` 描述 agent role、workspace awareness、核心 workflow、failure recovery、探索约束和最终回答要求。
 - OpenAI-compatible adapter 继续只补 provider 输出协议：JSON schema 或 native tool calling 使用规则。
 - 用测试锁定 system prompt 中最关键的行为约束，避免后续无意删掉。
 
@@ -44,8 +44,8 @@ Agent Runtime、tools、context 和 failure recovery 已经具备基础闭环，
 
 ## 实现与验证证据
 
-- 代码位置：[MockAgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunner.java)、[OpenAiCompatibleModelClient.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java)。
-- 测试位置：[MockAgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/MockAgentRunnerTests.java)。
+- 代码位置：[AgentRunner.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunner.java)、[OpenAiCompatibleModelClient.java](../backend/src/main/java/com/zhumeiyuan/codingagent/agent/model/OpenAiCompatibleModelClient.java)。
+- 测试位置：[AgentRunnerTests.java](../backend/src/test/java/com/zhumeiyuan/codingagent/agent/execution/AgentRunnerTests.java)。
 - 验证记录：[PROMPT-001](../memory/VERIFICATION.md)。
 - 关联提交/运行：尚未提交。
 

@@ -42,15 +42,18 @@ watch(() => props.items, (items) => {
   for (const item of items) {
     if (item.kind !== 'assistant') continue
     const current = displayedAssistantContent.value[item.id] ?? ''
-    if (current === item.content) continue
-    if (streamTimers.has(item.id)) continue
     if (!item.streaming) {
+      stopStreaming(item.id)
       displayedAssistantContent.value[item.id] = item.content
       continue
     }
+    if (current === item.content) continue
+    if (streamTimers.has(item.id)) {
+      stopStreaming(item.id)
+    }
     startStreaming(item.id, item.content, current)
   }
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
 onUnmounted(() => {
   for (const id of streamTimers.keys()) stopStreaming(id)

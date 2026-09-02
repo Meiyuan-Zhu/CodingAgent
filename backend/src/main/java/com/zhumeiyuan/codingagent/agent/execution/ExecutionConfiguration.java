@@ -69,17 +69,17 @@ class ExecutionConfiguration {
 	}
 
 	@Bean
-	MockAgentRunner mockAgentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
+	AgentRunner agentRunner(AgentRunStore store, RunEventStream runEventStream, ToolRegistry toolRegistry,
 			ToolApprovalPolicy toolApprovalPolicy, ModelClient modelClient, RunBudget runBudget,
 			WorkspaceChangeJournal workspaceChangeJournal,
 			@Qualifier("agentToolExecutor") ExecutorService agentToolExecutor, Clock clock) {
-		return new MockAgentRunner(store, runEventStream, toolRegistry, toolApprovalPolicy, modelClient, runBudget,
+		return new AgentRunner(store, runEventStream, toolRegistry, toolApprovalPolicy, modelClient, runBudget,
 				workspaceChangeJournal, agentToolExecutor, clock);
 	}
 
 	@Bean
-	AgentRunService agentRunService(AgentRunStore store, RunEventStream runEventStream, MockAgentRunner mockAgentRunner,
+	AgentRunService agentRunService(AgentRunStore store, RunEventStream runEventStream, AgentRunner agentRunner,
 			RunTaskManager runTaskManager, WorkspaceChangeJournal workspaceChangeJournal, Clock clock) {
-		return new AgentRunService(store, runEventStream, mockAgentRunner, runTaskManager, workspaceChangeJournal, clock);
+		return new AgentRunService(store, runEventStream, agentRunner, runTaskManager, workspaceChangeJournal, clock);
 	}
 }

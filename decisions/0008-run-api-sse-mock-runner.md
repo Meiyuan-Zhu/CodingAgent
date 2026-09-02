@@ -20,7 +20,7 @@ Add a backend execution and API layer:
 
 - `AgentRunStore` keeps in-memory runs and ordered events.
 - `AgentRunService` validates prompts, creates runs, emits initial events, and starts the runner.
-- `MockAgentRunner` simulates model planning and executes one read-only workspace tool through `ToolRegistry`.
+- `AgentRunner` simulates model planning and executes one read-only workspace tool through `ToolRegistry`.
 - `RunEventStream` provides SSE replay and live publishing using Spring MVC `SseEmitter`.
 - `RunController` exposes:
   - `POST /api/runs`
@@ -50,7 +50,7 @@ This is explicitly a mock runner. It verifies the run lifecycle, event stream, A
 ## Costs
 
 - Current run storage is process-local; restarting the backend loses run history.
-- `MockAgentRunner` uses heuristic prompt matching and executes only one read-only tool.
+- `AgentRunner` uses heuristic prompt matching and executes only one read-only tool.
 - SSE subscriber tracking is intentionally simple and not yet tuned for many concurrent users.
 - The frontend displays event payloads mostly as compact text; rich tool cards and diffs remain future work.
 
