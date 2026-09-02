@@ -200,15 +200,6 @@ export function approvalView(card: ToolCard): ApprovalView {
   }
 }
 
-export function inspectorTitle(selection: InspectorSelection, _toolCards: ToolCard[]) {
-  if (selection.kind === 'review') return '审查'
-  if (selection.kind === 'diff') return '审查'
-  if (selection.kind === 'command') return '审查'
-  if (selection.kind === 'tool') return '审查'
-  if (selection.kind === 'file') return selection.path
-  return 'Workspace'
-}
-
 export function filesFromEvents(events: RunEvent[]): FileEntry[] {
   const files = new Map<string, FileEntry>()
   for (const event of events) {

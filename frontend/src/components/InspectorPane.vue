@@ -6,7 +6,6 @@ import type { ToolCard } from '../run/toolCards'
 import { basename, diffStats } from '../run/display'
 import {
   diffPreview,
-  inspectorTitle,
   type InspectorSelection,
 } from '../run/timeline'
 import UiIcon from './UiIcon.vue'
@@ -23,6 +22,7 @@ const props = defineProps<{
   loadingWorkspacePath: string | null
   loadingWorkspaceDirectory: string | null
   workspaceError: string | null
+  projectName: string
 }>()
 
 const emit = defineEmits<{
@@ -33,7 +33,7 @@ const emit = defineEmits<{
   toggle: []
 }>()
 
-const title = computed(() => inspectorTitle(props.selection, props.toolCards))
+const panelTitle = computed(() => props.projectName.trim() || 'Workspace')
 const selectedTool = computed(() => {
   const selection = props.selection
   if (!isToolSelection(selection)) return null
@@ -199,7 +199,7 @@ function languageBadge(path: string | null | undefined) {
     <header class="inspector-header">
       <div>
         <p class="section-label">面板</p>
-        <h2>{{ title }}</h2>
+        <h2>{{ panelTitle }}</h2>
       </div>
       <button class="panel-icon-button" type="button" aria-label="收起右侧面板" @click="emit('toggle')"><UiIcon name="chevron-right" /></button>
     </header>

@@ -692,6 +692,7 @@ function editUserMessage(content: string) {
       :loading-workspace-path="loadingWorkspacePath"
       :loading-workspace-directory="loadingWorkspaceDirectory"
       :workspace-error="workspaceError"
+      :project-name="activeProject?.name ?? 'Workspace'"
       @select="selectInspector"
       @toggle-directory="toggleWorkspaceDirectory"
       @open-file="openWorkspaceFile"

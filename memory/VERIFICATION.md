@@ -13,6 +13,7 @@
   - 紫色视觉层仅覆盖活跃状态、Markdown 重点、代码块、composer focus 和审查选择状态；成功/审批/失败语义色仍保持 green/amber/red。
   - 添加项目手动路径表单声明 `novalidate`，满足应用自有验证约定。
   - 左侧任务历史行去掉创建时间和完成/失败等状态 tag，压缩为单行标题与删除入口。
+  - 右侧 Inspector header 主标题使用当前 project 名称，未加载项目时才兜底为 `Workspace`。
 - 命令：`cd frontend && npm run build`。结果：通过，`vue-tsc -b && vite build` 成功。
 - 命令：`python3 /Users/zhumeiyuan/.codex/plugins/cache/openai-curated-remote/frontend-design-premium/1.4.0/skills/frontend-design-premium/scripts/audit_project.py /Users/zhumeiyuan/Desktop/CodingAgent --mode strict`。结果：初次发现 `ProjectSidebar.vue` form 缺少 `novalidate`；修复后复跑通过，0 findings。
 - 命令：`rg -n "v-html|innerHTML|href=\"javascript|alert\\(|confirm\\(|prompt\\(" frontend/src`。结果：无匹配。
